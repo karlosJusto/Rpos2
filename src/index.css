@@ -1,0 +1,75 @@
+@import url('https://fonts.googleapis.com/css2?family=Nunito:ital,wght@0,200..1000;1,200..1000&display=swap');
+
+
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+
+/* Cambia color focus en observaciones */
+#observaciones:focus {
+    border-color: #f2ac02; /* Cambia el color del borde al del focus */
+    box-shadow: 0 0 0 0px rgba(242, 172, 2, 0.3); /* Cambia el color del contorno en focus */
+  }
+
+
+ /* Personalización del checkbox cuando está marcado */
+.form-check-input:checked {
+    background-color: #f2ac02;  /* Amarillo cuando está marcado */
+    border-color: #f2ac02;      /* Amarillo en el borde */
+  }
+  
+  .form-check-input:checked:focus {
+    box-shadow: 0 0 0 0.0rem rgba(242, 172, 2, 0.25); /* Sombra amarilla */
+  }
+  
+  /* Si prefieres un estilo sin border, con solo el color de fondo */
+  .form-check-input {
+    background-color: #fff;
+    border-color: #ccc;
+  }
+  
+  .form-check-input:checked {
+    background-color: #f2ac02;
+    border-color: #f2ac02;    
+  }
+
+  /* Eliminar el borde azul predeterminado al hacer foco */
+.form-check-input:focus {
+    outline: none;  /* Elimina el borde azul de foco */
+    box-shadow: 0 0 0 0.0rem rgba(242, 172, 2, 0.25); /* Sombra amarilla cuando esté enfocado */
+    border-color: #f2ac02;  /* Establece el borde en amarillo */
+  }
+
+  
+
+swiper-container {
+    width: 100%;
+    height: 80%;
+    line-height: 150px;
+    text-align: center;
+}
+
+swiper-slide {
+    background-color: rgb(4 47 46);
+    color: #fff;
+    font-size: 25px;
+    
+}
+
+swiper-slide:nth-child(2) {
+    background-color: rgb(15 118 110);
+}
+
+swiper-slide:nth-child(3) {
+    background-color: rgb(45 212 191);
+}
+
+swiper-slide:nth-child(4) {
+    background-color: rgb(153 246 228);
+}
+
+swiper-slide:nth-child(5) {
+    background-color: rgb(34 197 94);
+}
