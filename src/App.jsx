@@ -34,7 +34,7 @@ function App() {
         <Route path="/scanner" element={<Scanner />} />
        
 
-        {/* Solo acceso admin */}
+        {/* Solo acceso administrador */}
 
         <Route path="/dashboard" element={<Dashboard />} />
 
