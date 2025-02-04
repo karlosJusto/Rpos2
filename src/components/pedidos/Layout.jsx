@@ -20,7 +20,7 @@ const Layout = () => {
   return (
 
    <>
-    <div className=" flex  max-w-[3000px]  mx-auto h-screen   bg-contain" style={{ backgroundImage: `url(${fondo})` }}>
+    <div className=" flex  max-w-[2500px]  mx-auto h-[calc(100vh-5px)] bg-no-repeat bg-cover   " style={{ backgroundImage: `url(${fondo})` }}>
      
           <div className="w-[7%]">
             <Sidebar/>

@@ -24,6 +24,7 @@ const ModalClientes = ({ show, handleClose, onSave }) => {
     });
   };
 
+
   const [clientes, setClientes] = useState([]); // Lista completa de clientes
   const [filteredClientes, setFilteredClientes] = useState([]); // Lista filtrada de clientes
 
@@ -134,21 +135,19 @@ const ModalClientes = ({ show, handleClose, onSave }) => {
                   setFormData({
                     cliente: cliente.cliente || '',
                     telefono: cliente.telefono || '',
-                    fechahora: formData.fechahora,
-                    observaciones: formData.observaciones,
+                    fechahora: formData.fechahora,  // Mantiene la fecha actual
+                    observaciones: cliente.observaciones || '',  // Asigna las observaciones del cliente a formData
                     pagado: formData.pagado,
                     celiaco: formData.celiaco,
                   });
-                 // handleClose(); // Cierra el modal cuando seleccionas un cliente
+                  // handleClose(); // Cierra el modal cuando seleccionas un cliente
                 }}>
-
-                  
-                   {/* Otros campos del formulario */}
+                  {/* Otros campos del formulario */}
                   <div className="px-[3.5vw] mt-[2vh]">
-                  <div className="grid grid-cols-2 text-center  h-[2vh] bg-red-400">
-                  <h1 className="text-lg font-nunito text-gray-500">{cliente.cliente}</h1>
-                  <h1 className="text-lg font-nunito text-gray-500">{cliente.telefono}</h1>
-                  </div>
+                    <div className="grid grid-cols-2 text-center h-[2vh] bg-red-400">
+                      <h1 className="text-lg font-nunito text-gray-500">{cliente.cliente}</h1>
+                      <h1 className="text-lg font-nunito text-gray-500">{cliente.telefono}</h1>
+                    </div>
                   </div>
                 </div>
               ))
@@ -157,24 +156,27 @@ const ModalClientes = ({ show, handleClose, onSave }) => {
             )}
           </div>
 
-        
-
-          <div className='p-[4.5vh] '>
+          {/* Calendario */}
+          <div className='p-[4.5vh]'>
             <Calendario onDateChange={handleDateChange} />
           </div>
 
+          
+
+          {/* Observaciones */}
           <div className='px-[4.5vh]'>
             <label htmlFor="textarea" className="form-label text-gray-500 text-lg font-nunito "></label>
             <textarea
               className="form-control text-lg font-nunito border-2 border-gray-200"
-              value={formData.observaciones}
-              onChange={(e) => setFormData({ ...formData, observaciones: e.target.value })}
+              value={formData.observaciones || ""}  // Usamos formData.observaciones aquí
+              onChange={(e) => setFormData({ ...formData, observaciones: e.target.value })}  // Actualiza formData.observaciones
               id="observaciones"
               rows="2"
               placeholder="Observaciones al pedido"
             />
           </div>
 
+          {/* Checkboxes */}
           <div className='pt-[4.5vh] text-center'>
             <div className="form-check form-check-inline border-2 p-[1vw] border-gray-200 rounded-xl">
               <input

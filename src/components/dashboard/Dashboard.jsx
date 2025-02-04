@@ -1,10 +1,21 @@
+import CardDash from "./CardDash"
 
 
 const Dashboard = () => {
+
+  
   return (
-    <div>
-      <h1>dashboard</h1>
-    </div>
+    <div className="min-h-screen flex items-center justify-center  bg-gray-200 ">
+         
+
+      
+   <CardDash/>     
+          
+
+          
+
+   </div>
+   
   )
 }
 

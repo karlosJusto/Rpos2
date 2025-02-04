@@ -10,7 +10,7 @@ const Home = () => {
               <h1 className="font-nunito text-8xl text-gray-500 font-bold  ">SuperPollo <span className="text-[#ffa300]"> Mungia </span> <span className="text-lg">POS</span></h1>
           <div className="flex gap-20 font-nunito text-gray-400 text-xl">
               <Link to={"/login"} className="hover:text-yellow-500 transition-colors" >ACCESO EMPLEADO</Link>
-              <Link to={"/layout/comida"} className="hover:text-yellow-500 transition-colors">ACCESO GERENTE</Link>
+              <Link to={"/loginJefe"} className="hover:text-yellow-500 transition-colors">ACCESO GERENTE</Link>
               <Link to={""} className="hover:text-yellow-500 transition-colors">SALIR</Link>
           </div>
         </div>

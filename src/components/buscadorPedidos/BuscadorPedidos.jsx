@@ -3,39 +3,76 @@ import { db } from "../firebase/firebase"; // Asegúrate de tener correctamente 
 import { collection, query, where, getDocs } from "firebase/firestore";
 
 const BuscadorPedidos = () => {
-  // Estados para teléfono, nombre del cliente, los pedidos encontrados y el estado de carga
   const [telefono, setTelefono] = useState('');
   const [nombre, setNombre] = useState('');
+  const [numeroPedido, setNumeroPedido] = useState('');
+  const [confirmacionTarjeta, setConfirmacionTarjeta] = useState('');
+  const [criterio, setCriterio] = useState('telefono');
   const [pedidos, setPedidos] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
-  // Función para buscar los pedidos del cliente por nombre o teléfono
+  // Función para buscar los pedidos
   const buscarPedidos = async () => {
-    if (!telefono && !nombre) {
-      setError('Por favor, ingresa un número de teléfono o nombre de cliente.');
+    setLoading(true);
+    setError(null);
+
+    // Validación de entrada
+    if (!telefono && !nombre && !numeroPedido && !confirmacionTarjeta) {
+      setError('Por favor, ingresa un teléfono, nombre de cliente, número de pedido o confirmación de tarjeta.');
+      setLoading(false);
       return;
     }
 
-    setLoading(true);
-    setError(null);
     try {
-      // Referencia a la colección de pedidos
       const pedidosRef = collection(db, 'pedidos');
-      
-      // Si se ingresa un teléfono, buscaremos por ese campo
       let q;
-      if (telefono) {
-        q = query(pedidosRef, where('idCliente', '==', telefono));
-      } else if (nombre) {
-        // Si se ingresa un nombre, buscamos por el campo 'cliente'
-        q = query(pedidosRef, where('cliente', '==', nombre));
+
+      // Crear la consulta según el criterio seleccionado
+      switch (criterio) {
+        case 'telefono':
+          if (telefono) {
+            q = query(pedidosRef, where('idCliente', '==', telefono));
+          }
+          break;
+
+        case 'nombre':
+          if (nombre) {
+            q = query(pedidosRef, where('cliente', '==', nombre));
+          }
+          break;
+
+        case 'numeroPedido':
+          if (numeroPedido) {
+            const numeroPedidoInt = parseInt(numeroPedido, 10);
+            if (isNaN(numeroPedidoInt)) {
+              setError("El número de pedido debe ser un valor numérico.");
+              setLoading(false);
+              return;
+            }
+            q = query(pedidosRef, where('NumeroPedido', '==', numeroPedidoInt));
+          }
+          break;
+
+        case 'confirmacionTarjeta':
+          if (confirmacionTarjeta) {
+            q = query(pedidosRef, where('confirmacionTarjeta', '==', confirmacionTarjeta));
+          }
+          break;
+
+        default:
+          break;
       }
 
-      // Ejecutamos la consulta
+      if (!q) {
+        setError('Por favor, ingresa un valor válido para la búsqueda.');
+        setLoading(false);
+        return;
+      }
+
+      // Ejecución de la consulta
       const querySnapshot = await getDocs(q);
 
-      // Guardamos los resultados en el estado `pedidos`
       if (querySnapshot.empty) {
         setPedidos([]);
       } else {
@@ -53,59 +90,106 @@ const BuscadorPedidos = () => {
   };
 
   return (
-    <div className="p-4">
-      <h1 className="text-xl font-bold mb-4">Buscar Pedidos de Cliente</h1>
-      
-      {/* Input para ingresar el nombre del cliente */}
-      <div className="mb-4">
-        <label htmlFor="nombre" className="block text-gray-700">Nombre del Cliente</label>
-        <input
-          type="text"
-          id="nombre"
-          value={nombre}
-          onChange={(e) => setNombre(e.target.value)}
-          className="w-full p-2 border border-gray-300 rounded-md"
-          placeholder="Ingresa el nombre del cliente"
-        />
+    <div className="p-4 max-w-4xl mx-auto">
+      <div className="flex flex-wrap items-center gap-4 mb-4">
+        <div className="w-full sm:w-auto">
+          <label htmlFor="criterio" className="block text-gray-700">Buscar por</label>
+          <select
+            id="criterio"
+            value={criterio}
+            onChange={(e) => setCriterio(e.target.value)}
+            className="w-full sm:w-auto p-3 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-yellow-500"
+          >
+            <option value="telefono">Teléfono</option>
+            <option value="nombre">Nombre del Cliente</option>
+            <option value="numeroPedido">Número de Pedido</option>
+            <option value="confirmacionTarjeta">Confirmación de Tarjeta</option>
+          </select>
+        </div>
+
+        {criterio === 'telefono' && (
+          <div className="w-full sm:w-auto">
+            <label htmlFor="telefono" className="block text-gray-700">Teléfono</label>
+            <input
+              type="text"
+              id="telefono"
+              value={telefono}
+              onChange={(e) => setTelefono(e.target.value)}
+              className="w-full sm:w-auto p-3 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-yellow-500"
+              placeholder="Ingresa el teléfono"
+            />
+          </div>
+        )}
+
+        {criterio === 'nombre' && (
+          <div className="w-full sm:w-auto">
+            <label htmlFor="nombre" className="block text-gray-700">Nombre del Cliente</label>
+            <input
+              type="text"
+              id="nombre"
+              value={nombre}
+              onChange={(e) => setNombre(e.target.value)}
+              className="w-full sm:w-auto p-3 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-yellow-500"
+              placeholder="Ingresa el nombre del cliente"
+            />
+          </div>
+        )}
+
+        {criterio === 'numeroPedido' && (
+          <div className="w-full sm:w-auto">
+            <label htmlFor="numeroPedido" className="block text-gray-700">Número de Pedido</label>
+            <input
+              type="text"
+              id="numeroPedido"
+              value={numeroPedido}
+              onChange={(e) => setNumeroPedido(e.target.value)}
+              className="w-full sm:w-auto p-3 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-yellow-500"
+              placeholder="Ingresa el número de pedido"
+            />
+          </div>
+        )}
+
+        {criterio === 'confirmacionTarjeta' && (
+          <div className="w-full sm:w-auto">
+            <label htmlFor="confirmacionTarjeta" className="block text-gray-700">Confirmación de Tarjeta</label>
+            <input
+              type="text"
+              id="confirmacionTarjeta"
+              value={confirmacionTarjeta}
+              onChange={(e) => setConfirmacionTarjeta(e.target.value)}
+              className="w-full sm:w-auto p-3 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-yellow-500"
+              placeholder="Ingresa la confirmación de tarjeta"
+            />
+          </div>
+        )}
       </div>
 
-      {/* Input para ingresar el teléfono */}
-      <div className="mb-4">
-        <label htmlFor="telefono" className="block text-gray-700">Número de Teléfono del Cliente</label>
-        <input
-          type="text"
-          id="telefono"
-          value={telefono}
-          onChange={(e) => setTelefono(e.target.value)}
-          className="w-full p-2 border border-gray-300 rounded-md"
-          placeholder="Ingresa el número de teléfono"
-        />
-      </div>
-
-      {/* Botón para buscar */}
-      <button 
+      <button
         onClick={buscarPedidos}
-        className="w-full bg-yellow-600 text-white py-2 rounded-md hover:bg-yellow-500"
+        className="w-full bg-yellow-600 text-white py-3 rounded-md shadow-md hover:bg-yellow-500 disabled:bg-gray-300"
         disabled={loading}
       >
-        {loading ? 'Buscando...' : 'Buscar Pedidos'}
+        {loading ? (
+          <div className="flex justify-center items-center">
+            <div className="spinner-border animate-spin border-t-2 border-b-2 border-yellow-500 w-6 h-6 rounded-full"></div>
+          </div>
+        ) : (
+          'Buscar Pedidos'
+        )}
       </button>
 
-      {/* Mensaje de error si hay algún problema */}
-      {error && <p className="mt-4 text-red-600">{error}</p>}
+      {error && <p className="mt-4 text-red-600 text-center">{error}</p>}
 
-      {/* Mostrar los pedidos encontrados */}
       <div className="mt-6">
         {pedidos.length > 0 ? (
-          <ul>
+          <div className="space-y-4">
             {pedidos.map((pedido) => (
-              <li key={pedido.id} className="border-b py-3">
-                <h3 className="font-semibold">Pedido #{pedido.NumeroPedido}</h3>
+              <div key={pedido.id} className="border p-4 rounded-md shadow-md hover:shadow-xl transition">
+                <h3 className="font-semibold text-xl text-yellow-600">Pedido #{pedido.NumeroPedido}</h3>
                 <p><strong>Fecha:</strong> {pedido.fechahora_realizado}</p>
                 <p><strong>Estado:</strong> {pedido.pagado ? 'Pagado' : 'Pendiente'}</p>
                 <p><strong>Total:</strong> {pedido.productos.reduce((acc, item) => acc + parseFloat(item.total), 0).toFixed(2)} €</p>
 
-                {/* Mostrar los productos comprados */}
                 <div className="mt-4">
                   <h4 className="font-semibold">Productos Comprados:</h4>
                   <ul>
@@ -115,20 +199,15 @@ const BuscadorPedidos = () => {
                         <p><strong>Cantidad:</strong> {producto.cantidad}</p>
                         <p><strong>Precio Unitario:</strong> {producto.precio} €</p>
                         <p><strong>Total:</strong> {producto.total} €</p>
-                        {/* Agregar más detalles si lo deseas */}
-                        {producto.tostado && <p><strong>Tostado:</strong> Sí</p>}
-                        {producto.salsa && <p><strong>Salsa:</strong> {producto.salsa}</p>}
-                        {producto.celiaco && <p><strong>Celíaco:</strong> Sí</p>}
-                        {producto.troceado && <p><strong>Troceado:</strong> Sí</p>}
                       </li>
                     ))}
                   </ul>
                 </div>
-              </li>
+              </div>
             ))}
-          </ul>
+          </div>
         ) : (
-          <p>No se encontraron pedidos para este cliente.</p>
+          <p className="text-center text-gray-500">No se encontraron pedidos para este cliente.</p>
         )}
       </div>
     </div>

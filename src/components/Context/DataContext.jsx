@@ -1,5 +1,5 @@
 import { createContext, useState, useEffect } from "react";
-import { collection, getDocs, doc, updateDoc } from "firebase/firestore";
+import { collection, getDocs, doc, updateDoc, onSnapshot } from "firebase/firestore";
 import { db } from "../firebase/firebase";
 import { useParams } from "react-router-dom";
 
@@ -12,25 +12,15 @@ const DataProvider = ({ children }) => {
 
   // Función para actualizar el stock de un producto
   const actualizarStock = async (id_product, nuevoStock) => {
-    // Asegurarse de que el id_product se convierte a string
-    const idString = String(id_product);  // Conversión a cadena
+    const idString = String(id_product);
     if (!idString) {
       console.error("El ID del producto es inválido");
       return;
     }
 
     try {
-      const productoRef = doc(db, "productos", idString); // Usamos 'idString' aquí
+      const productoRef = doc(db, "productos", idString);
       await updateDoc(productoRef, { stock: nuevoStock });
-      
-      // Recargar los productos después de la actualización
-      const productosRef = collection(db, "productos");
-      const querySnapshot = await getDocs(productosRef);
-      const productosList = querySnapshot.docs.map((doc) => ({
-        id_product: doc.id,
-        ...doc.data(),
-      }));
-      setData(productosList); // Actualiza el estado con los productos recargados
     } catch (error) {
       console.error("Error al actualizar el stock:", error);
     }
@@ -38,20 +28,21 @@ const DataProvider = ({ children }) => {
 
   const categoria = useParams().categoria;
 
+  // Usamos onSnapshot para escuchar los cambios en la colección 'productos'
   useEffect(() => {
     const productosRef = collection(db, "productos");
+    
+    // Establecemos el listener en tiempo real
+    const unsubscribe = onSnapshot(productosRef, (querySnapshot) => {
+      const productosList = querySnapshot.docs.map((doc) => ({
+        id_product: doc.id,
+        ...doc.data(),
+      }));
+      setData(productosList); // Actualizamos el estado con los datos en tiempo real
+    });
 
-    getDocs(productosRef)
-      .then((resp) => {
-        setData(
-          resp.docs.map((doc) => {
-            return { ...doc.data(), id: doc.id };
-          })
-        );
-      })
-      .catch((error) => {
-        console.error("Error al obtener productos: ", error);
-      });
+    // Limpiar el listener cuando el componente se desmonte
+    return () => unsubscribe();
   }, []);
 
   // Función para actualizar el término de búsqueda
@@ -61,7 +52,7 @@ const DataProvider = ({ children }) => {
 
   // Filtrar productos globalmente por el nombre
   const filteredData = data.filter((product) =>
-    product.name.toLowerCase().includes(buscar.toLowerCase()) // Filtra globalmente por el nombre
+    product.name.toLowerCase().includes(buscar.toLowerCase())
   );
 
   return (

@@ -42,10 +42,15 @@
     border-color: #f2ac02;  /* Establece el borde en amarillo */
   }
 
+  .no-border {
+    margin-top: -20px;
+    border: none !important; /* Elimina el borde del footer */
+  }
+
   
 
 swiper-container {
-    width: 100%;
+    width: 85%;
     height: 80%;
     line-height: 150px;
     text-align: center;
@@ -55,6 +60,7 @@ swiper-slide {
     background-color: rgb(4 47 46);
     color: #fff;
     font-size: 25px;
+    border-radius: 10px;
     
 }
 

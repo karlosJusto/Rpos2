@@ -10,34 +10,27 @@ import dayjs from 'dayjs';
 
 import Layout from './Layout';
 
-
-
 const theme = createTheme({
   palette: {
     primary: {
       main: '#f2ac02', // Cambiar a cualquier color que desees.
-      
     },
   },
 });
 
 export default function Calendario({ onDateChange }) {
-
-
-   
-  const [selectedDate, setSelectedDate] = useState(dayjs());  // Inicializa con la fecha y hora actual
+  // Inicializa con la fecha y hora actual más 15 minutos
+  const [selectedDate, setSelectedDate] = useState(dayjs().add(15, 'minute'));
 
   // Función para manejar el cambio de fecha y hora
   const handleDateChange = (newDate) => {
     setSelectedDate(newDate);
 
-    onDateChange(newDate ?  dayjs(newDate).format("DD/MM/YYYY HH:mm") : "");  // Pasamos la fecha seleccionada al ModalCliente
-
-    //console.log(newDate);  // Ver la fecha y hora seleccionada
+    // Pasamos la fecha seleccionada al ModalCliente
+    onDateChange(newDate ? dayjs(newDate).format("DD/MM/YYYY HH:mm") : "");
   };
-  return (
 
-   
+  return (
     <ThemeProvider theme={theme}> {/* Aplicar el tema personalizado */}
       <LocalizationProvider dateAdapter={AdapterDayjs} adapterLocale="es">
         <DemoContainer components={['DateTimePicker']}>
@@ -52,7 +45,6 @@ export default function Calendario({ onDateChange }) {
             }}
           />
         </DemoContainer>
-       
       </LocalizationProvider>
     </ThemeProvider>
   );
