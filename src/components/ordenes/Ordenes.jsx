@@ -3,7 +3,7 @@ import fondo from '../../assets/fondo.jpg';
 
 import { useState, useContext, useEffect, useRef} from 'react';
 import { dataContext } from '../Context/DataContext';
-import { doc, setDoc, updateDoc, getDoc } from 'firebase/firestore';
+import { doc, setDoc, updateDoc, getDoc, onSnapshot } from 'firebase/firestore';
 import { db } from '../firebase/firebase';
 
 import { collection, getDocs, query, where } from 'firebase/firestore';
@@ -173,53 +173,46 @@ const realizarPedido = () => {
             };
 
     
-          useEffect(() => {
-            const fetchPedidos = async () => {
-              try {
-                // Obtener la fecha de hoy (sin la hora)
-                const fechaHoy = dateToPass ? dayjs(dateToPass).startOf('day') : dayjs().startOf('day'); // Esto establece la hora a 00:00:00
-                //console.log('Fecha de hoy (inicio del día):', fechaHoy.format('DD/MM/YYYY HH:mm'));
-
-                //console.log(dateToPass);
-
-                // Crear una fecha para el final del día (23:59:59)
-                const fechaFinDia = dateToPass ? dayjs(dateToPass).endOf('day') : dayjs().endOf('day'); // Esto establece la hora a 23:59:59
-                //console.log('Fecha de hoy (final del día):', fechaFinDia.format('DD/MM/YYYY HH:mm'));
-
-                // Crear la consulta de Firebase para obtener solo los pedidos de hoy
-                  const pedidosRef = collection(db, 'pedidos');
-                  const pedidosQuery = query(
-                    pedidosRef,
-                    where("fechahora", ">=", fechaHoy.format('DD/MM/YYYY HH:mm')), // Filtra por fecha mayor o igual a la de hoy
-                    where("fechahora", "<=", fechaFinDia.format('DD/MM/YYYY HH:mm')) // Filtra por fecha menor o igual a la de hoy
-                  );
-                        
-                // Ejecutar la consulta
-                const querySnapshot = await getDocs(pedidosQuery);
-        
-                // Obtener todos los datos de cada pedido, incluyendo productos
+            useEffect(() => {
+              // Si la fecha a filtrar es proporcionada, establece los límites de tiempo
+              const fechaHoy = dateToPass ? dayjs(dateToPass).startOf('day') : dayjs().startOf('day');
+              const fechaFinDia = dateToPass ? dayjs(dateToPass).endOf('day') : dayjs().endOf('day');
+          
+              // Creamos la referencia a la colección de pedidos
+              const pedidosRef = collection(db, 'pedidos');
+          
+              // Creamos la consulta para filtrar pedidos por fecha (hoy)
+              const pedidosQuery = query(
+                pedidosRef,
+                where("fechahora", ">=", fechaHoy.format('DD/MM/YYYY HH:mm')), // Pedidos desde el inicio del día
+                where("fechahora", "<=", fechaFinDia.format('DD/MM/YYYY HH:mm')) // Pedidos hasta el final del día
+              );
+          
+              // Usamos `onSnapshot` para escuchar los cambios en la colección
+              const unsubscribe = onSnapshot(pedidosQuery, (querySnapshot) => {
+                // Mapear los documentos que llegan a la consulta
                 const pedidosArray = querySnapshot.docs.map(doc => {
                   const pedido = doc.data();
                   return {
                     id: doc.id, // Incluimos el id del documento
-                    NumeroPedido: pedido.NumeroPedido, // Número de pedido
-                    Cliente: pedido.Cliente, // Cliente del pedido
-                    direccion: pedido.direccion, // Dirección del cliente
-                    productos: pedido.productos, // Array de productos
+                    NumeroPedido: pedido.NumeroPedido,
+                    Cliente: pedido.Cliente,
+                    direccion: pedido.direccion,
+                    productos: pedido.productos,
                     fechahora: pedido.fechahora,
-                    imagen: pedido.imagen //imagen producto
+                    imagen: pedido.imagen,
                   };
                 });
-        
-                setPedidos(pedidosArray); // Guardamos los pedidos filtrados en el estado
-                
-              } catch (error) {
+          
+                // Actualizamos el estado de los pedidos
+                setPedidos(pedidosArray);
+              }, (error) => {
                 console.error("Error al obtener los pedidos: ", error);
-              }
-            };
-        
-            fetchPedidos();
-          }, [dateToPass]); // Este useEffect solo se ejecuta una vez cuando el componente se monta
+              });
+          
+              // Limpiar la suscripción cuando el componente se desmonta
+              return () => unsubscribe();
+            }, [dateToPass]); // Solo se ejecuta cuando `dateToPass` cambia
 
 
 
