@@ -556,7 +556,7 @@ const realizarPedido = () => {
               );
             })}
         </div>
-        {/* Mostrar las observaciones del pedido en un div negro */}
+        {/* Mostrar las observaciones del pedido en un div negroo */}
         {pedido.observaciones && (
           <div className="ml-2 p-2 gap-3 border-3 border-gray-700  bg-gray-300 rounded-md w-auto font-nunito flex justify-center items-center">
           <p className="flex items-center gap-3">
