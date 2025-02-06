@@ -1,5 +1,5 @@
 
-import fondo from '../../assets/fondo.jpg';
+import dinero from '../../assets/dinero.png';
 
 import { useState, useContext, useEffect, useRef} from 'react';
 import { dataContext } from '../Context/DataContext';
@@ -55,6 +55,7 @@ const realizarPedido = () => {
       // Inicializamos la estructura si no existe para este pedido
       if (!updatedClicks[pedidoId]) {
         updatedClicks[pedidoId] = {};
+
       }
   
       // Inicializamos la cantidad de clics del producto si no existe
@@ -248,15 +249,20 @@ const realizarPedido = () => {
                   return {
                     id: doc.id, // Incluimos el id del documento
                     NumeroPedido: pedido.NumeroPedido,
-                    Cliente: pedido.Cliente,
+                    cliente: pedido.cliente,
                     direccion: pedido.direccion,
                     productos: pedido.productos,
                     fechahora: pedido.fechahora,
                     imagen: pedido.imagen,
+                    pagado: pedido.pagado,
+                    celiaco: pedido.celiaco,
                     observaciones: pedido.observaciones,
                     origen: pedido.origen // Asegúrate de que el campo 'origen' esté presente en los datos de tu pedido
                   };
+                  
                 });
+
+                
           
                 // Actualizamos el estado de los pedidos
                 setPedidos(pedidosArray);
@@ -469,11 +475,12 @@ const realizarPedido = () => {
         <div className="flex items-center">
           {/* Mostrar el número de pedido en la misma línea que los productos */}
           <h3 
-          className={`text-[0.70vw] font-semibold mr-4 
+          className={`text-[0.70vw] font-semibold mr-4 text-center
             ${pedido.origen === 1 ? 'text-green-700' : 
-            pedido.origen === 0 ? 'text-gray-700' : 'text-gray-700'}`}
+            pedido.origen === 0 ? 'text-gray-600' : 'text-gray-700'}`}
         >
           {pedido.NumeroPedido}
+         <p className='pt-1 w-16 font-extrabold '>{pedido.cliente ? pedido.cliente : 'Sin cliente'}</p> 
         </h3>
 
           {/* Botón de tres puntos al final de cada pedido */}
@@ -551,9 +558,17 @@ const realizarPedido = () => {
         </div>
         {/* Mostrar las observaciones del pedido en un div negro */}
         {pedido.observaciones && (
-          <div className="ml-2 p-2 gap-2 border-3 border-gray-700 items-center bg-gray-300 rounded-md w-auto font-nunito">
-            <p>Obser: {pedido.observaciones}</p>
-          </div>
+          <div className="ml-2 p-2 gap-3 border-3 border-gray-700  bg-gray-300 rounded-md w-auto font-nunito flex justify-center items-center">
+          <p className="flex items-center gap-3">
+            {pedido.pagado ? (
+              <>
+                <img src={dinero} alt="importe pagado" className="w-5" />
+              </>
+            ) : null}
+            Obser: {pedido.observaciones}
+          </p>
+        </div>
+        
         )}
       </div>
     );
