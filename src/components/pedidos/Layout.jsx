@@ -3,7 +3,8 @@ import Navbar from "./Navbar"
 import Tabs from "./Tabs"
 import Card from "./Card"
 import Ticket from "./Ticket"
-import { useState } from "react"
+import { useState} from "react"
+
 import Calendario from './Calendario';
 
 import fondo from '../../assets/fondo.jpg';

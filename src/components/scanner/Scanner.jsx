@@ -265,7 +265,7 @@ const Scanner = () => {
                 <li key={index} className="flex border-b border-gray-300 p-3 text-center text-xl">
                   <span className="w-1/3 truncate">{producto.nombre}</span>
                   <span className="w-1/3">{producto.cantidad}</span>
-                  <span className="w-1/3">{producto.total}€</span>
+                  <span className="w-1/3">{producto.precio}€</span>
                  
                 </li>
               ))

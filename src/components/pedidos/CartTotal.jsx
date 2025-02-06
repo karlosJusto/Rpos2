@@ -121,6 +121,7 @@ const CartTotal = ({ datosCliente  }) => {
         total_pedido: cart.reduce((acc, item) => {
           return acc + (item.price * item.cantidad || 0);
         }, 0).toFixed(2), // Redondea el resultado a 2 decimales
+        
 
         fechahora_realizado: new Date().toLocaleDateString('es-ES') + ' ' + new Date().toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' }),
       };

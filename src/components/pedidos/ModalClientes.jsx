@@ -89,7 +89,7 @@ const ModalClientes = ({ show, handleClose, onSave }) => {
 
   return (
     <>
-      <Modal show={show} onHide={handleClose} size="lg" backdrop="static" keyboard={false} centered>
+      <Modal show={show} onHide={handleClose} size="xl" backdrop="static" keyboard={false} centered>
         <Modal.Header closeButton>
           <Modal.Title>Buscar Cliente</Modal.Title>
         </Modal.Header>
