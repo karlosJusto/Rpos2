@@ -21,6 +21,7 @@ import LGScanner from "./components/scanner/LGScanner"
 import CrearProductos from "./components/dashboard/CrearProductos"
 import ListarClientes from "./components/dashboard/ListarClientes"
 import Ordenes from "./components/ordenes/Ordenes"
+import Listaproductos from "./components/dashboard/ListaProductos"
 
 
 
@@ -50,6 +51,7 @@ function App() {
 
         <Route path="/dashboard" element={<Dashboard />} />
         <Route path="/dashboard/crearProductos" element={<CrearProductos />} />
+        <Route path="/dashboard/listaProductos" element={<Listaproductos />} />
         <Route path="/dashboard/listarClientes" element={<ListarClientes />} />
 
        
