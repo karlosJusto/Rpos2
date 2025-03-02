@@ -32,6 +32,7 @@ const ImageCropper = ({ imageSrc, onComplete, onCancel }) => {
           onCropChange={setCrop}
           onZoomChange={setZoom}
           onCropComplete={onCropComplete}
+          
         />
       </div>
       <div className="mt-4 flex space-x-4">

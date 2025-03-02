@@ -186,7 +186,7 @@ const CrearProductos = () => {
                 />
               )}
             </div>
-            <label className="mt-2 inline-block px-4 py-2 bg-yellow-500 text-white rounded-md cursor-pointer hover:bg-yellow-600">
+            <label className="mt-2 inline-block px-4 py-2 bg-[#f2ac02] text-white rounded-md cursor-pointer hover:[#f2ac02]">
               Cambiar Imagen
               <input
                 type="file"
@@ -223,6 +223,7 @@ const CrearProductos = () => {
           >
             <option value="">Seleccionar</option>
             <option value="comida">Comida</option>
+            <option value="complementos">Complementos</option>
             <option value="bebida">Bebida</option>
             <option value="postre">Postre</option>
             <option value="extra">Extra</option>
@@ -285,7 +286,7 @@ const CrearProductos = () => {
 
       <button
         onClick={subirImagenes}
-        className="w-full py-3 mt-6 bg-yellow-500 text-white rounded-md hover:bg-yellow-600"
+        className="w-full py-3 mt-6 bg-[#f2ac02] text-white rounded-md hover:bg-yellow-600"
         disabled={!camposCompletos()}
       >
         Crear Producto
