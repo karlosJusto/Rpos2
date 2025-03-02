@@ -6,27 +6,51 @@ import { collection, onSnapshot, doc, updateDoc } from 'firebase/firestore';
 function CalendarioPollos() {
   const [days, setDays] = useState([]);
 
-  // Escucha en tiempo real los cambios de la colección "calendar"
+  // Función para normalizar el formato de hora a "HH:MM"
+  const normalizeTime = (timeStr) => {
+    if (!timeStr) return '';
+    return timeStr.includes(':') ? timeStr : `${timeStr.padStart(2, '0')}:00`;
+  };
+
+  // Escucha en tiempo real los cambios de la colección "calendar" y normaliza los horarios
   useEffect(() => {
     const unsubscribe = onSnapshot(collection(db, 'calendar'), (snapshot) => {
-      const daysData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      const daysData = snapshot.docs.map(doc => {
+        const data = doc.data();
+        // Normalizar horarios de mañana
+        if (data.morningSchedule) {
+          data.morningSchedule.start = normalizeTime(data.morningSchedule.start);
+          data.morningSchedule.end = normalizeTime(data.morningSchedule.end);
+        }
+        // Normalizar horarios de tarde
+        if (data.eveningSchedule) {
+          data.eveningSchedule.start = normalizeTime(data.eveningSchedule.start);
+          data.eveningSchedule.end = normalizeTime(data.eveningSchedule.end);
+        }
+        // Normalizar horario de trabajo (si aplica)
+        if (data.workSchedule) {
+          data.workSchedule.start = normalizeTime(data.workSchedule.start);
+          data.workSchedule.end = normalizeTime(data.workSchedule.end);
+        }
+        return { id: doc.id, ...data };
+      });
       setDays(daysData);
     });
     return unsubscribe;
   }, []);
 
-  // Funciones para actualizar el state local de forma dinámica
+  // Función para actualizar el state local de forma dinámica
   const handleInputChange = (dayId, field, value, scheduleField) => {
-    setDays(prevDays => 
+    setDays(prevDays =>
       prevDays.map(day => {
-        if(day.id === dayId) {
-          if(scheduleField) {
+        if (day.id === dayId) {
+          if (scheduleField) {
             return {
               ...day,
               [field]: {
                 ...day[field],
-                [scheduleField]: value
-              }
+                [scheduleField]: value,
+              },
             };
           } else {
             return { ...day, [field]: value };
@@ -37,17 +61,28 @@ function CalendarioPollos() {
     );
   };
 
+  // Función para actualizar el checkbox y limpiar los campos de hora si se desactiva el horario
   const handleCheckboxChange = (dayId, field, checked, scheduleField) => {
     setDays(prevDays =>
       prevDays.map(day => {
-        if(day.id === dayId) {
-          if(scheduleField) {
+        if (day.id === dayId) {
+          if (scheduleField && scheduleField === 'active') {
             return {
               ...day,
               [field]: {
                 ...day[field],
-                [scheduleField]: checked
-              }
+                active: checked,
+                start: checked ? day[field].start : "",
+                end: checked ? day[field].end : "",
+              },
+            };
+          } else if (scheduleField) {
+            return {
+              ...day,
+              [field]: {
+                ...day[field],
+                [scheduleField]: checked,
+              },
             };
           } else {
             return { ...day, [field]: checked };
@@ -58,13 +93,42 @@ function CalendarioPollos() {
     );
   };
 
-  // Actualiza los documentos en Firebase con los datos modificados
+  // Actualiza los documentos en Firebase, forzando start y end a cadena vacía si el horario está inactivo
   const handleUpdate = async () => {
     try {
       await Promise.all(
         days.map(day => {
           const dayRef = doc(db, 'calendar', day.id);
-          const { id, ...data } = day;
+          const updatedData = { ...day };
+
+          if (updatedData.morningSchedule) {
+            updatedData.morningSchedule.start = updatedData.morningSchedule.active
+              ? normalizeTime(updatedData.morningSchedule.start)
+              : "";
+            updatedData.morningSchedule.end = updatedData.morningSchedule.active
+              ? normalizeTime(updatedData.morningSchedule.end)
+              : "";
+          }
+
+          if (updatedData.eveningSchedule) {
+            updatedData.eveningSchedule.start = updatedData.eveningSchedule.active
+              ? normalizeTime(updatedData.eveningSchedule.start)
+              : "";
+            updatedData.eveningSchedule.end = updatedData.eveningSchedule.active
+              ? normalizeTime(updatedData.eveningSchedule.end)
+              : "";
+          }
+
+          if (updatedData.workSchedule) {
+            updatedData.workSchedule.start = updatedData.workSchedule.active
+              ? normalizeTime(updatedData.workSchedule.start)
+              : "";
+            updatedData.workSchedule.end = updatedData.workSchedule.active
+              ? normalizeTime(updatedData.workSchedule.end)
+              : "";
+          }
+
+          const { id, ...data } = updatedData;
           return updateDoc(dayRef, data);
         })
       );
@@ -88,7 +152,7 @@ function CalendarioPollos() {
         <div className="p-6">
           <h2 className="text-2xl font-bold text-gray-800 mb-6">Modo venta</h2>
           
-          {/* Table */}
+          {/* Tabla */}
           <div className="overflow-x-auto">
             <table className="w-full border-collapse">
               <thead>
@@ -150,27 +214,17 @@ function CalendarioPollos() {
                           className="w-4 h-4 text-blue-600"
                         />
                         <input
-                          type="text"
-                          value={day.morningSchedule?.start || ''}
+                          type="time"
+                          value={normalizeTime(day.morningSchedule?.start)}
                           onChange={(e) => handleInputChange(day.id, 'morningSchedule', e.target.value, 'start')}
-                          className="w-10 px-2 py-1 border border-gray-300 rounded text-center"
-                          disabled={!day.morningSchedule?.active}
-                        />
-                        <span className="text-gray-600">:</span>
-                        <input
-                          type="text"
-                          value={day.morningSchedule?.minutes || ''}
-                          onChange={(e) => handleInputChange(day.id, 'morningSchedule', e.target.value, 'minutes')}
-                          className="w-10 px-2 py-1 border border-gray-300 rounded text-center"
-                          disabled={!day.morningSchedule?.active}
+                          className="w-24 px-2 py-1 border border-gray-300 rounded text-center"
                         />
                         <span className="text-gray-600">-</span>
                         <input
-                          type="text"
-                          value={day.morningSchedule?.end || ''}
+                          type="time"
+                          value={normalizeTime(day.morningSchedule?.end)}
                           onChange={(e) => handleInputChange(day.id, 'morningSchedule', e.target.value, 'end')}
-                          className="w-10 px-2 py-1 border border-gray-300 rounded text-center"
-                          disabled={!day.morningSchedule?.active}
+                          className="w-24 px-2 py-1 border border-gray-300 rounded text-center"
                         />
                       </div>
                     </td>
@@ -185,19 +239,17 @@ function CalendarioPollos() {
                           className="w-4 h-4 text-blue-600"
                         />
                         <input
-                          type="text"
-                          value={day.eveningSchedule?.start || ''}
+                          type="time"
+                          value={normalizeTime(day.eveningSchedule?.start)}
                           onChange={(e) => handleInputChange(day.id, 'eveningSchedule', e.target.value, 'start')}
-                          className="w-10 px-2 py-1 border border-gray-300 rounded text-center"
-                          disabled={!day.eveningSchedule?.active}
+                          className="w-24 px-2 py-1 border border-gray-300 rounded text-center"
                         />
-                        <span className="text-gray-600">:</span>
+                        <span className="text-gray-600">-</span>
                         <input
-                          type="text"
-                          value={day.eveningSchedule?.end || ''}
+                          type="time"
+                          value={normalizeTime(day.eveningSchedule?.end)}
                           onChange={(e) => handleInputChange(day.id, 'eveningSchedule', e.target.value, 'end')}
-                          className="w-10 px-2 py-1 border border-gray-300 rounded text-center"
-                          disabled={!day.eveningSchedule?.active}
+                          className="w-24 px-2 py-1 border border-gray-300 rounded text-center"
                         />
                       </div>
                     </td>
@@ -217,17 +269,17 @@ function CalendarioPollos() {
                       {day.workSchedule?.active ? (
                         <div className="flex items-center space-x-1">
                           <input
-                            type="text"
-                            value={day.workSchedule?.start || ''}
+                            type="time"
+                            value={normalizeTime(day.workSchedule?.start)}
                             onChange={(e) => handleInputChange(day.id, 'workSchedule', e.target.value, 'start')}
-                            className="w-10 px-2 py-1 border border-gray-300 rounded text-center"
+                            className="w-24 px-2 py-1 border border-gray-300 rounded text-center"
                           />
                           <span className="text-gray-600">-</span>
                           <input
-                            type="text"
-                            value={day.workSchedule?.end || ''}
+                            type="time"
+                            value={normalizeTime(day.workSchedule?.end)}
                             onChange={(e) => handleInputChange(day.id, 'workSchedule', e.target.value, 'end')}
-                            className="w-10 px-2 py-1 border border-gray-300 rounded text-center"
+                            className="w-24 px-2 py-1 border border-gray-300 rounded text-center"
                           />
                         </div>
                       ) : (
