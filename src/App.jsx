@@ -22,6 +22,7 @@ import CrearProductos from "./components/dashboard/CrearProductos"
 import ListarClientes from "./components/dashboard/ListarClientes"
 import Ordenes from "./components/ordenes/Ordenes"
 import Listaproductos from "./components/dashboard/ListaProductos"
+import CalendarioPollos from "./components/dashboard/CalendarioPollos"
 
 
 
@@ -53,6 +54,7 @@ function App() {
         <Route path="/dashboard/crearProductos" element={<CrearProductos />} />
         <Route path="/dashboard/listaProductos" element={<Listaproductos />} />
         <Route path="/dashboard/listarClientes" element={<ListarClientes />} />
+        <Route path="/dashboard/calendarioPollos" element={<CalendarioPollos />} />
 
        
 

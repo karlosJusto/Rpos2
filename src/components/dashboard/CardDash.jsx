@@ -49,7 +49,7 @@ const CardDash = () => {
                   <div className="p-6">
                     <h2 className="text-2xl text-center font-extrabold text-gray-600 font-nunito">Calendario</h2>
                     <div>
-                      <Link className=" p-10 flex items-center " to={"/layout/comida"}>
+                      <Link className=" p-10 flex items-center " to={"/dashboard/calendarioPollos"}>
 
                       <svg width="100px" height="100px" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
 
