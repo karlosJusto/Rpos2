@@ -1,10 +1,46 @@
-import React from 'react';
+import React from "react";
+import { doc, updateDoc, getDoc } from "firebase/firestore";
+import { db } from "../../firebase/firebase";
 
 export function ProductCard({ product }) {
+  const handleOrderClick = async (order) => {
+    try {
+      if (!order.idPedido) {
+        console.error("El idPedido no está definido en la orden");
+        return;
+      }
+      
+      const pedidoRef = doc(db, "pedidos", order.idPedido);
+      const pedidoSnap = await getDoc(pedidoRef);
+      if (!pedidoSnap.exists()) {
+        console.error("El pedido no existe");
+        return;
+      }
+      const pedidoData = pedidoSnap.data();
+
+      // Actualizamos el array "productos": buscamos el producto con el id y marcamos listo: true
+      const productosActualizados = pedidoData.productos.map((prod) =>
+        prod.id === order.idProducto ? { ...prod, listo: true } : prod
+      );
+
+      await updateDoc(pedidoRef, { productos: productosActualizados });
+      console.log(
+        `Producto ${order.idProducto} del pedido ${order.idPedido} marcado como listo.`
+      );
+
+      // Actualización local para reflejar el cambio (opcional)
+      order.producto.listo = true;
+    } catch (error) {
+      console.error("Error actualizando el pedido:", error);
+    }
+  };
+
   return (
     <div className="border border-gray-200 rounded-lg overflow-hidden bg-white shadow-sm flex flex-col h-full">
       <div className="flex justify-between items-center p-1 border-b border-gray-200">
-        <div className="truncate text-xs font-bold text-gray-800">{product.name}</div>
+        <div className="truncate text-xs font-bold text-gray-800">
+          {product.name}
+        </div>
         <div className="flex gap-2 text-[10px]">
           <div className="flex flex-col items-center">
             <span className="font-semibold text-gray-600">STOCK</span>
@@ -16,30 +52,48 @@ export function ProductCard({ product }) {
           </div>
         </div>
       </div>
-      
+
       <div className="flex-1 overflow-y-auto">
         <table className="w-full text-[10px]">
           <thead className="bg-gray-50 sticky top-0">
             <tr>
-              <th className="py-1 px-2 text-left text-gray-600 font-semibold">HORA</th>
-              <th className="py-1 px-2 text-left text-gray-600 font-semibold">NOMBRE</th>
-              <th className="py-1 px-2 text-left text-gray-600 font-semibold">CANTIDAD</th>
+              <th className="py-1 px-2 text-left text-gray-600 font-semibold">
+                HORA
+              </th>
+              <th className="py-1 px-2 text-left text-gray-600 font-semibold">
+                NOMBRE
+              </th>
+              <th className="py-1 px-2 text-left text-gray-600 font-semibold">
+                CANTIDAD
+              </th>
             </tr>
           </thead>
           <tbody>
-            {product.orders.map((order, index) => (
-              <tr 
-                key={index} 
-                className={`
-                  ${index % 2 === 0 ? 'bg-green-50' : 'bg-white'}
-                  hover:bg-gray-50 transition-colors
-                `}
-              >
-                <td className="py-1 px-2 border-t border-gray-100">{order.hora}</td>
-                <td className="py-1 px-2 border-t border-gray-100 font-medium">{order.nombre}</td>
-                <td className="py-1 px-2 border-t border-gray-100">{order.cantidad}</td>
-              </tr>
-            ))}
+            {product.orders.map((order, index) => {
+              const baseColor = index % 2 === 0 ? "bg-white" : "bg-gray-50";
+              const rowClass =
+                order.producto && order.producto.listo
+                  ? "bg-green-200"
+                  : baseColor;
+
+              return (
+                <tr
+                  key={index}
+                  className={`cursor-pointer ${rowClass} hover:bg-gray-100 transition-colors`}
+                  onClick={() => handleOrderClick(order)}
+                >
+                  <td className="py-1 px-2 border-t border-gray-100">
+                    {order.hora}
+                  </td>
+                  <td className="py-1 px-2 border-t border-gray-100 font-medium">
+                    {order.nombre}
+                  </td>
+                  <td className="py-1 px-2 border-t border-gray-100">
+                    {order.cantidad}
+                  </td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </div>

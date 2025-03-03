@@ -39,7 +39,7 @@ function CalendarioPollos() {
     return unsubscribe;
   }, []);
 
-  // Función para actualizar el state local de forma dinámica
+  // Actualiza el state local según el cambio en un input
   const handleInputChange = (dayId, field, value, scheduleField) => {
     setDays(prevDays =>
       prevDays.map(day => {
@@ -61,39 +61,29 @@ function CalendarioPollos() {
     );
   };
 
-  // Función para actualizar el checkbox y limpiar los campos de hora si se desactiva el horario
-  const handleCheckboxChange = (dayId, field, checked, scheduleField) => {
+  // Actualiza el state local según el cambio en el checkbox
+  // Si se desmarca (active === false) se limpian start y end; al volver a marcar, los inputs quedan editables (con valor vacío si no se definió otro)
+  const handleCheckboxChange = (dayId, field, checked) => {
     setDays(prevDays =>
       prevDays.map(day => {
         if (day.id === dayId) {
-          if (scheduleField && scheduleField === 'active') {
-            return {
-              ...day,
-              [field]: {
-                ...day[field],
-                active: checked,
-                start: checked ? day[field].start : "",
-                end: checked ? day[field].end : "",
-              },
-            };
-          } else if (scheduleField) {
-            return {
-              ...day,
-              [field]: {
-                ...day[field],
-                [scheduleField]: checked,
-              },
-            };
-          } else {
-            return { ...day, [field]: checked };
-          }
+          return {
+            ...day,
+            [field]: {
+              ...day[field],
+              active: checked,
+              start: checked ? day[field].start : "",
+              end: checked ? day[field].end : "",
+            },
+          };
         }
         return day;
       })
     );
   };
 
-  // Actualiza los documentos en Firebase, forzando start y end a cadena vacía si el horario está inactivo
+  // Actualiza los documentos en Firebase
+  // Se fuerza que si el horario está inactivo (active false), se guarden start y end como cadenas vacías
   const handleUpdate = async () => {
     try {
       await Promise.all(
@@ -148,7 +138,7 @@ function CalendarioPollos() {
           <p className="text-gray-600 mt-2">Gestiona calendario y el modo de venta</p>
         </div>
 
-        {/* Main content */}
+        {/* Contenido principal */}
         <div className="p-6">
           <h2 className="text-2xl font-bold text-gray-800 mb-6">Modo venta</h2>
           
@@ -210,14 +200,14 @@ function CalendarioPollos() {
                         <input
                           type="checkbox"
                           checked={day.morningSchedule?.active || false}
-                          onChange={(e) => handleCheckboxChange(day.id, 'morningSchedule', e.target.checked, 'active')}
+                          onChange={(e) => handleCheckboxChange(day.id, 'morningSchedule', e.target.checked)}
                           className="w-4 h-4 text-blue-600"
                         />
                         <input
                           type="time"
                           value={normalizeTime(day.morningSchedule?.start)}
                           onChange={(e) => handleInputChange(day.id, 'morningSchedule', e.target.value, 'start')}
-                          className="w-24 px-2 py-1 border border-gray-300 rounded text-center"
+                          className="w-24 px-2 py-1 border border-gray-300 rounded text-center ml-2"
                         />
                         <span className="text-gray-600">-</span>
                         <input
@@ -235,14 +225,14 @@ function CalendarioPollos() {
                         <input
                           type="checkbox"
                           checked={day.eveningSchedule?.active || false}
-                          onChange={(e) => handleCheckboxChange(day.id, 'eveningSchedule', e.target.checked, 'active')}
+                          onChange={(e) => handleCheckboxChange(day.id, 'eveningSchedule', e.target.checked)}
                           className="w-4 h-4 text-blue-600"
                         />
                         <input
                           type="time"
                           value={normalizeTime(day.eveningSchedule?.start)}
                           onChange={(e) => handleInputChange(day.id, 'eveningSchedule', e.target.value, 'start')}
-                          className="w-24 px-2 py-1 border border-gray-300 rounded text-center"
+                          className="w-24 px-2 py-1 border border-gray-300 rounded text-center ml-2"
                         />
                         <span className="text-gray-600">-</span>
                         <input

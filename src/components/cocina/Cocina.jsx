@@ -3,7 +3,7 @@ import { Header } from './components/Header';
 import { ProductCard } from './components/ProductCard';
 import { SaladCard } from './components/SaladCard';
 import { db } from '../firebase/firebase';
-import { collection, getDocs } from 'firebase/firestore';
+import { collection, onSnapshot } from 'firebase/firestore';
 
 const Cocina = () => {
   const [productsData, setProductsData] = useState([]);
@@ -19,78 +19,75 @@ const Cocina = () => {
   };
 
   useEffect(() => {
-    const fetchPedidos = async () => {
-      try {
-        const pedidosRef = collection(db, 'pedidos');
-        const querySnapshot = await getDocs(pedidosRef);
-        const pedidos = [];
+    const pedidosRef = collection(db, 'pedidos');
+    const unsubscribe = onSnapshot(pedidosRef, (querySnapshot) => {
+      const pedidos = [];
+      querySnapshot.forEach((doc) => {
+        pedidos.push({ id: doc.id, ...doc.data() });
+      });
 
-        querySnapshot.forEach((doc) => {
-          pedidos.push({ id: doc.id, ...doc.data() });
-        });
+      // Obtener fecha de hoy en formato "dd/mm/yyyy"
+      const today = new Date();
+      const todayStr = today.toLocaleDateString('es-ES');
 
-        // Obtener fecha de hoy en formato "dd/mm/yyyy"
-        const today = new Date();
-        const todayStr = today.toLocaleDateString('es-ES');
+      // Filtrar pedidos del día actual usando "fechahora_realizado"
+      const pedidosHoy = pedidos.filter((pedido) => {
+        if (!pedido.fechahora_realizado) return false;
+        const fechaPedido = pedido.fechahora_realizado.split(' ')[0];
+        return fechaPedido === todayStr;
+      });
 
-        // Filtrar pedidos del día actual usando "fechahora_realizado"
-        const pedidosHoy = pedidos.filter((pedido) => {
-          if (!pedido.fechahora_realizado) return false;
-          const fechaPedido = pedido.fechahora_realizado.split(' ')[0];
-          return fechaPedido === todayStr;
-        });
+      // IDs de productos válidos para pintar en ProductCard
+      const validProductIds = [20, 24, 3, 41];
+      const aggregatedProducts = {};
 
-        // IDs de productos válidos para pintar en ProductCard
-        const validProductIds = [20, 24, 3, 41];
-        const aggregatedProducts = {};
-
-        pedidosHoy.forEach((pedido) => {
-          if (pedido.productos && Array.isArray(pedido.productos)) {
-            pedido.productos.forEach((prod) => {
-              if (validProductIds.includes(prod.id)) {
-                if (!aggregatedProducts[prod.id]) {
-                  aggregatedProducts[prod.id] = {
-                    name: prod.nombre,
-                    stock: 8,
-                    pedidos: 0,
-                    orders: [],
-                  };
-                }
-                aggregatedProducts[prod.id].orders.push({
-                  hora: pedido.fechahora_realizado,
-                  nombre: pedido.cliente,
-                  cantidad: prod.cantidad,
-                });
-                aggregatedProducts[prod.id].pedidos += prod.cantidad;
+      pedidosHoy.forEach((pedido) => {
+        if (pedido.productos && Array.isArray(pedido.productos)) {
+          pedido.productos.forEach((prod) => {
+            if (validProductIds.includes(prod.id)) {
+              if (!aggregatedProducts[prod.id]) {
+                aggregatedProducts[prod.id] = {
+                  name: prod.nombre,
+                  stock: 8,
+                  pedidos: 0,
+                  orders: [],
+                };
               }
-            });
-          }
-        });
+              aggregatedProducts[prod.id].orders.push({
+                idPedido: pedido.id,       // Agregamos el id del pedido
+                idProducto: prod.id,       // Agregamos el id del producto
+                producto: prod,            // Objeto completo del producto (incluye "listo")
+                hora: pedido.fechahora_realizado,
+                nombre: pedido.cliente,
+                cantidad: prod.cantidad,
+              });
+              aggregatedProducts[prod.id].pedidos += prod.cantidad;
+            }
+          });
+        }
+      });
 
-        // Asegurarse de incluir todos los productos válidos, incluso sin pedidos
-        validProductIds.forEach((id) => {
-          if (!aggregatedProducts[id]) {
-            aggregatedProducts[id] = {
-              name: `Producto ${id}`,
-              stock: 8,
-              pedidos: 0,
-              orders: [],
-            };
-          }
-        });
+      // Incluir todos los productos válidos, incluso sin pedidos
+      validProductIds.forEach((id) => {
+        if (!aggregatedProducts[id]) {
+          aggregatedProducts[id] = {
+            name: `Producto ${id}`,
+            stock: 8,
+            pedidos: 0,
+            orders: [],
+          };
+        }
+      });
 
-        Object.values(aggregatedProducts).forEach((product) => {
-          product.orders.sort((a, b) => parseFechaHora(a.hora) - parseFechaHora(b.hora));
-          product.pedidos = `${product.orders.length} (${product.pedidos})`;
-        });
+      Object.values(aggregatedProducts).forEach((product) => {
+        product.orders.sort((a, b) => parseFechaHora(a.hora) - parseFechaHora(b.hora));
+        product.pedidos = `${product.orders.length} (${product.pedidos})`;
+      });
 
-        setProductsData(Object.values(aggregatedProducts));
-      } catch (error) {
-        console.error('Error fetching pedidos:', error);
-      }
-    };
+      setProductsData(Object.values(aggregatedProducts));
+    });
 
-    fetchPedidos();
+    return () => unsubscribe();
   }, []);
 
   const productCount = Math.min(productsData.length, 9);
