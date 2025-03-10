@@ -1,4 +1,3 @@
-// ListadoEmpleados.jsx
 import React, { useState, useEffect } from "react";
 import { collection, getDocs, doc, deleteDoc } from "firebase/firestore";
 import { db } from "../firebase/firebase";
@@ -57,7 +56,7 @@ const ListadoEmpleados = () => {
       <div className="mb-4 text-right">
         <button
           onClick={handleCrear}
-          className="px-4 py-2 bg-[#f2ac02] text-white rounded-md hover:bg-yellow-600"
+          className="px-4 py-2 bg-[#f2ac02] border border-yellow-500 hover:bg-yellow-600 hover:border-yellow-600 text-white rounded font-nunito"
         >
           Crear Empleado
         </button>
@@ -82,13 +81,13 @@ const ListadoEmpleados = () => {
                 <td className="py-2 px-4 border-b">
                   <button
                     onClick={() => handleEditar(empleado)}
-                    className="mr-2 px-3 py-1 bg-blue-500 text-white rounded-md hover:bg-blue-600"
+                    className="mr-2 px-3 py-1 bg-[#f2ac02] border border-yellow-500 hover:bg-yellow-600 hover:border-yellow-600 text-white rounded font-nunito"
                   >
                     Editar
                   </button>
                   <button
                     onClick={() => handleEliminar(empleado.id)}
-                    className="px-3 py-1 bg-red-500 text-white rounded-md hover:bg-red-600"
+                    className="px-3 py-1 bg-white text-gray-500 border border-gray-300 hover:text-yellow-600 hover:border-yellow-600 rounded font-nunito"
                   >
                     Eliminar
                   </button>

@@ -17,23 +17,24 @@ export function ProductCard({ product }) {
         return;
       }
       const pedidoData = pedidoSnap.data();
-
-      // Actualizamos el array "productos": buscamos el producto con el id y marcamos listo: true
+  
+      // Alternamos el valor de 'listo' para el producto correspondiente
       const productosActualizados = pedidoData.productos.map((prod) =>
-        prod.id === order.idProducto ? { ...prod, listo: true } : prod
+        prod.id === order.idProducto ? { ...prod, listo: !prod.listo } : prod
       );
-
+  
       await updateDoc(pedidoRef, { productos: productosActualizados });
       console.log(
-        `Producto ${order.idProducto} del pedido ${order.idPedido} marcado como listo.`
+        `Producto ${order.idProducto} del pedido ${order.idPedido} cambiado a ${order.producto.listo ? "no listo" : "listo"}.`
       );
-
+  
       // Actualización local para reflejar el cambio (opcional)
-      order.producto.listo = true;
+      order.producto.listo = !order.producto.listo;
     } catch (error) {
       console.error("Error actualizando el pedido:", error);
     }
   };
+  
 
   return (
     <div className="border border-gray-200 rounded-lg overflow-hidden bg-white shadow-sm flex flex-col h-full">

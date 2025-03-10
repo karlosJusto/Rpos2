@@ -8,12 +8,12 @@ import ImageCropper from "./ImageCropper"; // Asegúrate de que la ruta sea la c
 
 const CrearProductos = () => {
   const location = useLocation();
-  // Verificamos si se pasó un producto y modo en el state (para editar)
   const productoEditar = location.state?.producto || null;
   const modoEdicion = location.state?.modo === "editar";
 
   const [producto, setProducto] = useState({
     nombre: "",
+    alias: "",
     categoria: "",
     precio: "",
     visible: false,
@@ -26,6 +26,8 @@ const CrearProductos = () => {
     productoDoble: false,
     mediaRacion: false,
     sabores: false,
+    cocina: false,
+    promocion: false,
     imagen: null,
     imagenRpos: null,
   });
@@ -33,11 +35,12 @@ const CrearProductos = () => {
   const [mensaje, setMensaje] = useState("");
   const [cropModal, setCropModal] = useState({ open: false, field: "", imageSrc: "" });
 
-  // Si está en modo edición, pre-cargamos los datos del producto
+  // Cargar datos del producto si se está en modo edición
   useEffect(() => {
     if (modoEdicion && productoEditar) {
       setProducto({
         nombre: productoEditar.name || "",
+        alias: productoEditar.alias || "",
         categoria: productoEditar.categoria || "",
         precio: productoEditar.price || "",
         visible: productoEditar.visible === 1,
@@ -46,35 +49,48 @@ const CrearProductos = () => {
         celiaco: productoEditar.gluten_free === "1",
         vegetariano: productoEditar.vegetarian === "1",
         vegano: productoEditar.vegan === "1",
-        freidora: false, // Si tienes este campo en la base, ajusta según corresponda
+        freidora: false, // Ajusta si tienes este campo en la base
         productoDoble: false,
         mediaRacion: productoEditar.half ? true : false,
         sabores: productoEditar.sabores === "1",
-        // Nota: Las imágenes se mantienen como URL; si se quiere recortarlas de nuevo, habría que descargar o usar otro mecanismo
+        cocina: productoEditar.cocina === "1",
+        promocion: productoEditar.promocion === "1",
         imagen: productoEditar.imagen || null,
         imagenRpos: productoEditar.imagen_rpos || null,
       });
     }
   }, [modoEdicion, productoEditar]);
 
+  // Manejo de cambios en los inputs
   const handleChange = (e) => {
     const { name, type, checked, value } = e.target;
-    setProducto({ ...producto, [name]: type === "checkbox" ? checked : value });
+    const newValue = type === "checkbox" ? checked : value;
+    setProducto({ ...producto, [name]: newValue });
   };
 
-  // Modificamos handleImageChange para abrir el modal de recorte
+  // Formatea el precio a 2 decimales con punto (ej. "12.00")
+  const handlePriceBlur = (e) => {
+    let value = e.target.value;
+    if (value) {
+      const numberValue = parseFloat(value);
+      if (!isNaN(numberValue)) {
+        const formatted = numberValue.toFixed(2);
+        setProducto({ ...producto, precio: formatted });
+      }
+    }
+  };
+
+  // Abre el modal para recortar imagen
   const handleImageChange = (e) => {
     const file = e.target.files[0];
     if (file) {
-      // Convertir a URL para poder mostrarla en el cropper
       const imageSrc = URL.createObjectURL(file);
       setCropModal({ open: true, field: e.target.name, imageSrc });
     }
   };
 
-  // Función para recibir la imagen recortada
+  // Recibe la imagen recortada
   const handleCropComplete = (croppedFile) => {
-    // Se guarda el archivo recortado en el campo correspondiente
     setProducto({ ...producto, [cropModal.field]: croppedFile });
     setCropModal({ open: false, field: "", imageSrc: "" });
   };
@@ -83,25 +99,49 @@ const CrearProductos = () => {
     setCropModal({ open: false, field: "", imageSrc: "" });
   };
 
-  // Función para obtener el nuevo ID basado en la cantidad de documentos existentes
-  // Solo se usa en modo creación
+  // Obtiene nuevo ID para el producto en modo creación
   const obtenerNuevoID = async () => {
     const productosSnapshot = await getDocs(collection(db, "productos"));
-    return productosSnapshot.size + 100;
+    let maxId = 0;
+    productosSnapshot.forEach((doc) => {
+      const data = doc.data();
+      const currentId = parseInt(data.id_product, 10);
+      if (currentId > maxId) {
+        maxId = currentId;
+      }
+    });
+    return maxId + 1;
   };
 
-  // Función para subir las imágenes y luego guardar o actualizar el producto en Firestore
+  // Verifica que los campos obligatorios estén completos
+  const camposCompletos = () =>
+    producto.nombre &&
+    producto.categoria &&
+    producto.precio &&
+    producto.descripcionBreve &&
+    producto.descripcion &&
+    producto.imagen &&
+    producto.imagenRpos;
+
+  // Se ejecuta al presionar el botón
+  const handleSubmit = () => {
+    if (!camposCompletos()) {
+      setMensaje("Por favor, completa todos los campos obligatorios.");
+      return;
+    }
+    subirImagenes();
+  };
+
+  // Sube las imágenes y luego guarda/actualiza el producto en Firestore
   const subirImagenes = async () => {
-    // Si no se han modificado las imágenes en edición, se mantienen las existentes.
     if (!producto.imagen || !producto.imagenRpos) {
-      setMensaje("Por favor selecciona y recorta ambas imágenes.");
+      setMensaje("Por favor, selecciona y recorta ambas imágenes.");
       return;
     }
 
     try {
       let id;
       if (modoEdicion && productoEditar) {
-        // En modo edición usamos el mismo id
         id = productoEditar.id_product;
       } else {
         id = await obtenerNuevoID();
@@ -109,7 +149,6 @@ const CrearProductos = () => {
       const urls = {};
       const imagenes = ["imagen", "imagenRpos"];
 
-      // Si las imágenes son archivos (File) se suben, sino se asumen como URL existentes
       for (const img of imagenes) {
         if (producto[img] instanceof File) {
           const folder = img === "imagen" ? "imagenes_sinfondo" : "imagenes";
@@ -130,7 +169,6 @@ const CrearProductos = () => {
             );
           });
         } else {
-          // Si no es un File, se usa la URL existente
           urls[img] = producto[img];
         }
       }
@@ -143,11 +181,11 @@ const CrearProductos = () => {
   };
 
   const guardarProducto = async (imagenUrl, imagenRposUrl, id) => {
-    const fullPrice = producto.precio ? Number(producto.precio) : 0;
+    const fullPrice = producto.precio ? parseInt(parseFloat(producto.precio)) : 0;
     const computedHalfPrice = fullPrice ? fullPrice - 6 : 0;
 
     const productoFinal = {
-      categoria: producto.categoria,
+      categoria: producto.categoria ? producto.categoria.toLowerCase() : "",
       description: producto.descripcion,
       description_half: producto.descripcionBreve,
       gluten_free: producto.celiaco ? "1" : "0",
@@ -157,6 +195,7 @@ const CrearProductos = () => {
       imagen: imagenUrl,
       imagen_rpos: imagenRposUrl,
       name: producto.nombre,
+      alias: producto.alias,
       position: id,
       price: fullPrice,
       sabores: producto.sabores ? "1" : "",
@@ -164,15 +203,17 @@ const CrearProductos = () => {
       vegan: producto.vegano ? "1" : "",
       vegetarian: producto.vegetariano ? "1" : "",
       visible: producto.visible ? 1 : 0,
+      cocina: producto.cocina ? "1" : "0",
+      promocion: producto.promocion ? "1" : "0",
     };
 
     try {
       await setDoc(doc(db, "productos", id.toString()), productoFinal);
       setMensaje(modoEdicion ? "Producto actualizado con éxito." : "Producto creado con éxito.");
       if (!modoEdicion) {
-        // Reiniciamos el formulario solo en modo creación
         setProducto({
           nombre: "",
+          alias: "",
           categoria: "",
           precio: "",
           visible: false,
@@ -185,6 +226,8 @@ const CrearProductos = () => {
           productoDoble: false,
           mediaRacion: false,
           sabores: false,
+          cocina: false,
+          promocion: false,
           imagen: null,
           imagenRpos: null,
         });
@@ -194,22 +237,6 @@ const CrearProductos = () => {
       setMensaje("Error al guardar el producto.");
     }
   };
-
-  // Función para comprobar si los campos están completos
-  const camposCompletos = () => {
-    return (
-      producto.nombre &&
-      producto.categoria &&
-      producto.precio &&
-      producto.descripcionBreve &&
-      producto.descripcion &&
-      producto.imagen &&
-      producto.imagenRpos
-    );
-  };
-
-  // Función para verificar si un campo está vacío
-  const esCampoVacio = (campo) => !producto[campo] && campo !== "sabores"; // "sabores" no es obligatorio
 
   return (
     <div className="max-w-5xl mx-auto p-8 border border-gray-300 rounded-lg shadow-md bg-white">
@@ -223,25 +250,14 @@ const CrearProductos = () => {
           <div key={index} className="flex flex-col items-center">
             <div className="w-48 h-48 bg-gray-100 border border-gray-300 flex items-center justify-center">
               {producto[img] ? (
-                // Si es una URL (modo edición) o un archivo (modo creación)
                 typeof producto[img] === "string" ? (
-                  <img
-                    src={producto[img]}
-                    alt={img}
-                    className="object-cover w-full h-full"
-                  />
+                  <img src={producto[img]} alt={img} className="object-cover w-full h-full" />
                 ) : (
-                  <img
-                    src={URL.createObjectURL(producto[img])}
-                    alt={img}
-                    className="object-cover w-full h-full"
-                  />
+                  <img src={URL.createObjectURL(producto[img])} alt={img} className="object-cover w-full h-full" />
                 )
               ) : (
                 <img
-                  src={`https://cdn.pixabay.com/photo/2014/06/03/19/38/board-361516_1280.jpg?text=${
-                    img === "imagen" ? "Portada" : "Contraportada"
-                  }`}
+                  src={`https://cdn.pixabay.com/photo/2014/06/03/19/38/board-361516_1280.jpg?text=${img === "imagen" ? "Portada" : "Contraportada"}`}
                   alt="Demo"
                   className="object-cover w-full h-full"
                 />
@@ -249,19 +265,14 @@ const CrearProductos = () => {
             </div>
             <label className="mt-2 inline-block px-4 py-2 bg-[#f2ac02] text-white rounded-md cursor-pointer">
               Cambiar Imagen
-              <input
-                type="file"
-                name={img}
-                accept="image/*"
-                onChange={handleImageChange}
-                className="hidden"
-              />
+              <input type="file" name={img} accept="image/*" onChange={handleImageChange} className="hidden" />
             </label>
           </div>
         ))}
       </div>
 
       {/* Formulario */}
+      {/* Fila 1: Nombre y Alias */}
       <div className="grid grid-cols-2 gap-6">
         <div>
           <label className="block text-sm font-medium text-gray-700">Nombre</label>
@@ -270,21 +281,32 @@ const CrearProductos = () => {
             name="nombre"
             value={producto.nombre}
             onChange={handleChange}
-            className={`w-full px-4 py-2 mt-1 border ${
-              esCampoVacio("nombre") ? "border-red-500" : "border-gray-300"
-            } rounded-md focus:ring-yellow-500 focus:border-yellow-500`}
+            className={`w-full px-4 py-2 mt-1 border ${!producto.nombre ? "border-red-500" : "border-gray-300"} rounded-md focus:ring-yellow-500 focus:border-yellow-500`}
             placeholder="Nombre del producto"
           />
         </div>
+        <div>
+          <label className="block text-sm font-medium text-gray-700">Alias</label>
+          <input
+            type="text"
+            name="alias"
+            value={producto.alias}
+            onChange={handleChange}
+            className={`w-full px-4 py-2 mt-1 border ${!producto.alias ? "border-red-500" : "border-gray-300"} rounded-md focus:ring-yellow-500 focus:border-yellow-500`}
+            placeholder="Alias del producto"
+          />
+        </div>
+      </div>
+
+      {/* Fila 2: Categoría y Precio */}
+      <div className="grid grid-cols-2 gap-6 mt-4">
         <div>
           <label className="block text-sm font-medium text-gray-700">Categoría</label>
           <select
             name="categoria"
             value={producto.categoria}
             onChange={handleChange}
-            className={`w-full px-4 py-2 mt-1 border ${
-              esCampoVacio("categoria") ? "border-red-500" : "border-gray-300"
-            } rounded-md focus:ring-yellow-500 focus:border-yellow-500`}
+            className={`w-full px-4 py-2 mt-1 border ${!producto.categoria ? "border-red-500" : "border-gray-300"} rounded-md focus:ring-yellow-500 focus:border-yellow-500`}
           >
             <option value="">Seleccionar</option>
             <option value="comida">Comida</option>
@@ -294,42 +316,26 @@ const CrearProductos = () => {
             <option value="extra">Extra</option>
           </select>
         </div>
-      </div>
-
-      {/* Precio */}
-      <div>
-        <label className="block text-sm font-medium text-gray-700">Precio</label>
-        <input
-          type="number"
-          name="precio"
-          value={producto.precio}
-          onChange={handleChange}
-          className={`w-full px-4 py-2 mt-1 border ${
-            esCampoVacio("precio") ? "border-red-500" : "border-gray-300"
-          } rounded-md focus:ring-yellow-500 focus:border-yellow-500`}
-          placeholder="Precio del producto"
-        />
-      </div>
-
-      {/* Checkboxes */}
-      <div className="grid grid-cols-4 gap-4 mt-4">
-        {["visible", "celiaco", "vegetariano", "vegano", "freidora", "productoDoble", "mediaRacion", "sabores"].map((campo) => (
-          <label key={campo} className="flex items-center space-x-2">
+        <div>
+          <label className="block text-sm font-medium text-gray-700">Precio</label>
+          <div className="relative">
             <input
-              type="checkbox"
-              name={campo}
-              checked={producto[campo]}
+              type="text"
+              name="precio"
+              value={producto.precio}
               onChange={handleChange}
-              className="h-5 w-5 text-yellow-500"
+              onBlur={handlePriceBlur}
+              className={`w-full px-4 py-2 pr-8 mt-1 border ${!producto.precio ? "border-red-500" : "border-gray-300"} rounded-md focus:ring-yellow-500 focus:border-yellow-500`}
+              placeholder="12.00"
             />
-            <span className="text-sm text-gray-700">
-              {campo.charAt(0).toUpperCase() + campo.slice(1)}
-            </span>
-          </label>
-        ))}
+            <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
+              <span className="text-gray-500">€</span>
+            </div>
+          </div>
+        </div>
       </div>
 
-      {/* Descripciones */}
+      {/* Resto del formulario */}
       <div className="grid grid-cols-2 gap-6 mt-4">
         <div>
           <label className="block text-sm font-medium text-gray-700">Descripción Breve</label>
@@ -337,9 +343,7 @@ const CrearProductos = () => {
             name="descripcionBreve"
             value={producto.descripcionBreve}
             onChange={handleChange}
-            className={`w-full px-4 py-2 mt-1 border ${
-              esCampoVacio("descripcionBreve") ? "border-red-500" : "border-gray-300"
-            } rounded-md focus:ring-yellow-500 focus:border-yellow-500`}
+            className={`w-full px-4 py-2 mt-1 border ${!producto.descripcionBreve ? "border-red-500" : "border-gray-300"} rounded-md focus:ring-yellow-500 focus:border-yellow-500`}
           />
         </div>
         <div>
@@ -348,18 +352,33 @@ const CrearProductos = () => {
             name="descripcion"
             value={producto.descripcion}
             onChange={handleChange}
-            className={`w-full px-4 py-2 mt-1 border ${
-              esCampoVacio("descripcion") ? "border-red-500" : "border-gray-300"
-            } rounded-md focus:ring-yellow-500 focus:border-yellow-500`}
+            className={`w-full px-4 py-2 mt-1 border ${!producto.descripcion ? "border-red-500" : "border-gray-300"} rounded-md focus:ring-yellow-500 focus:border-yellow-500`}
           />
         </div>
       </div>
 
-      <button
-        onClick={subirImagenes}
-        className="w-full py-3 mt-6 bg-[#f2ac02] text-white rounded-md hover:bg-yellow-600"
-        disabled={!camposCompletos()}
-      >
+      {/* Checkboxes */}
+      <div className="grid grid-cols-4 gap-4 mt-4">
+        {[
+          "visible",
+          "celiaco",
+          "vegetariano",
+          "vegano",
+          "freidora",
+          "productoDoble",
+          "mediaRacion",
+          "sabores",
+          "cocina",
+          "promocion",
+        ].map((campo) => (
+          <label key={campo} className="flex items-center space-x-2">
+            <input type="checkbox" name={campo} checked={producto[campo]} onChange={handleChange} className="h-5 w-5 accent-[#f2ac02]" />
+            <span className="text-sm text-gray-700">{campo.charAt(0).toUpperCase() + campo.slice(1)}</span>
+          </label>
+        ))}
+      </div>
+
+      <button onClick={handleSubmit} className="w-full py-3 mt-6 bg-[#f2ac02] text-white rounded-md hover:bg-yellow-600">
         {modoEdicion ? "Editar Producto" : "Crear Producto"}
       </button>
 
@@ -367,11 +386,7 @@ const CrearProductos = () => {
 
       {/* Modal de recorte */}
       {cropModal.open && (
-        <ImageCropper
-          imageSrc={cropModal.imageSrc}
-          onComplete={handleCropComplete}
-          onCancel={handleCropCancel}
-        />
+        <ImageCropper imageSrc={cropModal.imageSrc} onComplete={handleCropComplete} onCancel={handleCropCancel} />
       )}
     </div>
   );

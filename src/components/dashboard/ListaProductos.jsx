@@ -1,30 +1,23 @@
-// Listaproductos.jsx
 import React, { useState, useEffect } from "react";
 import { collection, getDocs, deleteDoc, doc } from "firebase/firestore";
 import { db } from "../firebase/firebase";
 import { useNavigate } from "react-router-dom";
 
-const Listaproductos = () => {
-  const [productosPorCategoria, setProductosPorCategoria] = useState({});
+export default function GestionProductos() {
+  const [productos, setProductos] = useState([]);
   const [mensaje, setMensaje] = useState("");
   const [loading, setLoading] = useState(true);
-
   const navigate = useNavigate();
 
-  // Función para obtener y agrupar los productos
+  // --- 1) Obtener productos de Firebase ---
   const fetchProducts = async () => {
     try {
       const querySnapshot = await getDocs(collection(db, "productos"));
-      const groupedProducts = {};
-      querySnapshot.forEach((docSnap) => {
-        const producto = docSnap.data();
-        const categoria = producto.categoria || "Sin categoría";
-        if (!groupedProducts[categoria]) {
-          groupedProducts[categoria] = [];
-        }
-        groupedProducts[categoria].push(producto);
-      });
-      setProductosPorCategoria(groupedProducts);
+      const productList = querySnapshot.docs.map((docSnap) => ({
+        id: docSnap.id,
+        ...docSnap.data(),
+      }));
+      setProductos(productList);
     } catch (error) {
       console.error("Error al obtener los productos:", error);
       setMensaje("Error al cargar los productos");
@@ -36,17 +29,26 @@ const Listaproductos = () => {
     fetchProducts();
   }, []);
 
-  // Función para redirigir a la pantalla de edición (CrearProductos)
-  const editarProducto = (producto) => {
-    // Se navega a /crearproductos y se pasa el objeto producto y un flag de edición
-    navigate("/dashboard/crearProductos", { state: { producto, modo: "editar" } });
+  // --- 2) Crear nuevo producto ---
+  const handleNewProduct = () => {
+    // Navegamos a la pantalla de creación
+    navigate("/dashboard/crearProductos");
   };
 
-  // Función para eliminar el producto usando el id_product
-  const eliminarProducto = async (id) => {
+  // --- 3) Modificar producto ---
+  const handleModify = (product) => {
+    // Enviamos el producto y el modo 'editar' a la ruta de creación/edición
+    navigate("/dashboard/crearProductos", {
+      state: { producto: product, modo: "editar" },
+    });
+  };
+
+  // --- 4) Eliminar producto ---
+  const handleDelete = async (productId) => {
     try {
-      await deleteDoc(doc(db, "productos", id.toString()));
+      await deleteDoc(doc(db, "productos", productId));
       setMensaje("Producto eliminado correctamente");
+      // Vuelve a cargar la lista tras eliminar
       fetchProducts();
     } catch (error) {
       console.error("Error al eliminar el producto:", error);
@@ -55,53 +57,122 @@ const Listaproductos = () => {
   };
 
   return (
-    <div className="max-w-5xl mx-auto p-8 border border-gray-300 rounded-lg shadow-md bg-white">
-      <h2 className="text-2xl font-semibold text-center mb-6">Listado de Productos</h2>
-      {mensaje && <p className="text-center text-sm text-gray-700 mb-4">{mensaje}</p>}
+    <div className="p-6 min-h-screen bg-gray-50">
+      {/* Encabezado */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-6">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-800">Gestión de Productos</h1>
+          <p className="text-gray-500">Gestiona los productos en venta en la tienda.</p>
+        </div>
+        <button
+          onClick={handleNewProduct}
+          className="px-4 py-2 bg-[#f2ac02] border border-yellow-500 hover:bg-yellow-600 hover:border-yellow-600 text-white rounded font-nunito"
+        >
+          + Nuevo Producto
+        </button>
+      </div>
+
+      {/* Mensaje de estado (éxito/error) */}
+      {mensaje && (
+        <p className="text-center text-sm text-gray-700 mb-4">
+          {mensaje}
+        </p>
+      )}
+
+      {/* Tabla de productos */}
       {loading ? (
-        <p>Cargando productos...</p>
+        <p className="text-center">Cargando productos...</p>
       ) : (
-        Object.keys(productosPorCategoria).map((categoria) => (
-          <div key={categoria} className="mb-8">
-            <h3 className="text-xl font-bold mb-4">{categoria}</h3>
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-              {productosPorCategoria[categoria].map((producto, index) => (
-                <div
-                  key={index}
-                  className="border border-gray-300 rounded-lg p-4 shadow-sm flex flex-col"
+        <div className="overflow-x-auto bg-white rounded shadow">
+          <table className="min-w-full divide-y divide-gray-200 text-sm">
+            <thead className="bg-gray-50">
+              <tr>
+                <th className="px-4 py-3 text-left font-semibold text-gray-600">
+                  Posición
+                </th>
+                <th className="px-4 py-3 text-left font-semibold text-gray-600">
+                  Producto
+                </th>
+                <th className="px-4 py-3 text-left font-semibold text-gray-600">
+                  Precio
+                </th>
+                <th className="px-4 py-3 text-left font-semibold text-gray-600">
+                  Categoría
+                </th>
+                <th className="px-4 py-3 text-center font-semibold text-gray-600">
+                  Visible
+                </th>
+                <th className="px-4 py-3 text-center font-semibold text-gray-600">
+                  Acciones
+                </th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-200">
+              {productos.map((producto) => (
+                <tr
+                  key={producto.id}
+                  className="hover:bg-gray-50 transition-colors"
                 >
-                  <div className="w-full h-40 mb-4">
-                    <img
-                      src={producto.imagen}
-                      alt={producto.name}
-                      className="object-cover w-full h-full rounded-md"
-                    />
-                  </div>
-                  <h4 className="font-semibold text-lg">{producto.name}</h4>
-                  <p className="text-sm text-gray-600">{producto.description}</p>
-                  <p className="mt-2 font-bold">Precio: ${producto.price}</p>
-                  <div className="flex justify-between mt-auto pt-4">
+                  {/* Posición */}
+                  <td className="px-4 py-3 text-gray-700">
+                    {producto.position || "N/A"}
+                  </td>
+
+                  {/* Producto (con imagen opcional) */}
+                  <td className="px-4 py-3 flex items-center gap-2">
+                    {producto.imagen && (
+                      <img
+                        src={producto.imagen}
+                        alt={producto.nombre || "Producto"}
+                        className="w-8 h-8 rounded object-cover"
+                      />
+                    )}
+                    <span className="font-medium text-gray-800">
+                      {producto.nombre || producto.name || "Sin nombre"}
+                    </span>
+                  </td>
+
+                  {/* Precio */}
+                  <td className="px-4 py-3 text-gray-700">
+                    {producto.precio || producto.price || "0.00€"}
+                  </td>
+
+                  {/* Categoría */}
+                  <td className="px-4 py-3 text-gray-700">
+                    {producto.categoria || "Sin categoría"}
+                  </td>
+
+                  {/* Visible */}
+                  <td className="px-4 py-3 text-center">
+                    {producto.visible ? (
+                      <span className="text-green-500 font-semibold">Sí</span>
+                    ) : (
+                      <span className="text-red-500 font-semibold">No</span>
+                    )}
+                  </td>
+
+                  {/* Acciones */}
+                  <td className="px-4 py-3 text-center">
                     <button
-                      className="px-4 py-2 bg-green-500 text-white rounded hover:bg-green-600"
-                      onClick={() => editarProducto(producto)}
+                      onClick={() => handleModify(producto)}
+                      className="bg-[#f2ac02] border-yellow-500 hover:bg-yellow-600 hover:border-yellow-600 text-white p-3 font-nunito rounded mr-2"
                     >
-                      Editar
+                      Modificar
                     </button>
                     <button
-                      className="px-4 py-2 bg-red-500 text-white rounded hover:bg-red-600"
-                      onClick={() => eliminarProducto(producto.id_product)}
+                      onClick={() => handleDelete(producto.id)}
+                      className="bg-white font-nunito text-gray-500 border border-gray-300 hover:text-yellow-600 hover:border-yellow-600 p-3 rounded"
                     >
                       Eliminar
                     </button>
-                  </div>
-                </div>
+                  </td>
+
+                </tr>
               ))}
-            </div>
-          </div>
-        ))
+            </tbody>
+          </table>
+        </div>
       )}
     </div>
   );
-};
-
-export default Listaproductos;
+}
