@@ -68,6 +68,9 @@ export function ProductCard({ product }) {
               <th className="py-1 px-2 text-left text-gray-600 font-semibold">
                 CANTIDAD
               </th>
+              <th className="py-1 px-2 text-left text-gray-600 font-semibold">
+                DESCRIPCION
+              </th>
             </tr>
           </thead>
           <tbody>
@@ -92,6 +95,9 @@ export function ProductCard({ product }) {
                   </td>
                   <td className="py-1 px-2 border-t border-gray-100">
                     {order.cantidad}
+                  </td>
+                  <td className="py-1 px-2 border-t border-gray-100">
+                    {order.descripcion}
                   </td>
                 </tr>
               );
