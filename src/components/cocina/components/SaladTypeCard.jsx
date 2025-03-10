@@ -26,7 +26,7 @@ export function SaladTypeCard({ type, data, updateSaladCount }) {
       <table className="min-w-full table-auto border-collapse border border-gray-300 bg-white shadow-sm rounded">
         <tbody>
           {/* Fila 1: Título y cabeceras principales */}
-          <tr className="bg-gray-100">
+          <tr className="bg-[#f2ac02]">
             {/* La celda del título ocupa tres filas */}
             <th className="px-4 py-2 text-left" rowSpan="3">
               {type.toUpperCase()}

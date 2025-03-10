@@ -38,7 +38,7 @@ export function ProductCard({ product }) {
 
   return (
     <div className="border border-gray-200 rounded-lg overflow-hidden bg-white shadow-sm flex flex-col h-full">
-      <div className="flex justify-between items-center p-1 border-b border-gray-200">
+      <div className="flex justify-between items-center p-1 border-b border-gray-200 bg-[#f2ac02]">
         <div className="truncate text-xs font-bold text-gray-800">
           {product.name}
         </div>
@@ -53,6 +53,7 @@ export function ProductCard({ product }) {
           </div>
         </div>
       </div>
+
 
       <div className="flex-1 overflow-y-auto">
         <table className="w-full text-[10px]">
@@ -74,13 +75,13 @@ export function ProductCard({ product }) {
               const baseColor = index % 2 === 0 ? "bg-white" : "bg-gray-50";
               const rowClass =
                 order.producto && order.producto.listo
-                  ? "bg-green-200"
+                  ? "bg-green-500"
                   : baseColor;
 
               return (
                 <tr
                   key={index}
-                  className={`cursor-pointer ${rowClass} hover:bg-gray-100 transition-colors`}
+                  className={`cursor-pointer ${rowClass} hover:bg-[#f2ac02] transition-colors`}
                   onClick={() => handleOrderClick(order)}
                 >
                   <td className="py-1 px-2 border-t border-gray-100">
