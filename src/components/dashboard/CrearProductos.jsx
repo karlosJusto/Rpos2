@@ -1,4 +1,3 @@
-// CrearProductos.jsx
 import React, { useState, useEffect } from "react";
 import { storage, db } from "../firebase/firebase";
 import { ref, uploadBytesResumable, getDownloadURL } from "firebase/storage";
@@ -209,6 +208,12 @@ const CrearProductos = () => {
 
     try {
       await setDoc(doc(db, "productos", id.toString()), productoFinal);
+
+      // Si el producto tiene marcado "cocina", se crea también en la colección "cocina" con su id y nombre
+      if (producto.cocina) {
+        await setDoc(doc(db, "cocina", id.toString()), { nombre: producto.nombre });
+      }
+
       setMensaje(modoEdicion ? "Producto actualizado con éxito." : "Producto creado con éxito.");
       if (!modoEdicion) {
         setProducto({

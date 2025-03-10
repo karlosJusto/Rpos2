@@ -36,19 +36,30 @@ export default function GestionProductos() {
   };
 
   // --- 3) Modificar producto ---
-  const handleModify = (product) => {
+  const handleModify = (producto) => {
     // Enviamos el producto y el modo 'editar' a la ruta de creación/edición
     navigate("/dashboard/crearProductos", {
-      state: { producto: product, modo: "editar" },
+      state: { producto: producto, modo: "editar" },
     });
   };
 
   // --- 4) Eliminar producto ---
-  const handleDelete = async (productId) => {
+  const handleDelete = async (producto) => {
+    // Confirmación antes de eliminar
+    if (!window.confirm("¿Está seguro que desea eliminar el producto?")) {
+      return;
+    }
     try {
-      await deleteDoc(doc(db, "productos", productId));
+      // Eliminar de la colección "productos"
+      await deleteDoc(doc(db, "productos", producto.id));
+      
+      // Si el producto tiene el parámetro cocina igual a "1", se elimina también de la colección "cocina"
+      if (producto.cocina === "1") {
+        await deleteDoc(doc(db, "cocina", producto.id));
+      }
+      
       setMensaje("Producto eliminado correctamente");
-      // Vuelve a cargar la lista tras eliminar
+      // Recarga la lista de productos
       fetchProducts();
     } catch (error) {
       console.error("Error al eliminar el producto:", error);
@@ -160,13 +171,12 @@ export default function GestionProductos() {
                       Modificar
                     </button>
                     <button
-                      onClick={() => handleDelete(producto.id)}
+                      onClick={() => handleDelete(producto)}
                       className="bg-white font-nunito text-gray-500 border border-gray-300 hover:text-yellow-600 hover:border-yellow-600 p-3 rounded"
                     >
                       Eliminar
                     </button>
                   </td>
-
                 </tr>
               ))}
             </tbody>
