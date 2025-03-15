@@ -15,7 +15,7 @@ import ElementsCantidad from './ElementsCantidad';
     const [show, setShow] = useState(false);
     const [selectedProduct, setSelectedProduct] = useState(null);
 
-    const [counter, setCounter] = useState(0); // Aquí guardamos el contador
+    //const [counter, setCounter] = useState(0); // Aquí guardamos el contador
 
 
 

@@ -62,7 +62,7 @@ const ModalProductos = ({show, handleClose, product,isNuevoProducto}) => {
           celiaco,
         };
 
-    //console.log(updatedProduct);
+   //console.log(updatedProduct);
 
     
 
@@ -207,7 +207,7 @@ const ModalProductos = ({show, handleClose, product,isNuevoProducto}) => {
  {/* Condicional para mostrar u ocultar el bloque */}
 
  {/* Condicional con el operador ternario: si no es pollo, no renderizamos el bloque */}
- {(product?.name === "Pollo Asado" || product?.name === "Medio Pollo") && (
+ {(product?.name === "Pollo Asado" || product?.name === "1/2 Pollo Asado") && (
     <div className='text-center flex justify-center  gap-10 font-nunito text-lg p-[2vw] pt-[5vh]'>
 
         <div className="form-check form-switch ">
@@ -220,7 +220,7 @@ const ModalProductos = ({show, handleClose, product,isNuevoProducto}) => {
                     setSinsalsa(false); // Desmarcar "Sin salsa"
                 }
             }}/>
-          <label className="form-check-label" htmlFor="flexSwitchCheckDefault">Sin salsa</label>
+          <label className="form-check-label font-nunito font-bold" htmlFor="sinsalsa">Sin salsa</label>
        </div>
        <div className="form-check form-switch">
           <input className="form-check-input" type="checkbox" role="switch" id="extrasalsa" checked={extrasalsa}  onChange={(e) =>{
@@ -232,7 +232,7 @@ const ModalProductos = ({show, handleClose, product,isNuevoProducto}) => {
                     setExtrasalsa(false); // Desmarcar "Extra salsa"
                 }
             }}/>
-          <label className="form-check-label" htmlFor="flexSwitchCheckDefault">Extra Salsa</label>
+          <label className="form-check-label font-nunito font-bold" htmlFor="extrasalsa">Extra Salsa</label>
       </div>
   
           
@@ -243,21 +243,21 @@ const ModalProductos = ({show, handleClose, product,isNuevoProducto}) => {
 
     <div className='text-center justify-center items-center font-nunito  p-4'>
 
-  
+                  
                   <div className="form-check form-check-inline border-2 p-[1vw] border-gray-200 rounded-xl ">
-                    <input className="form-check-input m-1" type="checkbox" id="Tostado" name="ostado" value="option1" checked={tostado} onChange={(e) => setTostado(e.target.checked)} disabled={product?.name !== "Pollo Asado"}   />
-                    <label className="form-check-label text-lg font-nunito text-gray-900" htmlFor="inlineCheckbox1">Tostado</label>
+                    <input className="form-check-input m-1" type="checkbox" id="tostado" name="tostado" value="option1" checked={tostado} onChange={(e) => setTostado(e.target.checked)} disabled={product?.name !== "Pollo Asado" && product?.name !== "1/2 Pollo Asado"}   />
+                    <label  className="form-check-label text-lg font-nunito text-gray-900 font-bold" htmlFor="tostado">Tostado</label>
                   </div>
                
               
                   <div className="form-check form-check-inline border-2 p-[1vw] border-gray-200 rounded-xl ">
-                    <input className="form-check-input m-1" type="checkbox" id="Troceado"  name="troceado" value="option2" checked={troceado} onChange={(e) => setTroceado(e.target.checked)} disabled={product?.name !== "Pollo Asado"}  />
-                    <label className="form-check-label text-lg font-nunito text-gray-900" htmlFor="inlineCheckbox2">Troceado</label>
+                    <input className="form-check-input m-1" type="checkbox" id="troceado"  name="troceado" value="option2" checked={troceado} onChange={(e) => setTroceado(e.target.checked)} disabled={product?.name !== "Pollo Asado" && product?.name !== "1/2 Pollo Asado"}  />
+                    <label className="form-check-label text-lg font-nunito text-gray-900 font-bold" htmlFor="troceado">Troceado</label>
                   </div>
                
                   <div className="form-check form-check-inline border-2 p-[1vw] border-gray-200 rounded-xl " >
                     <input className="form-check-input m-1" type="checkbox" id="celiaco"  name="celiaco" value="option3" checked={celiaco} onChange={(e) => setCeliaco(e.target.checked)}  disabled={!product?.gluten_free} />
-                    <label className="form-check-label text-lg font-nunito text-black" htmlFor="inlineCheckbox3">Celiaco</label>
+                    <label className="form-check-label text-lg font-nunito text-gray-900 font-bold" htmlFor="celiaco">Celiaco</label>
                   </div>
       
     </div>

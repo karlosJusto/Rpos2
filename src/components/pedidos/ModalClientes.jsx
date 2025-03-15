@@ -193,7 +193,7 @@ const ModalClientes = ({ show, handleClose, onSave }) => {
               </label>
             </div>
 
-            <div className="form-check form-check-inline border-2 p-[1vw] border-gray-200 rounded-xl">
+             {/*<div className="form-check form-check-inline border-2 p-[1vw] border-gray-200 rounded-xl">
               <input
                 className="form-check-input m-1"
                 type="checkbox"
@@ -206,7 +206,7 @@ const ModalClientes = ({ show, handleClose, onSave }) => {
               <label className="form-check-label text-lg font-nunito text-gray-900" htmlFor="inlineCheckbox2">
                 Celiaco
               </label>
-            </div>
+            </div>  */}
           </div>
         </Modal.Body>
 

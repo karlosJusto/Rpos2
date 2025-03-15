@@ -1,5 +1,13 @@
 
 import dinero from '../../assets/dinero.png';
+import singluten from '../../assets/singluten.png';
+import fire_new from '../../assets/fire_new.png';
+import tijera_new from '../../assets/tijera_new.png';
+
+import Layout from '../pedidos/Layout';
+import GenerarQRCodeInvisible from './GenerarQRCodeInvisible';
+
+
 
 import { useState, useContext, useEffect, useRef} from 'react';
 import { dataContext } from '../Context/DataContext';
@@ -24,64 +32,72 @@ import { createTheme, ThemeProvider } from '@mui/material/styles';
 import PedidoRapido from './PedidoRapido';
 
 import dayjs from 'dayjs';
+import 'dayjs/locale/es'; // Para trabajar con el locale en español
+import timezone from 'dayjs/plugin/timezone'; // Plugin para zona horaria
+import utc from 'dayjs/plugin/utc'; // Plugin para trabajar con fechas en UTC
+import customParseFormat from 'dayjs/plugin/customParseFormat';
+
+
 
 
 
 const Ordenes = () => {
 
+  //ajustamos la hora
+  const obtenerHoraRedondeada = () => {
+    const now = dayjs(); // Hora actual
+    
+    // Obtener los minutos actuales
+    const minutos = now.minute();
+  
+    // Redondeamos los minutos al múltiplo más cercano de 15 (xx:00, xx:15, xx:30, xx:45)
+    const siguienteBloque = Math.floor(minutos / 15) * 15; // Redondea hacia abajo al múltiplo más cercano de 15 minutos
+    
+    // Ajustar la hora a 00, 15, 30, 45 minutos
+    const nuevaHora = now
+      .minute(siguienteBloque) // Ajustamos a los minutos correspondientes (xx:00, xx:15, etc.)
+      .second(0)
+      .millisecond(0);
+  
+    // Si la hora ajustada es antes de la hora actual, avanzamos al siguiente bloque (añadimos 15 minutos)
+    return nuevaHora.isBefore(now) ? nuevaHora.add(15, 'minute') : nuevaHora;
+  };
+  
+  const fechahora = obtenerHoraRedondeada().format('DD/MM/YYYY HH:mm');
+
+  // Usamos los plugins
+dayjs.extend(utc);
+dayjs.extend(timezone);
+dayjs.extend(customParseFormat);
+
 //usamos la refencia del otro componente
 const pedidoRapidoRef = useRef();
 
-const realizarPedido = () => {
-  if (pedidoRapidoRef.current) {
-    pedidoRapidoRef.current.hacerPedido();
-  }
+//pedidos rapidos pasandole el id producto 1 o 2
+const handlePedidoRapido = (idProduct) => {
+  // Llamamos a la función hacerPedidoRapido sin la comprobación del carrito
+  pedidoRapidoRef.current.hacerPedidoRapido(idProduct);
 };
+
+
 
   // Configurar dayjs para usar el idioma español
    dayjs.locale('es');
 
+
   
   const [show, setShow] = useState(false);
-  const [numero, setNumero] = useState(0);
-  const [clicks, setClicks] = useState({});
-  
+  const [numeroBarra, setNumeroBarra]=useState(0);
+  const [isColorChanged, setIsColorChanged] = useState(false); // Estado para controlar si el color del div cambió
+  const [vm, setVm] = useState(0); // Estado para 'VM'
 
-  const handleClick = (pedidoId, productoId, maxCantidad) => {
-    // Usamos el spread operator para asegurar que no estamos mutando el estado directamente
-    setClicks(prevClicks => {
-      const updatedClicks = { ...prevClicks };
-  
-      // Inicializamos la estructura si no existe para este pedido
-      if (!updatedClicks[pedidoId]) {
-        updatedClicks[pedidoId] = {};
 
-      }
-  
-      // Inicializamos la cantidad de clics del producto si no existe
-      if (!updatedClicks[pedidoId][productoId]) {
-        updatedClicks[pedidoId][productoId] = 0;
-      }
-  
-      // Si ya se alcanzó el número máximo de clics, reiniciamos el contador de clics
-      if (updatedClicks[pedidoId][productoId] >= maxCantidad) {
-        updatedClicks[pedidoId][productoId] = 0;  // Reiniciamos el contador
-      } else {
-        // Si no se ha alcanzado el límite, incrementamos los clics
-        updatedClicks[pedidoId][productoId] += 1;
-      }
-  
-      return updatedClicks; // Devolvemos el estado actualizado
-    });
-  };
-  
-  
-
+ 
   // Datos del cliente para pasar a PedidoRapido
   const [datosCliente, setDatosCliente] = useState({
     cliente: 'AAgenerico',
     telefono: '000000000',
-    fechahora: dayjs().add(15, 'minute').format('DD/MM/YYYY HH:mm'),
+    fechahora: fechahora,
     observaciones: 'Pedido Rapido',
     pagado: false,
     celiaco: false,
@@ -104,14 +120,50 @@ const realizarPedido = () => {
 
   const handleAccept = () => {
     setDateToPass(selectedDate);  // Pasa la fecha seleccionada a otro componente
+    setIsColorChanged(true);
     handleCloseModal();  // Cierra el modal
   };
+
+  // Estilo del div que cambiará dependiendo de si el color ha cambiado
+  const divStyle = isColorChanged
+    ? 'w-[8vw] h-[10vh] bg-[#75adab]'  // Color de fondo si se ha hecho clic
+    : 'w-[8vw] h-[10vh] bg-[#f2ac02]'; // Color de fondo inicial
 
   //modal
 
   const [showModal, setShowModal] = useState(false);
   const handleCloseModal = () => setShowModal(false);
   const handleShowModal= () => setShowModal(true);
+  const [loading, setLoading] = useState(false); // Estado de carga
+ 
+
+  //cierre turno fuerza recarga pagina
+
+  const [showModal2, setShowModal2] = useState(false);
+  const handleCloseModal2 = () => {
+    setShowModal2(false); // Cerrar el modal
+    window.location.reload(); // Recargar la página
+  };
+
+  useEffect(() => {
+    // Configuramos un intervalo para comprobar la hora cada minuto
+    const interval = setInterval(() => {
+      const currentTime = dayjs().locale('es').tz('Europe/Madrid'); // Obtener la hora actual en España
+      const targetTime = currentTime.hour(18).minute(0).second(0);  // Establecer la hora objetivo: 18:00:00
+
+      // Si la hora actual es igual a las 18:00
+      if (currentTime.isSame(targetTime, 'minute')) {
+        setShowModal2(true);  // Mostrar el modal
+        clearInterval(interval); // Detener el intervalo una vez que se ha abierto el modal
+      }
+    }, 60000);  // Comprobamos cada minuto
+
+    // Limpiamos el intervalo cuando el componente se desmonte
+    return () => clearInterval(interval);
+  }, []);
+
+
+
 
   //origen pedidos, 0 tienda 1 online
 
@@ -158,13 +210,18 @@ const realizarPedido = () => {
   };
 
 
-
  
+  
+
+
 
 
   // Función para alternar el estado del offcanvas
   const toggleOffcanvas = () => setShow(!show);
   const [pedidos, setPedidos] = useState([]); // Estado para almacenar todos los pedidos
+
+
+
 
   const theme = createTheme({
     palette: {
@@ -175,121 +232,641 @@ const realizarPedido = () => {
   });
 
 
-            // Función para manejar los cambios en el input
-            const handleInputChange = (e) => {
-              const value = e.target.value;
-              // Verifica que el valor sea un número válido y lo actualiza
-              if (!isNaN(value) && value !== "") {
-                setNumero(Number(value));
-              }
-            };
+          
+           // Función para manejar los cambios en el input
+                const handleInputChange = (e) => {
+                  const value = e.target.value;  // Obtener el valor del input
+                  console.log("value: "+value);
+                  const aux=value === "" ? "" : parseFloat(value) + pollosEntregados;
 
-                    // Función que suma 5 a la variable 'numero'
-             const sumamosCinco = () => {
-              setNumero((prevNumero) => prevNumero + 5);
-              //setNumero((prevNumero) => prevNumero + 5); // Usamos el valor previo
-            };
+                  // Verificar si el valor es un número válido
+                  if (value === "" || !isNaN(value)) { 
+                    setNumeroBarra(aux);  // Actualizar el estado solo si es un número o está vacío
+                  }
+                };
+
+              // Función que suma 5 a la variable 'numero'
+              const sumarCinco = () => {
+                setNumeroBarra((prevNumero) => parseFloat(prevNumero) + 5); // Sumamos la cantidad al valor actual
+              };
             
             // Función para sumar 4 a la variable 'numero'
             const sumarCuatro = () => {
-              setNumero((prevNumero) => prevNumero + 4); // Usamos el valor previo
+              setNumeroBarra((prevNumero) => parseFloat(prevNumero) + 4); // Usamos el valor previo
             };
             
             // Función para restar 5 a la variable 'numero'
             const restarCinco = () => {
-              setNumero((prevNumero) => prevNumero - 5); // Usamos el valor previo
+              setNumeroBarra((prevNumero) => parseFloat(prevNumero) - 5); // Usamos el valor previo
             };
             
             // Función para restar 4 a la variable 'numero'
             const restarCuatro = () => {
-              setNumero((prevNumero) => prevNumero - 4); // Usamos el valor previo
+              setNumeroBarra((prevNumero) => parseFloat(prevNumero) - 4); // Usamos el valor previo
             };
 
             // Función sumar 1 a la variable 'numero'
             const sumarUno = () => {
-              setNumero(numero + 1); // Actualiza el número sumando 1
+              setNumeroBarra((prevNumero) => parseFloat(prevNumero) + 1); // Usamos el valor previo
             };
 
             // Función restar 1 a la variable 'numero'
             const restarUno = () => {
-              setNumero(numero - 1); // Actualiza el número restando 1
+              setNumeroBarra((prevNumero) => parseFloat(prevNumero) - 1); // Usamos el valor previo
             };
 
             // Función sumar 1/2 a la variable 'numero'
             const sumaMedio = () => {
-              setNumero(numero + 0.5); // Actualiza el número sumando 1/2
+              setNumeroBarra((prevNumero) => parseFloat(prevNumero) + 0.5); // Usamos el valor previo
             };
 
             // Función restar 1/2 a la variable 'numero'
             const restaMedio = () => {
-              setNumero(numero - 0.5); // Actualiza el número restando 1/2
+              setNumeroBarra((prevNumero) => parseFloat(prevNumero) - 0.5);  // Usamos el valor previo
             };
 
+          
+            //Clicks para entregados
+            const handleClick = async (numeroPedido, productoId, maxCantidad) => {
+              console.log('------------->>>>', numeroPedido);
+            
+              // Encontramos el pedido que contiene el producto
+              const pedido = pedidos.find(pedido => pedido.NumeroPedido === numeroPedido); // Comparamos directamente como números
+              if (!pedido) {
+                console.error('No se encontró el pedido con NumeroPedido:', numeroPedido);
+                return;
+              }
+            
+              // Buscamos el producto dentro de ese pedido
+              const producto = pedido.productos.find(producto => producto.id === productoId); // Comparamos directamente como números
+              if (!producto) {
+                console.error('No se encontró el producto con id:', productoId);
+                return;
+              }
+            
+              console.log('+++++++++++++++++' + productoId);
+            
+              // Ahora obtenemos el valor actual de 'entregado' directamente desde Firestore
+              const numeroPedidoStr = numeroPedido.toString();
+              const pedidoRef = doc(db, 'pedidos', numeroPedidoStr); // Referencia al pedido
+              try {
+                const pedidoDoc = await getDoc(pedidoRef);
+            
+                if (!pedidoDoc.exists()) {
+                  console.error('No se encontró el pedido en Firestore:', numeroPedidoStr);
+                  return;
+                }
+            
+                const productosFirestore = pedidoDoc.data().productos;
+            
+                // Buscamos el producto en Firestore
+                const productoFirestore = productosFirestore.find(p => p.id === productoId);
+                if (!productoFirestore) {
+                  console.error('No se encontró el producto en Firestore:', productoId);
+                  return;
+                }
+            
+                // Recuperamos el valor actual de 'entregado' desde Firestore
+                const entregadoActual = productoFirestore.entregado || 0;
+            
+                // Verificar si ya se alcanzó la cantidad máxima
+                let nuevoEntregado = entregadoActual + 1;
+            
+                // Si el contador llega al máximo, reiniciamos a 0
+                if (nuevoEntregado > maxCantidad) {
+                  nuevoEntregado = 0;
+                }
+            
+                // Actualizamos el producto correspondiente en Firestore
+                const productosActualizados = productosFirestore.map(p =>
+                  p.id === productoId
+                    ? { ...p, entregado: nuevoEntregado } // Actualizamos solo el producto afectado
+                    : p
+                );
+            
+                // Guardamos los cambios en Firestore
+                await updateDoc(pedidoRef, {
+                  productos: productosActualizados,
+                });
+            
+                console.log('Producto actualizado en Firestore con éxito');
+              } catch (error) {
+                console.error('Error al actualizar el pedido en Firestore:', error);
+              }
+            };
+            
+            
+            
+            
+            
     
             useEffect(() => {
-              // Si la fecha a filtrar es proporcionada, establece los límites de tiempo
-              const fechaHoy = dateToPass ? dayjs(dateToPass).startOf('day') : dayjs().startOf('day');
-              const fechaFinDia = dateToPass ? dayjs(dateToPass).endOf('day') : dayjs().endOf('day');
-          
-              // Creamos la referencia a la colección de pedidos
-              const pedidosRef = collection(db, 'pedidos');
-          
-              // Creamos la consulta para filtrar pedidos por fecha (hoy)
-              const pedidosQuery = query(
-                pedidosRef,
-                where("fechahora", ">=", fechaHoy.format('DD/MM/YYYY HH:mm')), // Pedidos desde el inicio del día
-                where("fechahora", "<=", fechaFinDia.format('DD/MM/YYYY HH:mm')) // Pedidos hasta el final del día
-              );
-          
-              // Usamos `onSnapshot` para escuchar los cambios en la colección
-              const unsubscribe = onSnapshot(pedidosQuery, (querySnapshot) => {
-                // Mapear los documentos que llegan a la consulta
-                const pedidosArray = querySnapshot.docs.map(doc => {
-                  const pedido = doc.data();
-                  return {
-                    id: doc.id, // Incluimos el id del documento
-                    NumeroPedido: pedido.NumeroPedido,
-                    cliente: pedido.cliente,
-                    direccion: pedido.direccion,
-                    productos: pedido.productos,
-                    fechahora: pedido.fechahora,
-                    imagen: pedido.imagen,
-                    pagado: pedido.pagado,
-                    celiaco: pedido.celiaco,
-                    observaciones: pedido.observaciones,
-                    origen: pedido.origen // Asegúrate de que el campo 'origen' esté presente en los datos de tu pedido
-                  };
-                  
-                });
 
-                
-          
-                // Actualizamos el estado de los pedidos
-                setPedidos(pedidosArray);
-          
-                // Filtrar los pedidos con origen = 0
-                const cantidadPedidosOrigenCero = pedidosArray.filter(pedido => pedido.origen === 1).length;
-                setPedidosConOrigenUno(cantidadPedidosOrigenCero);  // Actualizamos el estado de los pedidos con origen = 1
-              }, (error) => {
-                console.error("Error al obtener los pedidos: ", error);
-              });
-          
-              // Limpiar la suscripción cuando el componente se desmonta
-              return () => unsubscribe();
-            }, [dateToPass]); // Solo se ejecuta cuando `dateToPass` cambia
+             
 
-          
+                // Si se pasa una fecha específica, usamos esa fecha; de lo contrario, usamos la fecha actual
+                const fechaAUsar = dateToPass ? dayjs(dateToPass).locale('es').tz('Europe/Madrid') : dayjs().locale('es').tz('Europe/Madrid');
+
+
+                // Obtener la hora actual en la zona horaria de Madrid
+                const currentTime = dayjs().locale('es').tz('Europe/Madrid');
+                const esHoy = currentTime.isSame(fechaAUsar, 'day'); // Comprobamos si la fecha es hoy
+
+               
+
+                // Turno completo (dia entero)
+                let fechaIncio = fechaAUsar.hour(0).minute(0).second(0);  // Desde las 18:01
+                let fechaFin= fechaAUsar.hour(23).minute(59).second(59);  // Desde las 18:01
+
+                //Si no viene del calendario seleccionar turno
+     
+                /*
+                if (!dateToPass) { 
+                       // Verifica si la hora actual es antes de las 18:00
+                       const isBefore6PM = currentTime.hour() < 18;
+                       if (isBefore6PM)
+                         fechaFin = fechaAUsar.hour(17).minute(59).second(59);
+                       else
+                         fechaIncio = fechaAUsar.hour(18).minute(0).second(1);
+                   
+                } */
+
+
+
+
+                 //console.log("**********fechaIncio:"+fechaIncio.format('DD/MM/YYYY HH:mm'));
+                 //console.log("**********fechaFin:"+fechaFin.format('DD/MM/YYYY HH:mm'));
+
+
+                // Creamos la referencia a la colección de pedidos
+                const pedidosRef = collection(db, 'pedidos');
+
+
+                // Creamos la consulta para filtrar pedidos por fecha y hora
+                const pedidosQuery = query(
+                  pedidosRef,
+                  where("fechahora", ">=", fechaIncio.format('DD/MM/YYYY HH:mm')), // Desde el inicio del día
+                  where("fechahora", "<=", fechaFin.format('DD/MM/YYYY HH:mm')) // Hasta las 18:00 o desde las 18:01
+                );
+                          
+              
+                  // Usamos `onSnapshot` para escuchar los cambios en la colección
+                  const unsubscribe = onSnapshot(pedidosQuery, (querySnapshot) => {
+                    // Mapear los documentos que llegan a la consulta
+                    const pedidosArray = querySnapshot.docs.map(doc => {
+                      const pedido = doc.data();
+                      return {
+                        id: doc.id, 
+                        NumeroPedido: pedido.NumeroPedido,
+                        cliente: pedido.cliente,
+                        direccion: pedido.direccion,
+                        productos: pedido.productos.map(producto => ({
+                          ...producto,
+                          entregado: producto.entregado || 0 // Asegúrate de que 'entregado' esté inicializado
+                        })),
+                        fechahora: pedido.fechahora,
+                        imagen: pedido.imagen,
+                        pagado: pedido.pagado,
+                        celiaco: pedido.celiaco,
+                        troceado: pedido.troceado,
+                        alias: pedido.alias,
+                        tostado: pedido.tostado,
+                        salsa: pedido.sinsalsa,
+                        extrasalsa: pedido.extrasalsa,
+                        observaciones: pedido.observaciones,
+                        origen: pedido.origen,
+                      };
+                    });
+
             
+                    
+              
+                    // Actualizamos el estado de los pedidos
+                    setPedidos(pedidosArray);
+
+                    //search pedidos
+
+                  // Filtramos los nombres de los clientes directamente desde los pedidos obtenidos
+                  const nombresClientes = pedidosArray.map(pedido => pedido.cliente).filter(cliente => cliente); // Filtra solo los valores válidos
+                  setClientes(nombresClientes);
 
 
 
+                   
+                    
+                   
+               
+
+
+                    
+              
+                    // Filtrar los pedidos con origen = 0
+                    const cantidadPedidosOrigenCero = pedidosArray.filter(pedido => pedido.origen === 1).length;
+                    setPedidosConOrigenUno(cantidadPedidosOrigenCero);  // Actualizamos el estado de los pedidos con origen = 1
+                            }, (error) => {
+                              console.error("Error al obtener los pedidos: ", error);
+                            });
+                        
+                            // Limpiar la suscripción cuando el componente se desmonta
+                            return () => unsubscribe();
+                      }, [dateToPass]); // Solo se ejecuta cuando `dateToPass` cambia
+
+
+           
+
+            // Función para obtener la fecha en formato DD-MM-YYYY
+                const obtenerFechaFormateada = () => {
+                  // Configurar el idioma a español
+                  dayjs.locale('es');
+
+                  // Obtener la fecha actual y formatearla en el formato DD-MM-YYYY
+                  const fechaFormateada = dayjs().format('DD-MM-YYYY');
+
+                  
+
+                  return fechaFormateada;
+                };
+
+          
+
+
+      // Función para agrupar los pedidos por franjas horarias de 15 minutos y contar la cantidad de productos por franja
+      const agruparPorBloques15Minutos = (pedidos) => {
+        const bloques = {};
+        
+
+        pedidos.forEach((pedido) => {
+          const fechaHora = dayjs(pedido.fechahora, 'DD/MM/YYYY HH:mm');
+
+       // Formateamos la fecha y hora en franjas de 15 minutos
+              const hora = fechaHora.format('HH:mm');
+             // console.log('Hora:' + hora);
+
+              if (!bloques[hora]) {
+                bloques[hora] = {
+                  pedidos: [],
+                  cantidadProductos: 0,
+                  productos: [], // Guardaremos los productos y su cantidad
+                  //categorias: {}, // Guardaremos las categorías de los productos
+                  cantidadProductosId1: 0, // Guardamos el conteo de productos con id_product=1  Pollo
+                  cantidadProductosId20: 0, // Guardamos el conteo de productos con id_product=20 Codillo
+                  cantidadProductosId2: 0, // Guardamos el conteo de productos con id_product=2 1/2 Pollo
+                  cantidadProductosId41: 0, //Guardamos el conteo de productos con id_product=41 Costilla
+                  cantidadProductosId48: 0, //Guardamos el conteo de productos con id_product=49 1/2 Costilla
+
+
+
+                };
+              }
+
+              // Agregar el pedido a la franja horaria
+              bloques[hora].pedidos.push(pedido);
+
+              // Contamos la cantidad de productos en este pedido
+              pedido.productos.forEach((producto) => {
+                bloques[hora].cantidadProductos += producto.cantidad;
+
+
+            // Verificar si el producto ya existe en el array de productos
+             const productoExistente = bloques[hora].productos.find(p => p.nombre === producto.alias);
+             if (productoExistente) {
+              // Si el producto existe, actualizar la cantidad
+                 productoExistente.cantidad += producto.cantidad;
+                 productoExistente.entregado += producto.entregado;
+             } else {
+            
+                bloques[hora].productos.push({nombre: producto.alias, cantidad: producto.cantidad, categoria: producto.categoria, entregado:producto.entregado});
+             }
+                
+                // Si el producto tiene id_product=1, sumamos su cantidad
+                if (producto.id === 1) {
+                  bloques[hora].cantidadProductosId1 += producto.cantidad;
+                }
+                // Si el producto tiene id_product=2, sumamos su cantidad
+                if (producto.id === 2) {
+                  bloques[hora].cantidadProductosId2 += producto.cantidad;
+                }
+                 // Si el producto tiene id_product=20, sumamos su cantidad
+                 if (producto.id === 20) {
+                  bloques[hora].cantidadProductosId20 += producto.cantidad;
+                }
+                // Si el producto tiene id_product=41, sumamos su cantidad
+                if (producto.id === 41) {
+                  bloques[hora].cantidadProductosId41 += producto.cantidad;
+                }
+                // Si el producto tiene id_product=48, sumamos su cantidad
+                if (producto.id === 48) {
+                  bloques[hora].cantidadProductosId48 += producto.cantidad;
+                }
+               
+              });
+            });
+
+            return bloques;
+          };
+
+          // Agrupar los pedidos por bloques de 15 minutos
+          const bloquesPedidos = agruparPorBloques15Minutos(pedidos);
+
+         // console.log('bloque pedidos'+bloquesPedidos);
+
+          // Cálculo de productos después de las 18:00
+        const bloquesDespuesDeLas18 = Object.keys(bloquesPedidos)
+        .filter(bloque => dayjs(bloque, 'HH:mm').hour() >= 18)  // Filtrar solo bloques después de las 18:00
+        .reduce((total, bloque) => {
+          // Sumar productos con id = 1 y id = 2 (con ajuste para id = 2)
+          return total + bloquesPedidos[bloque].cantidadProductosId1 + bloquesPedidos[bloque].cantidadProductosId2 / 2;
+        }, 0);
+
+        // Guardar el resultado en una variable
+        const totalProductosDespuesDeLas18 = bloquesDespuesDeLas18;
+
+        // Cálculo de productos hasta las 18:00
+
+        const bloquesAntesdelas18 = Object.keys(bloquesPedidos)
+        .filter(bloque => dayjs(bloque, 'HH:mm').hour() < 18)  // Filtrar solo bloques después de las 18:00
+        .reduce((total, bloque) => {
+          // Sumar productos con id = 1 y id = 2 (con ajuste para id = 2)
+          return total + bloquesPedidos[bloque].cantidadProductosId1 + bloquesPedidos[bloque].cantidadProductosId2 / 2;
+         
+        }, 0 );
+
+        console.log("Bloque pedidos");
+        console.log(bloquesPedidos);
+
+        console.log("bloquesAntesdelas18 pedidos");
+        console.log(bloquesAntesdelas18);
+
+        console.log("bloquesDespueselas18 pedidos");
+        console.log(bloquesDespuesDeLas18);
+
+        
+
+        
+
+        //console.log("Total productos antes de las 18:00 (VM):", bloquesAntesdelas18);
+
+        // Guardar el resultado en una variable
+        const totalbloquesAntesdelas18 = bloquesAntesdelas18;
+
+        
+
+        // Sumar los totales antes y después de las 18:00
+       const totalProductos = totalProductosDespuesDeLas18 + totalbloquesAntesdelas18;
+
+       
+
+
+       
+       useEffect(() => {
+        // Función para obtener el valor de numeroBarra desde la base de datos
+        const cargarNumeroBarra = async () => {
+          try {
+            const fecha = obtenerFechaFormateada();  // Asegúrate de tener esta función definida
+            const docRef = doc(db, "estadisticas_diarias", fecha);
+            const docSnap = await getDoc(docRef);
+    
+            if (docSnap.exists()) {
+              const data = docSnap.data();
+              setNumeroBarra(data.enbarra);  // Asignamos el valor de 'enbarra' a estado
+              setVm(data.vm); 
+            } else {
+              //console.log("No hay datos para la fecha:", fecha);
+              
+              // Si no existe, puedes dejar el valor en 0 o asignar un valor predeterminado
+              setNumeroBarra(0);
+            }
+          } catch (e) {
+            console.error("Error al cargar los datos de numeroBarra: ", e);
+          }
+        };
+    
+        cargarNumeroBarra();  // Llamamos a la función cuando el componente se monta
+      }, []);  // Solo se ejecuta una vez cuando el componente se monta
+
+      //console.log("Pedidos mañana:", vm);
+
+    
+      // Función para guardar los datos de estadisticas_diarias
+      const guardarEstadisticasDiarias = async () => {
+        try {
+          const fecha = obtenerFechaFormateada();
+          const docRef = doc(db, "estadisticas_diarias", fecha);
+          
+          await updateDoc(docRef, {
+            enbarra: numeroBarra,
+            libresManana:numeroBarra-totalbloquesAntesdelas18,
+            libresTarde: numeroBarra-totalProductosDespuesDeLas18,
+            vm: bloquesAntesdelas18,
+            vt: totalProductosDespuesDeLas18,
+            vd: totalProductos,
+          });
+    
+          console.log("Datos guardados exitosamente para el día", fecha);
+        } catch (e) {
+          console.error("Error al guardar los datos: ", e);
+        }
+      };
+
+      // Llamar a guardarEstadisticasDiarias cada vez que el valor de numeroBarra cambie
+  useEffect(() => {
+    if (numeroBarra !== 0) {
+      guardarEstadisticasDiarias();
+    }
+  }, [numeroBarra]);  // Se ejecuta cada vez que 'numeroBarra' cambie
+
+
+
+        const [libres, setLibres] = useState(0);  // Estado para 'libres'
+
+        
+       
+
+  
+        // Cuando el numeroBarra o totalProductosDespuesDeLas18 cambien, recalculamos 'libres'
+        useEffect(() => {
+          const calcularLibres = () => {
+            setLoading(true);  // Activamos el spinner
+            const currentTime = dayjs().locale('es').tz('Europe/Madrid');
+            const antesDelas6pm = currentTime.hour() < 18;
+      
+            // Realizamos el cálculo de 'libres' según el turno (mañana o tarde)
+            if (antesDelas6pm) {
+              setLibres(numeroBarra - totalbloquesAntesdelas18);
+            } else {
+              setLibres(numeroBarra - totalProductosDespuesDeLas18);
+            }
+      
+            // Mantener el spinner visible durante 3 segundos
+            setTimeout(() => {
+              setLoading(false);  // Desactivamos el spinner después de 3 segundos
+            }, 0); // 
+          };
+      
+          calcularLibres();  // Llamamos a la función de cálculo de 'libres'
+        }, [numeroBarra, totalProductosDespuesDeLas18, totalbloquesAntesdelas18]);
+          
+
+
+      
+          //search clientes 
+          const [clientes, setClientes] = useState([]);
+          // Estado para el término de búsqueda
+          const [searchTerm, setSearchTerm] = useState('');
+
+          
+
+          // Función para manejar el cambio en el input de búsqueda
+          const handleSearchChange = (e) => {
+            setSearchTerm(e.target.value);
+            //console.log(e.target.value);
+          };
+
+
+          const [totales, setTotales] = useState({
+            totalProductosId1: 0,
+            totalProductosId2: 0,
+            totalProductosId20: 0,
+            totalProductosId41: 0,
+            totalProductosId48: 0,
+          });
+
+          useEffect(() => {
+            const horaActual = dayjs().locale('es').tz('Europe/Madrid');
+            const horaFin = horaActual.add(45, 'minutes');
+        
+            // Calculamos los totales de productos
+            const nuevosTotales = Object.keys(bloquesPedidos).reduce(
+              (acc, bloque) => {
+                const horaBloque = dayjs(bloque, 'HH:mm');
+                if (horaBloque.isBetween(horaActual, horaFin, null, '[)')) {
+                  acc.totalProductosId1 += bloquesPedidos[bloque].cantidadProductosId1;
+                  acc.totalProductosId2 += bloquesPedidos[bloque].cantidadProductosId2;
+                  acc.totalProductosId20 += bloquesPedidos[bloque].cantidadProductosId20;
+                  acc.totalProductosId41 += bloquesPedidos[bloque].cantidadProductosId41;
+                  acc.totalProductosId48 += bloquesPedidos[bloque].cantidadProductosId48;
+                }
+                return acc;
+              },
+              {
+                totalProductosId1: 0,
+                totalProductosId2: 0,
+                totalProductosId20: 0,
+                totalProductosId41: 0,
+                totalProductosId48: 0,
+              }
+            );
+        
+            // Solo actualizamos el estado si los totales han cambiado
+            if (
+              nuevosTotales.totalProductosId1 !== totales.totalProductosId1 ||
+              nuevosTotales.totalProductosId2 !== totales.totalProductosId2 ||
+              nuevosTotales.totalProductosId20 !== totales.totalProductosId20 ||
+              nuevosTotales.totalProductosId41 !== totales.totalProductosId41 ||
+              nuevosTotales.totalProductosId48 !== totales.totalProductosId48
+            ) {
+              setTotales(nuevosTotales);
+            }
+          }, [bloquesPedidos, totales]); // Añadimos `totales` como dependencia para evitar ciclos infinitos
+
+
+         // console.log(totales.totalProductosId41);
+
+
+
+
+    let bloquesFiltrados = bloquesPedidos;
+
+    if (!dateToPass) { 
+      const currentTime = dayjs().locale('es').tz('Europe/Madrid'); // Obtener la hora actual en España
+      const isBefore6PM = currentTime.hour() < 18; // Verificar si es antes de las 18:00
+
+      if (isBefore6PM) {
+        // Filtramos los bloques antes de las 18:00
+        bloquesFiltrados = Object.keys(bloquesPedidos)
+          .filter((hora) => {
+            const [hour, minute] = hora.split(":");
+            const time = new Date();
+            time.setHours(parseInt(hour), parseInt(minute), 0);
+            return time.getHours() < 18;
+          })
+          .reduce((acc, hora) => {
+            acc[hora] = bloquesPedidos[hora];
+            return acc;
+          }, {});
+      } else {
+        // Filtramos los bloques después de las 18:00
+        bloquesFiltrados = Object.keys(bloquesPedidos)
+          .filter((hora) => {
+            const [hour, minute] = hora.split(":");
+            const time = new Date();
+            time.setHours(parseInt(hour), parseInt(minute), 0);
+            return time.getHours() >= 18;
+          })
+          .reduce((acc, hora) => {
+            acc[hora] = bloquesPedidos[hora];
+            return acc;
+          }, {});
+      }
+    }
+
+
+
+    console.log("bloquesFiltrados");
+    console.log(bloquesFiltrados);
+
+
+    
+
+
+    const pollosEntregados = Object.values(bloquesFiltrados).reduce((total, bloque) => {
+      // Filtrar los pedidos dentro de cada bloque
+      const entregadosPorBloque = bloque.pedidos.reduce((sumaEntregados, pedido) => {
+        // Filtrar los productos con id_product 1
+        const productosDePollo = pedido.productos.filter(producto => producto.id === 1 || producto.id === 2);
+        
+        // Sumar la cantidad entregada de los productos de pollo (id_product === 1)
+        const entregados = productosDePollo.reduce((totalEntregado, producto) => {
+          if (producto.id === 1) {  // Si es id_product 1, sumamos el valor de 'entregado' directamente
+            return totalEntregado + producto.entregado;
+          } else if (producto.id === 2) { // Si es id_product 2, sumamos el valor de 'entregado' multiplicado por 0.5
+            return totalEntregado + (producto.entregado*0.5);
+          }
+          return totalEntregado;
+        }, 0);
+        
+        
+        // Sumar los entregados de este pedido a la suma total
+        return sumaEntregados + entregados;
+      }, 0);
+    
+      // Sumar la cantidad de entregados del bloque
+      return total + entregadosPorBloque;
+    }, 0); // Empezamos con 0 como valor inicial de la suma
+    
+    
+    console.log("pollosEntregados: "+pollosEntregados);
+
+    let mostraBarra=numeroBarra-pollosEntregados;
+
+          
+          
+          
+
+
+          
+
+         
+          
+          
+        
 
 
 
   return (
 
     <>
-    <div className="flex justify-center items-center w-full p-[0.5vh] mt-[6vh]" >
+    <div className="flex justify-center items-center w-full p-[0.5vh] mt-[6vh] mb-1" >
           {/* Contenedor principal con un grid de 12 columnas */}
           <div className="grid grid-cols-12 gap-2 w-full fixed top-0 bg-white p-2">
             
@@ -329,12 +906,12 @@ const realizarPedido = () => {
 
          <div className='w-[8vw] h-[10vh] bg-[#f2ac02]  rounded-xl shadow-md'>
 
-            <div className="flex justify-center items-center h-1/2" onClick={realizarPedido}>
+            <div className="flex justify-center items-center h-1/2" onClick={() => handlePedidoRapido(1)}>
             <button type='button' className="text-white text-center text-[1.8vw] font-nunito border-b-4">1P</button>
             </div>
             
             
-            <div className="flex justify-center items-center h-1/2">
+            <div className="flex justify-center items-center h-1/2" onClick={() => handlePedidoRapido(2)}>
             <button type='button' className="text-white text-center text-[1.8vw] font-nunito ">1/2P</button>
             </div>
         
@@ -358,7 +935,7 @@ const realizarPedido = () => {
 
             <div className='w-[8vw] h-[10vh]  bg-gray-700 rounded-xl shadow-md'>
               
-                <div className="flex justify-center items-center h-1/2" onClick={sumamosCinco} >
+                <div className="flex justify-center items-center h-1/2" onClick={sumarCinco} >
                 <button type='button' className="text-white text-center text-[1.8vw] font-nunito border-b-4"  >+5</button>
                 </div>
                 
@@ -373,12 +950,12 @@ const realizarPedido = () => {
 
 
 
-          <div className="w-[8vw] h-[10vh] bg-gray-500 flex flex-col justify-center items-center rounded-xl shadow-md">
+          <div className={`w-[8vw] h-[10vh] ${mostraBarra < 0 ? 'bg-[#cb4335]' : 'bg-gray-500'} flex flex-col justify-center items-center rounded-xl shadow-md`}>
             <input
               type="text"
-              value={numero}
+              value={mostraBarra}
               onChange={handleInputChange}
-              className="text-white text-center font-nunito bg-transparent border-none focus:outline-none w-full h-full text-[3vw] max-w-full max-h-[7.4vh]" 
+              className="text-white text-center font-nunito bg-transparent border-none focus:outline-none w-full h-full text-[2.5vw] max-w-full max-h-[7.4vh]" 
             />
             <p className="text-white text-center text-[2w] font-nunito pb-[1vh] ">En barra</p>
           </div>
@@ -388,8 +965,6 @@ const realizarPedido = () => {
 
 
       <div className='w-[8vw] h-[10vh]  bg-gray-700 rounded-xl shadow-md'>
-        
-        
          <div className="flex justify-center items-center h-1/2" onClick={sumarUno}>
          <button type='button' className="text-white text-center text-[1.8vw] font-nunito border-b-4">+1</button>
          </div>
@@ -397,10 +972,7 @@ const realizarPedido = () => {
         
          <div className="flex justify-center items-center h-1/2" onClick={sumaMedio}>
          <button type='button' className="text-white text-center text-[1.8vw] font-nunito">+1/2</button>
-         </div>
-        
-        
-        
+         </div> 
       </div>
 
 
@@ -419,161 +991,397 @@ const realizarPedido = () => {
       </div>
 
 
+      <div className={`w-[8vw] h-[10vh] ${libres < 0 ? 'bg-[#cb4335]' : 'bg-[#f2ac02]'} flex flex-col justify-center items-center rounded-xl shadow-md`}>
+      {loading ? (
+        // Spinner (SVG) mientras se calculan los libres
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          viewBox="0 0 50 50"
+          className="animate-spin h-12 w-12 text-white"
+        >
+          <circle
+            cx="25"
+            cy="25"
+            r="20"
+            stroke="currentColor"
+            strokeWidth="4"
+            fill="none"
+          />
+          <path
+            fill="currentColor"
+            d="M 45,25 A 20,20 0 0,1 25,45 A 20,20 0 0,1 5,25 A 20,20 0 0,1 25,5 A 20,20 0 0,1 45,25 Z"
+          />
+        </svg>
+      ) : (
+        <>
+          <h1 className="text-white text-center text-[2.5vw] font-nunito">{libres}</h1>
+          <p className="text-white text-center text-[0.85vw] font-nunito mt-[0.90vh] ">Libres</p>
+        </>
+      )}
+    </div>
+
+   
 
 
-      <div className='w-[8vw] h-[10vh] bg-[#f2ac02]  flex flex-col justify-center items-center rounded-xl shadow-md'>
-          <h1 className="text-white text-center text-[3vw] font-nunito">{numero}</h1>
-          <p className="text-white text-center text-[2w] font-nunito">Libres</p>
-     </div>
 
 
+              <div className='w-[8vw] h-[10vh] bg-[#f2ac02] flex flex-col justify-center items-center rounded-xl shadow-md'>
+            <h1 className="text-white text-center text-[2vw] font-nunito">
+            {totalbloquesAntesdelas18.toFixed(1)}
+            </h1>
+            <h1 className="text-white text-center text-[2w] font-nunito">VM</h1>
+          </div>
+
+          <div className='w-[8vw] h-[10vh] bg-[#f2ac02] flex flex-col justify-center items-center rounded-xl shadow-md'>
+            <h1 className="text-white text-center text-[2vw] font-nunito">
+            {totalProductosDespuesDeLas18.toFixed(1)}
+            </h1>
+            <h1 className="text-white text-center text-[2w] font-nunito">VT</h1>
+          </div>
+
+          {/* Aquí sumamos VM + VT */}
+          <div className='w-[8vw] h-[10vh] bg-[#f2ac02]  flex flex-col justify-center items-center rounded-xl shadow-md'>
+            <h1 className="text-white text-center text-[2vw] font-nunito">
+             {totalProductos.toFixed(1)}
+            </h1>
+            <h1 className="text-white text-center text-[2w] font-nunito">VD</h1>
+          </div>
 
 
-
-     <div className='w-[8vw] h-[10vh] bg-[#f2ac02]  flex flex-col justify-center items-center rounded-xl shadow-md'>
-          <h1 className="text-white text-center text-[2vw] font-nunito"  >61.0</h1>
-          <h1 className="text-white text-center text-[2w] font-nunito">VM</h1>
-     </div>
-
-     <div className='w-[8vw] h-[10vh] bg-[#f2ac02] flex flex-col justify-center items-center rounded-xl shadow-md'>
-          <h1 className="text-white text-center text-[2vw] font-nunito">0.0</h1>
-          <h1 className="text-white text-center text-[2w] font-nunito">VT</h1>
-     </div>
-
-     <div className='w-[8vw] h-[10vh] bg-[#f2ac02]  flex flex-col justify-center items-center rounded-xl shadow-md'>
-          <h1 className="text-white text-center text-[2vw] font-nunito">61.0</h1>
-          <h1 className="text-white text-center text-[2w] font-nunito">VD</h1>
-     </div>
 
 
       
-     <div className='w-[8vw] h-[10vh] bg-[#f2ac02] flex flex-col justify-center items-center rounded-xl shadow-md' onClick={handleShowModal}>
-        <RelojDistinto fecha={dateToPass} />
-      </div>
-      </div>
-    </div>
-
-    
-    <div className="w-full  bg-gray-700 flex justify-center items-center mt-5">
-      <p className="text-white text-[2vh]">Prox 45mins: 0 + 0/2</p>
-    </div>
-
-
-    <div className="w-full bg-gray-100 flex flex-col justify-center items-center mt-2">
-      {pedidos.map((pedido) => {
-            // Verificamos si todos los productos de este pedido tienen los clics igualados a la cantidad
-            const todosCompletados = pedido.productos.every((producto) => {
-              const productoClicks = clicks[pedido.id]?.[producto.id] || 0;
-              return productoClicks === producto.cantidad;
-            });
-
-    // Definir el color de fondo del pedido según si todos los productos están completos
-    const containerColor = todosCompletados ? 'bg-green-700' : 'bg-gray-200'; // Fondo verde solo si todos los productos están completos
-
-    return (
-      <div key={pedido.id} className={`w-full flex  ${containerColor} p-2  mb-1`}>
-        <div className="flex items-center">
-          {/* Mostrar el número de pedido en la misma línea que los productos */}
-          <h3 
-          className={`text-[0.70vw] font-semibold mr-4 text-center
-            ${pedido.origen === 1 ? 'text-green-700' : 
-            pedido.origen === 0 ? 'text-gray-600' : 'text-gray-700'}`}
-        >
-          {pedido.NumeroPedido}
-         <p className='pt-1 w-16 font-extrabold '>{pedido.cliente ? pedido.cliente : 'Sin cliente'}</p> 
-        </h3>
-
-          {/* Botón de tres puntos al final de cada pedido */}
-          <div className='ms-[-0.5vw]'>
-            <button
-              className="p-2 rounded-md hover:bg-[#f2ac02] transition-all border-1 border-gray-300"
-              //onClick={() => alert(`Acción para el pedido: ${pedido.NumeroPedido}`)}
-              onClick={() => handleShowModal1(pedido.NumeroPedido)} 
-            >
-              {/* SVG de tres puntos */}
-              <svg fill="#808b96" width="25px" height="25px" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                <path d="M12,7a2,2,0,1,0-2-2A2,2,0,0,0,12,7Zm0,10a2,2,0,1,0,2,2A2,2,0,0,0,12,17Zm0-7a2,2,0,1,0,2,2A2,2,0,0,0,12,10Z"/>
-              </svg>
-            </button>
+        <div className={`${divStyle} flex flex-col justify-center items-center rounded-xl shadow-md`} onClick={handleShowModal}>
+            <RelojDistinto fecha={dateToPass} />
           </div>
-        </div>
+      </div>
+    </div>
 
-        {/* Mostrar los productos del pedido */}
-        <div className="ml-2 gap-2 flex flex-wrap items-center">
-          {/* Ordenar los productos según la categoría */}
-          {pedido.productos
-            .sort((a, b) => {
-              const ordenCategorias = ['comida', 'complementos', 'bebidas', 'postres', 'extras'];
-              return ordenCategorias.indexOf(a.categoria) - ordenCategorias.indexOf(b.categoria);
-            })
-            .map((producto) => {
-              const productoClicks = clicks[pedido.id]?.[producto.id] || 0;
-              const maxClicks = producto.cantidad;
+    <div className="w-full bg-gray-700 mt-5 p-1 fixed flex">
+    <div className="flex justify-start items-center"> {/* Alinea ambos divs horizontal y verticalmente */}
+      <div className="ms-3 p-1">
+        <svg width="28px" height="28px" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <g id="SVGRepo_bgCarrier" strokeWidth="0"/>
+          <g id="SVGRepo_tracerCarrier" strokeLinecap="round" strokeLinejoin="round"/>
+          <g id="SVGRepo_iconCarrier">
+            <path fillRule="evenodd" clipRule="evenodd" d="M15 10.5C15 12.9853 12.9853 15 10.5 15C8.01472 15 6 12.9853 6 10.5C6 8.01472 8.01472 6 10.5 6C12.9853 6 15 8.01472 15 10.5ZM14.1793 15.2399C13.1632 16.0297 11.8865 16.5 10.5 16.5C7.18629 16.5 4.5 13.8137 4.5 10.5C4.5 7.18629 7.18629 4.5 10.5 4.5C13.8137 4.5 16.5 7.18629 16.5 10.5C16.5 11.8865 16.0297 13.1632 15.2399 14.1792L20.0304 18.9697L18.9697 20.0303L14.1793 15.2399Z" fill="#e5e7e9"/>
+          </g>
+        </svg>
+      </div>
+      <div className="ms-1 w-30 h-6 bg-white rounded-md">
+      <div className="relative w-full">
+  <input
+    type="text"
+    className="w-full h-full bg-transparent border-none outline-none px-2 text-center pl-8"
+    placeholder="buscar..."
+    value={searchTerm}
+    onChange={handleSearchChange}
+  />
+  {searchTerm && (
+    <button
+      className="absolute right-2 top-1/2 transform -translate-y-1/2"
+      onClick={() => setSearchTerm('')}
+    >
+      <svg
+        xmlns="http://www.w3.org/2000/svg"
+        width="20"
+        height="20"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        className="text-gray-500 hover:text-gray-700"
+      >
+        <path d="M6 18L18 6M6 6l12 12" />
+      </svg>
+    </button>
+  )}
+</div>
 
-              // Colores según la categoría del producto
-              let borderColor = 'border-gray-500';
-              let backgroundColor = 'bg-white';
+      </div>
+    </div>
 
-              // Cambiar color de fondo solo si el número de clics alcanza la cantidad
-              if (productoClicks === maxClicks) {
-                if (producto.categoria === 'comida') {
-                  backgroundColor = 'bg-yellow-500';
-                } else if (producto.categoria === 'complementos') {
-                  backgroundColor = 'bg-green-700';
-                } else if (producto.categoria === 'bebidas') {
-                  backgroundColor = 'bg-red-700';
-                } else if (producto.categoria === 'postres') {
-                  backgroundColor = 'bg-purple-700';
-                } else if (producto.categoria === 'extras') {
-                  backgroundColor = 'bg-gray-500';
-                }
-              }
 
-              // Establecer el borde en función de la categoría
-              if (producto.categoria === 'comida') {
-                borderColor = 'border-3 border-yellow-500';
-              } else if (producto.categoria === 'complementos') {
-                borderColor = 'border-3 border-green-700';
-              } else if (producto.categoria === 'bebidas') {
-                borderColor = 'border-3 border-red-700';
-              } else if (producto.categoria === 'postres') {
-                borderColor = 'border-3 border-purple-700';
-              } else if (producto.categoria === 'extras') {
-                borderColor = 'border-3 border-gray-500';
-              }
+  {/* Contenedor flex para centrar el texto */}
+  <div className="flex justify-center w-full mt-1">
+    <div className="text-white text-[1.5vh]">
+      {/* Proximos 45 minutos */}
+      {(() => {
+       
 
-              return (
-                <div
-                  key={producto.id}
-                  className={`border-2 ${borderColor} ${backgroundColor} p-2 rounded-md w-auto cursor-pointer`}
-                  onClick={() => handleClick(pedido.id, producto.id, producto.cantidad)}
-                >
-                  {producto.nombre}
-                  <strong className='text-gray-500'> [ </strong>
-                  <strong>{productoClicks}/{producto.cantidad}</strong>
-                  <strong className='text-gray-500'> ] </strong>
-                </div>
-              );
-            })}
-        </div>
-        {/* Mostrar las observaciones del pedido en un div negro */}
-        {pedido.observaciones && (
-          <div className="ml-2 p-2 gap-3 border-3 border-gray-700  bg-gray-300 rounded-md w-auto font-nunito flex justify-center items-center">
-          <p className="flex items-center gap-3">
-            {pedido.pagado ? (
-              <>
-                <img src={dinero} alt="importe pagado" className="w-5" />
-              </>
-            ) : null}
-            Obser: {pedido.observaciones}
-          </p>
+          
+           return (
+          <div>
+            {dateToPass && (
+              // Si dateToPass está presente, mostrar "Modo Supervisión" encima del div
+              <span className="text-[#75adab] font-nunito font-extrabold -ms-[10vw]">MODO SUPERVISIÓN PEDIDOS</span>
+            )}
+        
+            <div
+              className={`text-gray-400 font-nunito text-xl flex space-x-1 -ms-[8vw] ${
+                dateToPass ? 'bg-gray-300' : 'bg-transparent'
+              }`} // Cambiar el color de fondo dependiendo de la condición
+            >
+              {!dateToPass && (
+                <>
+                  <span>Prox 45 min</span>
+                  <span>|</span>
+                  <span className="font-nunito text-gray-400">Pollo:</span>
+                  <span className="text-white font-nunito font-extrabold">{totales.totalProductosId1}</span>
+                  <span>+</span>
+                  <span className="text-white font-nunito font-extrabold">{totales.totalProductosId2}</span>
+                  <span>/2</span>
+                  {
+                      totales.totalProductosId20 > 0 && (
+                        <>
+                          <span>|</span>
+                          <span className="text-gray-400 font-nunito">Codillo:</span>
+                          <span className="text-white font-nunito font-extrabold">{totales.totalProductosId20}</span>
+                         
+                        </>
+                      )
+                    }
+                    {
+                      totales.totalProductosId41 > 0 && (
+                        <>
+                          <span>|</span>
+                          <span className="text-gray-400 font-nunito">Costilla:</span>
+                          <span className="text-white font-nunito font-extrabold">{totales.totalProductosId41}</span>
+                         
+                        </>
+                      )
+                    }
+                    {
+                      totales.totalProductosId48 > 0 && (
+                        <>
+                           <span>+</span>
+                           <span className="text-white font-nunito font-extrabold">{totales.totalProductosId48}</span>
+                           <span>/2</span>
+                        </>
+                      )
+                    }
+                  
+
+                 
+                 
+                </>
+              )}
+            </div>
+          </div>
+        );
+        
+        
+      })()}
+    </div>
+  </div>
+    </div>
+
+
+
+
+
+
+          <div className="w-full bg-gray-100 flex flex-col justify-center items-center mt-[6rem] mb-2 pl-1 pr-1">  
+        {Object.keys(bloquesFiltrados).map((bloque) => (
+          <div key={bloque} className="w-full ">
+            {/* Título con la franja horaria */}
+             <div className="text-center  bg-gray-500 text-md font-semibold mb-1 text-white font-nunito rounded-md ">
+                  <div className="flex justify-center items-center  ">
+                    <div>
+                    <span className='text-xl ms-[48vw] font-extrabold  '>{bloque}</span> {/* Mostrar la hora de la franja horaria */}
+                    </div>
+                    <div className=' flex ml-auto me-4 items-center'>
+                    <p className="text-lg font-bold  text-gray-300   "><span> Pedidos: </span>{bloquesFiltrados[bloque]?.pedidos.length || 0}  | Entregados:  </p>
+                    {/* Contamos los pedidos completados */}
+                    <p className="text-lg font-bold text-gray-300 ms-1 ">
+                      {/* Descontamos los productos completados de la longitud total de pedidos */}
+                      {bloquesFiltrados[bloque]?.pedidos.filter(pedido => {
+                        // Verificar si todos los productos del pedido están completos
+                        const todosCompletados = pedido.productos.every(producto => producto.entregado === producto.cantidad);
+                        return todosCompletados;  // Solo contar los pedidos donde todos los productos están completos
+                      }).length || 0} 
+                    </p>
+             </div>
+          
+         
+         
         </div>
         
-        )}
+        {/* Mostrar los alias de los productos en la franja horaria */}
+        {Object.keys(bloquesFiltrados[bloque].productos).length > 0 && (
+  <div className="">
+    {bloquesFiltrados[bloque].productos
+      // Ordenamos los productos según la categoría
+      .sort((a, b) => {
+        // Definimos las prioridades de las categorías
+        const categoriaPrioridad = {
+          comida: 1,
+          complementos: 2,
+          bebidas: 3,
+          postres: 4,
+          extras: 5,
+        };
+        
+        // Comparamos las categorías para ordenarlas
+        return categoriaPrioridad[a.categoria] - categoriaPrioridad[b.categoria];
+      })
+      .map((producto, index) => {
+        // Ahora accedemos directamente al objeto producto en el array
+
+        const categoriaColor = producto.categoria === "comida"
+          ? "text-yellow-500"  // Si la categoría es comida, amarillo
+          : producto.categoria === "complementos"
+          ? "text-green-900"  // Si la categoría es complementos, verde
+          : producto.categoria === "bebidas"
+          ? "text-red-700"  // Si la categoría es bebidas, rojo
+          : producto.categoria === "postres"
+          ? "text-purple-700"  // Si la categoría es postres, morado
+          : producto.categoria === "extras"
+          ? "text-gray-900"  // Si la categoría es extras, gris
+          : "text-gray-900";  // Si no es ninguna de las anteriores, gris
+
+        return (
+          <span key={index} className={`mr-2 font-extrabold font-nunito text-lg ${categoriaColor}`}>
+            {producto.nombre}: {producto.cantidad} ({producto.entregado}) 
+          </span>
+        );
+      })}
+  </div>
+)}
+
       </div>
-    );
-  })}
+
+      {/* Filtrar y mostrar los pedidos de esa franja horaria, aplicando el filtro de clientes */}
+      {bloquesFiltrados[bloque].pedidos.filter((pedido) => {
+        // Filtrar solo los pedidos que coinciden con el término de búsqueda de clientes
+        const numeroPedido = String(pedido.NumeroPedido || ""); // Convertir a string vacío si es null o undefined
+        const clienteMatch = pedido.cliente?.toLowerCase().includes(searchTerm.toLowerCase());
+        const numeroPedidoMatch = numeroPedido.toLowerCase().includes(searchTerm.toLowerCase());
+        return clienteMatch || numeroPedidoMatch;
+      }).map((pedido) => {
+        // Comprobamos si todos los productos del pedido tienen "entregado" igual a "cantidad"
+        const todosCompletados = pedido.productos.every(producto => producto.entregado === producto.cantidad);
+        
+        // Si todos los productos están completos, el color de fondo cambia a verde
+        const containerColor = todosCompletados ? 'bg-[#52be80]' : 'bg-gray-200';
+
+        return (
+          <div key={pedido.id} className={`w-full flex ${containerColor} p-[0.30vh] mb-1 rounded-md`}>
+            <div className="flex items-center">
+              <h3
+                className={`text-[0.70vw] font-semibold mr-4 text-center
+                  ${pedido.origen === 1 ? 'text-green-700' : 
+                  pedido.origen === 0 ? 'text-gray-600' : 'text-gray-700'}`}
+              >
+                {pedido.NumeroPedido}
+                <p className="pt-1 w-16 text-[0.5vw] font-extrabold">{pedido.cliente ? pedido.cliente : 'Generico'}</p>
+              </h3>
+
+              {/* Botón para mostrar detalles */}
+              <div className="ms-[-0.5vw]">
+                <button
+                  className="p-1 rounded-md hover:bg-[#f2ac02] transition-all border-1 border-gray-300"
+                  onClick={() => handleShowModal1(pedido.NumeroPedido)}
+                >
+                  <svg fill="#808b96" width="25px" height="25px" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M12,7a2,2,0,1,0-2-2A2,2,0,0,0,12,7Zm0,10a2,2,0,1,0,2,2A2,2,0,0,0,12,17Zm0-7a2,2,0,1,0,2,2A2,2,0,0,0,12,10Z"/>
+                  </svg>
+                </button>
+              </div>
+            </div>
+
+            {/* Mostrar los productos de este pedido */}
+            <div className="ml-2 gap-2 flex flex-wrap items-center ">
+              {pedido.productos.map((producto) => {
+                let borderColor = 'border-gray-500';
+                let backgroundColor = 'bg-white';
+
+                // Obtener el valor de entregado del producto
+                const entregadoActual = producto.entregado || 0;
+                const cantidadTotal = producto.cantidad;
+
+                // Definir el borde según la categoría
+                if (producto.categoria === 'comida') {
+                  borderColor = 'border-3 border-yellow-500';
+                } else if (producto.categoria === 'complementos') {
+                  borderColor = 'border-3 border-green-700';
+                } else if (producto.categoria === 'bebidas') {
+                  borderColor = 'border-3 border-red-700';
+                } else if (producto.categoria === 'postres') {
+                  borderColor = 'border-3 border-purple-700';
+                } else if (producto.categoria === 'extras') {
+                  borderColor = 'border-3 border-gray-500';
+                }
+
+                // Si entregado es igual a cantidad, cambia el color de fondo
+                if (entregadoActual === cantidadTotal) {
+                  backgroundColor = 'bg-[#52be80]';
+    
+                    }
+
+                return (
+                  <div
+                    key={producto.id}
+                    className={`border-2 ${borderColor} ${backgroundColor} p-2 rounded-md w-auto flex items-center text-md `}
+                    onClick={() => handleClick(pedido.NumeroPedido, producto.id, producto.cantidad)}
+                  >
+                    {producto.alias}
+                    <strong className="text-gray-500 ms-1"> [ </strong>
+                    <strong>{producto.entregado}/{producto.cantidad}</strong> {/* Mostrar entregado y cantidad */}
+                    <strong className="text-gray-500"> ] </strong>
+                    {producto.celiaco && <img src={singluten} alt="Sin gluten" className="w-5 h-5 ml-2" />}
+                    {producto.tostado && <img src={fire_new} alt="Tostado" className="w-5 h-5 ml-2" />}
+                    {producto.troceado && <img src={tijera_new} alt="Troceado" className="w-5 h-5 ml-2" />}
+                    {producto.salsa && <p className="ms-2 font-extrabold font-nunito"> | S.S</p>}
+                    {producto.extrasalsa && <p className="ms-2 font-extrabold font-nunito"> | E.S</p>}
+
+                    
+                  </div>
+                );
+              })}
+
+              {/* Si el pedido está completamente entregado, mostrar el componente GenerarQRCodeInvisible una sola vez */}
+              {pedido.productos.every(producto => producto.entregado === producto.cantidad) && (
+                <GenerarQRCodeInvisible numeroPedido={pedido.NumeroPedido} />
+              )}
+
+               {/* Si no tiene observaciones pero está pagado, mostrar solo el icono de pagado */}
+            {pedido.pagado && !pedido.observaciones && (
+              <div className="ml-2 p-2 gap-3 border-1 border-gray-700 bg-gray-300 rounded-md w-auto font-nunito flex justify-center items-center">
+                <img src={dinero} alt="importe pagado" className="w-5" />
+              </div>
+            )}
+
+            {/* Mostrar las observaciones del pedido */}
+            {pedido.pagado && pedido.observaciones && (
+              <div className="ml-2 p-2 gap-3 border-1 border-gray-700 bg-gray-300 rounded-md w-auto font-nunito flex justify-center items-center">
+                <p className="flex items-center gap-3">
+                  <img src={dinero} alt="importe pagado" className="w-5" />
+                  Ob: {pedido.observaciones}
+                </p>
+              </div>
+            )}
+
+              {/* Si tiene observaciones y no está pagado, mostrar solo las observaciones */}
+              {!pedido.pagado && pedido.observaciones && (
+              <div className="ml-2 p-2 gap-3 border-1 border-gray-700 bg-gray-300 rounded-md w-auto font-nunito flex justify-center items-center">
+                <p>Ob: {pedido.observaciones}</p>
+              </div>
+            )}
+
+
+            </div>
+
+          </div>
+        );
+      })}
     </div>
+  ))}
+</div>
+
+
 
 
 
@@ -608,7 +1416,9 @@ const realizarPedido = () => {
 
       </Link>
 
-      <Link className='p-3   hover:bg-gray-100 hover:rounded-2xl' to={"/ordenes"}>
+      <Link className='p-3   hover:bg-gray-100 hover:rounded-2xl' to={"/ordenes"} onClick={() => {
+          window.location.reload(); // Recarga la página al hacer clic en el enlace
+        }}>
 
       <svg width="40px" height="40px" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
 
@@ -846,10 +1656,59 @@ const realizarPedido = () => {
        
    </Modal>
 
+     {/* Modal cierre turno */}
+     <Modal show={showModal2} onHide={handleCloseModal2} size="md" backdrop="static" keyboard={false} centered>
+       
+  
+
+       
+       <Modal.Body className="flex flex-col items-center ">
+          
+          <div>
+
+          <h1 className='font-nunito text-2xl font-[2vw] text-[#808b96]'>El Turno actual ha finalizado!</h1>
+          </div>
+         
+         <div className='p-2'>
+         <svg fill="#808b96 " width="100px" height="100px" viewBox="-5.5 0 32 32" version="1.1" xmlns="http://www.w3.org/2000/svg">
+
+              <g id="SVGRepo_bgCarrier" strokeWidth="0"/>
+
+              <g id="SVGRepo_tracerCarrier" strokeLinecap="round" strokeLinejoin="round"/>
+
+              <g id="SVGRepo_iconCarrier"> <path d="M10.16 25.92c-2.6 0-8.72-0.24-9.88-2.24-1.28-2.28 2.040-8.24 3.080-10.040 1.040-1.76 4.64-7.56 7.12-7.56 2.8 0 7.24 7.48 8.56 10.12 1.92 3.84 2.48 6.4 1.56 7.6-1.52 2.040-8.96 2.12-10.44 2.12zM10.48 7.72c-0.72 0-3.080 2.36-5.64 6.76-2.76 4.68-3.48 7.72-3.080 8.4 0.32 0.56 3.2 1.4 8.4 1.4 5.44 0 8.64-0.88 9.080-1.48 0.28-0.36 0.040-2.28-1.72-5.84-2.64-5.28-6.12-9.24-7.040-9.24zM10.52 19.2c-0.48 0-0.84-0.36-0.84-0.84v-6.36c0-0.48 0.36-0.84 0.84-0.84s0.84 0.36 0.84 0.84v6.32c0 0.48-0.4 0.88-0.84 0.88zM11.36 21.36c0 0.464-0.376 0.84-0.84 0.84s-0.84-0.376-0.84-0.84c0-0.464 0.376-0.84 0.84-0.84s0.84 0.376 0.84 0.84z"/> </g>
+
+              </svg>
+
+
+
+         </div>
+       
+        </Modal.Body>
+
+  
+
+
+       
+       <Modal.Footer className='no-border'>
+         <Button
+           variant="primary"
+          
+           className="bg-yellow-500 border-yellow-500 hover:bg-yellow-600 hover:border-yellow-600 p-2 font-nunito"
+           onClick={handleCloseModal2}
+         >
+           Aceptar
+         </Button>
+       </Modal.Footer>
+       
+   </Modal>
+
          
     <PedidoRapido ref={pedidoRapidoRef} datosCliente={datosCliente} />
+   
                         
    </>
+   
   );
 };
 

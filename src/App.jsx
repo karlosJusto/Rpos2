@@ -14,7 +14,7 @@ import Layout from "./components/pedidos/Layout"
 import DataProvider from "./components/Context/DataContext"
 
 
-import LGCocina from "./components/cocina/LGCocina"
+
 import LGStock from "./components/stock/LGStock"
 import LGBuscadorPedidos from "./components/buscadorPedidos/LGBuscadorPedidos"
 import LGScanner from "./components/scanner/LGScanner"
@@ -26,6 +26,7 @@ import CalendarioPollos from "./components/dashboard/CalendarioPollos"
 import Empleados from "./components/dashboard/Empleados"
 import CrudEmpleados from "./components/dashboard/CrearEmpleado"
 import { ChickenOrderProvider } from './components/Context/ChickenOrderContext';
+import Cocina from "./components/cocina/Cocina"
 
 
 
@@ -46,7 +47,7 @@ function App() {
         <Route path="/layout/:categoria" element={<Layout />}/>
         <Route path="/ordenes" element={<Ordenes/>} />
         <Route path="/freidora" element={<LGFreidora />} />
-        <Route path="/cocina" element={<LGCocina />} />
+        <Route path="/cocina" element={<Cocina />} />
         <Route path="/buscadorPedidos" element={<LGBuscadorPedidos />} />
         <Route path="/stock" element={<LGStock />} />
         <Route path="/scanner" element={<LGScanner />} />
