@@ -93,7 +93,7 @@ const BuscadorPedidos = () => {
     <div className="p-4 max-w-4xl mx-auto">
       <div className="flex flex-wrap items-center gap-4 mb-4">
         <div className="w-full sm:w-auto">
-          <label htmlFor="criterio" className="block text-gray-700">Buscar por</label>
+          <label htmlFor="criterio" className="block text-gray-700 font-nunito text-xl">Buscar por:</label>
           <select
             id="criterio"
             value={criterio}
@@ -105,6 +105,9 @@ const BuscadorPedidos = () => {
             <option value="numeroPedido">Número de Pedido</option>
             <option value="confirmacionTarjeta">Confirmación de Tarjeta</option>
           </select>
+        </div>
+        <div className='pl-2 pr-2 pt-2'>
+          hola
         </div>
 
         {criterio === 'telefono' && (
@@ -166,7 +169,7 @@ const BuscadorPedidos = () => {
 
       <button
         onClick={buscarPedidos}
-        className="w-full bg-yellow-600 text-white py-3 rounded-md shadow-md hover:bg-yellow-500 disabled:bg-gray-300"
+        className="w-full bg-yellow-500 text-white py-3 rounded-md shadow-md hover:bg-yellow-600 disabled:bg-gray-300"
         disabled={loading}
       >
         {loading ? (
@@ -180,15 +183,18 @@ const BuscadorPedidos = () => {
 
       {error && <p className="mt-4 text-red-600 text-center">{error}</p>}
 
-      <div className="mt-6">
+      <div className="mt-6 text-center">
         {pedidos.length > 0 ? (
           <div className="space-y-4">
             {pedidos.map((pedido) => (
               <div key={pedido.id} className="border p-4 rounded-md shadow-md hover:shadow-xl transition">
-                <h3 className="font-semibold text-xl text-yellow-600">Pedido #{pedido.NumeroPedido}</h3>
-                <p><strong>Fecha:</strong> {pedido.fechahora_realizado}</p>
+                <h3 className="font-semibold text-xl text-yellow-500 pb-2">Pedido #{pedido.NumeroPedido}</h3>
+                <p><strong>Cliente:</strong> {pedido.cliente} | {pedido.telefono}</p>
+                <p><strong>Fecha Realizado:</strong> {pedido.fechahora_realizado}</p>
+                <p><strong>Fecha Recogida:</strong> {pedido.fechahora}</p>
+               
                 <p><strong>Estado:</strong> {pedido.pagado ? 'Pagado' : 'Pendiente'}</p>
-                <p><strong>Total:</strong> {pedido.productos.reduce((acc, item) => acc + parseFloat(item.total), 0).toFixed(2)} €</p>
+                <p className=''><strong>Total Pedido:</strong> {pedido.productos.reduce((acc, item) => acc + parseFloat(item.total), 0).toFixed(2)} €</p>
 
                 <div className="mt-4">
                   <h4 className="font-semibold">Productos Comprados:</h4>
@@ -199,6 +205,7 @@ const BuscadorPedidos = () => {
                         <p><strong>Cantidad:</strong> {producto.cantidad}</p>
                         <p><strong>Precio Unitario:</strong> {producto.precio} €</p>
                         <p><strong>Total:</strong> {producto.total} €</p>
+                        
                       </li>
                     ))}
                   </ul>

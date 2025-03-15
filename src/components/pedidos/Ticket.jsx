@@ -20,6 +20,9 @@ const Ticket = () => {
 
    const {cart} =useContext(dataContext);
 
+
+   //console.log(cart);
+
     const [show, setShow] = useState(false);
 
     const handleClose = () => setShow(false);
@@ -39,6 +42,7 @@ const Ticket = () => {
   const handleDataFromModal = (data) => {
     setDatosCliente(data);
   };
+
 
 
 
@@ -107,8 +111,8 @@ const Ticket = () => {
                     </Link>
                 </div>
 
-                <div className='p-[1.3vh] mt-[0.5vh]'>
-                <h1 className='font-nunito border-b-2 text-gray-500 font-bold border-gray-500 text-[1vw]'>Cliente</h1>
+                <div className='p-[1.3vh] mt-[1vh]'>
+                <h1 className='font-nunito border-b-2 text-gray-600 font-bold border-gray-600 text-[1vw]'>Cliente</h1>
                 </div>
 
                 <div className=''>
@@ -117,7 +121,7 @@ const Ticket = () => {
 
                     <div className='flex   items-center text-center justify-center '  onClick={handleShow} >
 
-                        <img src={avatar} alt={avatar} className='w-[3.5vw] rounded-lg border-2 border-yellow-500 ' />
+                        <img src={avatar} alt={avatar} className='w-[3.5vw] mt-2 rounded-lg border-2 border-yellow-500 ' />
 
                         <div className='ms-[1vw] font-nunito'>
                             <h3 className='text-gray-600 font-bold'>{datosCliente.cliente || ""}</h3>
@@ -168,11 +172,34 @@ const Ticket = () => {
                     <p className='font-nunito text-xs'>{datosCliente.observaciones}</p>
                          </div>
 
-                <div className='p-[1.3vh] '>
+              
+                
+                         {cart.length === 0  ? (
+                            <div className="flex justify-center items-center mt-52">
 
-                    <h1 className='font-nunito border-b-2 font-bold text-gray-500 border-gray-500 text-[1vw] '>Pedido</h1>
+                                <svg fill="#4B5563" height="150px" width="150px" version="1.1" id="Capa_1" xmlns="http://www.w3.org/2000/svg" xmlnsXlink="http://www.w3.org/1999/xlink" viewBox="0 0 483.1 483.1" xmlSpace="preserve">
 
-                </div>
+                                <g id="SVGRepo_bgCarrier" strokeWidth="0"/>
+
+                                <g id="SVGRepo_tracerCarrier" strokeLinecap="round" strokeLinejoin="round"/>
+
+                                <g id="SVGRepo_iconCarrier"> <g> <path d="M434.55,418.7l-27.8-313.3c-0.5-6.2-5.7-10.9-12-10.9h-58.6c-0.1-52.1-42.5-94.5-94.6-94.5s-94.5,42.4-94.6,94.5h-58.6 c-6.2,0-11.4,4.7-12,10.9l-27.8,313.3c0,0.4,0,0.7,0,1.1c0,34.9,32.1,63.3,71.5,63.3h243c39.4,0,71.5-28.4,71.5-63.3 C434.55,419.4,434.55,419.1,434.55,418.7z M241.55,24c38.9,0,70.5,31.6,70.6,70.5h-141.2C171.05,55.6,202.65,24,241.55,24z M363.05,459h-243c-26,0-47.2-17.3-47.5-38.8l26.8-301.7h47.6v42.1c0,6.6,5.4,12,12,12s12-5.4,12-12v-42.1h141.2v42.1 c0,6.6,5.4,12,12,12s12-5.4,12-12v-42.1h47.6l26.8,301.8C410.25,441.7,389.05,459,363.05,459z"/> </g> </g>
+
+                            </svg>
+
+
+
+
+
+
+                            </div>
+                        ) : (
+                            <div className='p-[1.3vh]'>
+                                <h1 className='font-nunito border-b-2 font-bold text-gray-600 border-gray-600 text-[1vw]'>
+                                    Pedido
+                                </h1>
+                            </div>
+                        )}
 
                
 
@@ -187,10 +214,14 @@ const Ticket = () => {
 
                 </div>
 
+                {cart.length === 0  ? (
+                         <div className="text-center text-[2vh] text-gray-600"></div>
+                        ) : (
                 <div className='p-[1.3vh] mt-[1vh]'>
-                <h1 className='font-nunito border-b-2 text-gray-500 font-bold border-gray-500 text-[1vw]'>Total</h1>
-                <CartTotal datosCliente={datosCliente} />
+                <h1 className='font-nunito border-b-2 text-gray-600 font-bold border-gray-600 text-[1vw]'>Total</h1>
+                <CartTotal datosCliente={datosCliente} setDatosCliente={setDatosCliente} />
                 </div>
+                 )}
 
                          
             
@@ -200,7 +231,7 @@ const Ticket = () => {
         
                 
           
-            </>
+                </>
 
 
             )

@@ -62,8 +62,8 @@ const RelojDistinto = ({ fecha }) => {
   return (
     <div className="flex flex-col items-center justify-center text-center p-2 rounded-lg ">
       <div className="text-[1vw] font-semibold  text-white font-nunito">{fechaDia}</div>  {/* Día de la semana */}
-      <div className="text-[1.25vw] text-white font-nunito">{fechaRestante}</div>  {/* Fecha DD/MM/AA */}
-      <div className="text-[1.10vw] text-white p-1 bg-gray-700 rounded-md font-nunito">{horaActual}</div>  {/* Hora en formato HH:mm */}
+      <div className="text-[1vw] text-white font-nunito">{fechaRestante}</div>  {/* Fecha DD/MM/AA */}
+      <div className="text-[0.9vw] text-white p-1 bg-gray-700 rounded-md font-nunito">{horaActual}</div>  {/* Hora en formato HH:mm */}
     </div>
   );
 };

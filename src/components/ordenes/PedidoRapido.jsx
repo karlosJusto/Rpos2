@@ -1,24 +1,55 @@
 import { useState, useContext, useImperativeHandle, forwardRef } from 'react';
-import { dataContext } from '../Context/DataContext';
 import { doc, setDoc, updateDoc, getDoc } from 'firebase/firestore';
 import { db } from '../firebase/firebase';
 import dayjs from 'dayjs';
 
 const PedidoRapido = forwardRef(({ datosCliente }, ref) => {
-  const { cart, setCart } = useContext(dataContext);
 
-  // Establecer el estado de los datos del cliente
+//obtener hora formateada
+
+
+const obtenerHoraRedondeada = () => {
+  const now = dayjs(); // Hora actual
+  
+  // Obtener los minutos actuales
+  const minutos = now.minute();
+
+  // Redondeamos los minutos al múltiplo más cercano de 15 (xx:00, xx:15, xx:30, xx:45)
+  const siguienteBloque = Math.floor(minutos / 15) * 15; // Redondea hacia abajo al múltiplo más cercano de 15 minutos
+  
+  // Ajustar la hora a 00, 15, 30, 45 minutos
+  const nuevaHora = now
+    .minute(siguienteBloque) // Ajustamos a los minutos correspondientes (xx:00, xx:15, etc.)
+    .second(0)
+    .millisecond(0);
+
+  // Si la hora ajustada es antes de la hora actual, avanzamos al siguiente bloque (añadimos 15 minutos)
+  return nuevaHora.isBefore(now) ? nuevaHora.add(15, 'minute') : nuevaHora;
+};
+
+const fechahora = datosCliente.fechahora || obtenerHoraRedondeada().format('DD/MM/YYYY HH:mm');
+
+
+
+
+
+
+
+
+//console.log(fechahora);
+
+
+
   const [clienteData, setClienteData] = useState({
-    cliente: 'AAgenerico',
-    telefono: '000000000',
-    fechahora: dayjs().add(15, 'minute').format('DD/MM/YYYY HH:mm'),
-    observaciones: 'Pedido Rapido',
-    pagado: false,
-    celiaco: false,
-    localidad: 'Mungia',
+    cliente: datosCliente.cliente || 'AAgenerico',
+    telefono: datosCliente.telefono || '000000000',
+    fechahora:  datosCliente.fechahora || fechahora,
+    observaciones: datosCliente.observaciones || 'Pedido Rapido',
+    pagado: datosCliente.pagado || false,
+    celiaco: datosCliente.celiaco || false,
+    localidad: datosCliente.localidad || 'Mungia',
   });
 
-  // Función para obtener el siguiente número de pedido
   const getNextId = async () => {
     const contadorRef = doc(db, 'contadorPedidos', 'pedidoId');
     const docSnap = await getDoc(contadorRef);
@@ -34,7 +65,6 @@ const PedidoRapido = forwardRef(({ datosCliente }, ref) => {
     }
   };
 
-  // Función para actualizar el stock de los productos
   const updateStock = async (productId, cantidadVendida) => {
     try {
       const productRef = doc(db, 'productos', productId);
@@ -47,7 +77,6 @@ const PedidoRapido = forwardRef(({ datosCliente }, ref) => {
 
         if (newStock >= 0) {
           await updateDoc(productRef, { stock: newStock });
-          console.log(`Stock actualizado para el producto ${productData.name}: ${newStock}`);
         } else {
           console.log(`No hay suficiente stock para el producto ${productData.name}`);
         }
@@ -59,103 +88,68 @@ const PedidoRapido = forwardRef(({ datosCliente }, ref) => {
     }
   };
 
-  // Función para realizar el pedido
-  const hacerPedido = async () => {
+  const hacerPedidoRapido = async (idProduct) => {
     try {
       const nextId = await getNextId();
 
-      const clienteDataSanitized = {
-        cliente: clienteData.cliente || datosCliente.cliente,
-        telefono: clienteData.telefono || datosCliente.telefono,
-        fechahora: clienteData.fechahora || datosCliente.fechahora,
-        observaciones: clienteData.observaciones || datosCliente.observaciones,
-        pagado: clienteData.pagado || datosCliente.pagado,
-        celiaco: clienteData.celiaco || datosCliente.celiaco,
-        localidad: clienteData.localidad || datosCliente.localidad,
-      };
-
-      if (!clienteDataSanitized.telefono || !clienteDataSanitized.cliente) {
-        console.error('El nombre y teléfono del cliente son obligatorios');
+      // Aquí se usa un id_product claro (por ejemplo, id_product = 1)
+      const productRef = doc(db, 'productos', idProduct.toString()); // Usamos el id del producto directamente
+      const productSnap = await getDoc(productRef);
+      
+      if (!productSnap.exists()) {
+        console.error('Producto no encontrado en Firestore');
         return;
       }
 
-      // Paso 1: Obtener los precios de los productos desde Firestore
-      const productosConPrecios = await Promise.all(
-        cart.map(async (item) => {
-          const productRef = doc(db, 'productos', item.id_product);
-          const productSnap = await getDoc(productRef);
+      const productData = productSnap.data();
 
-          if (productSnap.exists()) {
-            const productData = productSnap.data();
-            return {
-              ...item,
-              precio: (productData.price || 0).toFixed(2),
-             // total: ((productData.price || 0) * item.cantidad).toFixed(2),
-            };
-          } else {
-            console.error(`Producto con id ${item.id_product} no encontrado`);
-            return null;
-          }
-        })
-      );
-
-      console.log(productosConPrecios);
-
-      // Filtrar productos nulos (por si no se encuentra el producto)
-      const productosValidos = productosConPrecios.filter(item => item !== null);
-
-      if (productosValidos.length === 0) {
-        console.error('No se han encontrado productos válidos.');
-        return;
-      }
-
-      // Calcular el total del pedido
-      const totalPedido = productosValidos.reduce((acc, item) => acc + parseFloat(item.total), 0).toFixed(2);
-
-      // Crear los datos del pedido con los productos obtenidos
-      const pedidoData = {
+      // Crear los datos del pedido rápido
+      const productoRapidoData = {
         NumeroPedido: nextId,
-        cliente: clienteDataSanitized.cliente,
-        telefono: clienteDataSanitized.telefono,
-        fechahora: clienteDataSanitized.fechahora,
-        observaciones: clienteDataSanitized.observaciones,
-        pagado: clienteDataSanitized.pagado,
-        celiaco: clienteDataSanitized.celiaco,
-        productos: productosValidos,
-        total_pedido: totalPedido,
-        fechahora_realizado: new Date().toLocaleString(),
+        cliente: clienteData.cliente,
+        telefono: clienteData.telefono,
+        fechahora: datosCliente.fechahora || fechahora,
+        observaciones: clienteData.observaciones,
+        pagado: clienteData.pagado,
+        origen: 0, //origen del pedido
+        productos: [{
+          id: idProduct, // El id del producto que estamos usando
+          nombre: productData.name || 'Producto desconocido', // Nombre del producto desde Firestore
+          cantidad: 1, // Cantidad del producto, si es necesario
+          //cantidad: idProduct === 1 ? 1 : (idProduct === 2 ? 0.5 : 1),
+          alias: productData.alias, // Alias (si aplica)
+          observaciones: clienteData.observaciones || '', // Observaciones adicionales
+          celiaco: clienteData.celiaco || false, // Si el cliente tiene restricciones para celiacos
+          tostado: false, // Si el producto está tostado, si aplica
+          salsa: false, // Si no lleva salsa
+          extrasalsa: false, // Si lleva extra salsa
+          entregado: 1, // Si el producto ha sido entregado
+          troceado: false, // Si el producto está troceado
+          categoria: productData.categoria || 'No especificado', // Categoría del producto
+          precio: (productData.price || 0).toFixed(2), // Precio del producto, asegurándose de que no sea undefined
+          total: (productData.price || 0).toFixed(2), // Total para este producto (precio * cantidad)
+        }],
+        total_pedido: (productData.price || 0).toFixed(2), // Total del pedido
+        fechahora_realizado: new Date().toLocaleDateString('es-ES') + ' ' + new Date().toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' }), // Fecha y hora de realización
       };
 
-      // Paso 2: Guardar los datos del cliente en Firestore
-      await setDoc(doc(db, 'clientes', clienteDataSanitized.telefono), clienteDataSanitized, { merge: true });
+      // Guardar el pedido rápido en Firestore
+      await setDoc(doc(db, 'pedidos', nextId.toString()), productoRapidoData);
 
-      // Paso 3: Guardar el pedido en Firestore
-      await setDoc(doc(db, 'pedidos', nextId.toString()), {
-        ...pedidoData,
-        idCliente: clienteDataSanitized.telefono,
-      });
+      // Actualiza el stock de los productos
+      await updateStock(idProduct.toString(), 1);// Solo actualizamos el stock del producto 1
 
-      // Paso 4: Actualizar el stock de los productos
-      await Promise.all(
-        productosValidos.map((item) => {
-          return updateStock(item.id_product.toString(), item.cantidad || 1);
-        })
-      );
-
-      // Limpiar el carrito después de realizar el pedido
-      setCart([]);
-      console.log('Pedido realizado con éxito');
+      console.log('Pedido rápido realizado con éxito');
     } catch (error) {
-      console.error('Error al realizar el pedido:', error);
+      console.error('Error al realizar el pedido rápido:', error);
     }
   };
 
-  // Exponer la función hacerPedido a través de ref
   useImperativeHandle(ref, () => ({
-    hacerPedido,
+    hacerPedidoRapido,
   }));
 
-  return <></>;
+  return <></>; // Este componente no necesita un UI porque solo se usa para ejecutar la lógica
 });
 
 export default PedidoRapido;

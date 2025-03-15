@@ -3,9 +3,21 @@ import { dataContext } from '../Context/DataContext';
 
 const Stock = () => {
   const { data, actualizarStock, loading } = useContext(dataContext); // Usamos el context
-  const [nuevoStock, setNuevoStock] = useState(
+  
+  
+
+  const [stockActual, setStockActual] = useState(
     data.reduce((acc, producto) => {
       acc[producto.id_product] = producto.stock; // Inicializamos el stock con los valores actuales de cada producto
+      return acc;
+    }, {})
+  ); // Estado para almacenar el nuevo stock de cada producto
+
+  
+  
+  const [nuevoStock, setNuevoStock] = useState(
+    data.reduce((acc, producto) => {
+      acc[producto.id_product] = 0; // Inicializamos el stock con los valores actuales de cada producto
       return acc;
     }, {})
   ); // Estado para almacenar el nuevo stock de cada producto
@@ -20,24 +32,51 @@ const Stock = () => {
     });
   };
 
-  // Función para enviar todos los cambios de stock al backend (Firestore)
-  const handleActualizarStock = () => {
-    Object.keys(nuevoStock).forEach((id_product) => {
-      const stock = nuevoStock[id_product];
-      if (stock !== "") {
-        actualizarStock(id_product, stock); // Llamamos a la función para actualizar el stock en Firestore
-      }
+  const handleStockActualChange = (id_product, e) => {
+    setStockActual({
+      ...stockActual,
+      [id_product]: parseInt(e.target.value) || 0, // Actualizamos el stock para el producto correspondiente
     });
   };
 
-  // Si estamos cargando los datos, mostramos un mensaje de carga
+  // Función para enviar todos los cambios de stock al backend (Firestore)
+  const handleActualizarStock = () => {
+    
+
+    Object.keys(stockActual).forEach((id_product) => {
+    
+      const stock =stockActual[id_product] + nuevoStock[id_product];
+      if (stock !== "") {
+        actualizarStock(id_product, stock); // Llamamos a la función para actualizar el stock en Firestore
+        stockActual[id_product]=stock;
+        nuevoStock[id_product]=0;
+      }
+    });
+    
+    /*Object.keys(nuevoStock).forEach((id_product) => {
+    
+      const stock =stockActual[id_product] + nuevoStock[id_product];
+      if (stock !== "") {
+        actualizarStock(id_product, stock); // Llamamos a la función para actualizar el stock en Firestore
+        stockActual[id_product]=stock;
+        nuevoStock[id_product]=0;
+      }
+    });*/
+  };
+
+
+
+
+
+    // Si estamos cargando los datos, mostramos un mensaje de carga
   if (loading) {
     return <p className="text-center">Cargando productos...</p>;
   }
+  
 
   // Filtrar los productos según el término de búsqueda
   const productosFiltrados = data.filter((producto) =>
-    producto.name.toLowerCase().includes(search.toLowerCase()) // Filtramos por nombre del producto
+    producto.name.toLowerCase().includes(search.toLowerCase()) && ![1, 2, 48].includes(producto.id_product) // Filtramos por nombre del producto y excluimos los productos con id_product 1, 2 y 48
   );
 
   // Agrupar los productos por categoría
@@ -74,14 +113,15 @@ const Stock = () => {
         {/* Mostramos los productos agrupados por categoría */}
         {categoriasOrdenadas.map((categoria) => (
           <div key={categoria} className="mb-8">
-            <h2 className="text-2xl font-semibold mb-4 text-gray-800 capitalize">{categoria}</h2>
+            <h2 className="text-2xl font-nunito font-semibold mb-6  text-gray-500 capitalize">{categoria}</h2>
             <table className="table-auto w-full text-center border-collapse">
               <thead className="bg-[#F3F3F3]">
                 <tr className="text-xl font-nunito">
                   <th className="px-4 py-2">Producto</th>
                   <th className="px-4 py-2">Nombre</th>
                   <th className="px-4 py-2">Stock Actual</th>
-                  <th className="px-4 py-2">Nuevo Stock</th>
+                  <th className="px-4 py-2">Entran</th>
+                  <th className="px-4 py-2">Stock Final</th>
                 </tr>
               </thead>
               <tbody>
@@ -92,11 +132,23 @@ const Stock = () => {
                       <img
                         src={producto.imagen_rpos}
                         alt={producto.name}
-                        className="w-20 h-14 object-cover rounded-md mx-auto"
+                        className="w-15 h-10 object-cover rounded-md mx-auto"
                       />
                     </td>
-                    <td className="px-4 py-2 font-nunito text-xl">{producto.name}</td>
-                    <td className="px-4 py-2 font-extrabold font-nunito text-xl">{producto.stock}</td>
+                    <td className="px-4 py-2 font-nunito text-lg">{producto.name}</td>
+                   {/* <td className="px-4 py-2 font-extrabold font-nunito text-xl">{producto.stock}</td> */}
+
+                    <td className="px-4 py-2">
+                      <input
+                        type="number"
+                        value={stockActual[producto.id_product] || ""}
+                        onChange={(e) => handleStockActualChange(producto.id_product, e)}
+                        min="0"
+                        placeholder="Nuevo stock"
+                        className="px-2 py-1 border border-gray-300 rounded-md w-20 text-center focus:ring-yellow-500 focus:border-yellow-500"
+                      />
+                    </td>
+
                     <td className="px-4 py-2">
                       <input
                         type="number"
@@ -107,6 +159,8 @@ const Stock = () => {
                         className="px-2 py-1 border border-gray-300 rounded-md w-20 text-center focus:ring-yellow-500 focus:border-yellow-500"
                       />
                     </td>
+                    <td className="px-4 py-2 font-nunito text-lg font-extrabold">{producto.stock + (nuevoStock[producto.id_product] || 0)}</td>
+
                   </tr>
                 ))}
               </tbody>
@@ -116,53 +170,54 @@ const Stock = () => {
       </div>
 
       {/* Botón flotante para validar los cambios */}
-      <div className="fixed bottom-4 left-0 right-0 mx-4 rounded-md ">
-        <button
-          onClick={handleActualizarStock}
-          className="w-full py-3 bg-yellow-500 text-white font-nunito rounded-md focus:ring-yellow-500 hover:bg-yellow-600 flex items-center justify-center gap-2"
-        >
-          <svg
-            width="28px"
-            height="28px"
-            viewBox="0 0 24 24"
-            fill="none"
-            xmlns="http://www.w3.org/2000/svg"
-            className="text-white"
-          >
-            <g id="SVGRepo_iconCarrier">
-              <path
-                d="M4 18V6"
-                stroke="#ffffff"
-                strokeWidth="1.5"
-                strokeLinecap="round"
-              ></path>
-              <path
-                d="M20 12L20 18"
-                stroke="#ffffff"
-                strokeWidth="1.5"
-                strokeLinecap="round"
-              ></path>
-              <path
-                d="M12 10C16.4183 10 20 8.20914 20 6C20 3.79086 16.4183 2 12 2C7.58172 2 4 3.79086 4 6C4 8.20914 7.58172 10 12 10Z"
-                stroke="#ffffff"
-                strokeWidth="1.5"
-              ></path>
-              <path
-                d="M20 12C20 14.2091 16.4183 16 12 16C7.58172 16 4 14.2091 4 12"
-                stroke="#ffffff"
-                strokeWidth="1.5"
-                strokeLinecap="round"
-              ></path>
-              <path
-                d="M20 18C20 20.2091 16.4183 22 12 22C7.58172 22 4 20.2091 4 18"
-                stroke="#ffffff"
-                strokeWidth="1.5"
-              ></path>
-            </g>
-          </svg>
-          <span className="font-nunito text-lg">Actualizar Stock</span>
-        </button>
-      </div>
+      <div className="flex justify-center items-center w-full fixed bottom-4 mx-4 rounded-md">
+  <button
+    onClick={handleActualizarStock}
+    className="w-[33%] py-3 bg-yellow-500 text-white font-nunito rounded-md focus:ring-yellow-500 hover:bg-yellow-600 flex items-center justify-center gap-2"
+  >
+    <svg
+      width="28px"
+      height="28px"
+      viewBox="0 0 24 24"
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg"
+      className="text-white"
+    >
+      <g id="SVGRepo_iconCarrier">
+        <path
+          d="M4 18V6"
+          stroke="#ffffff"
+          strokeWidth="1.5"
+          strokeLinecap="round"
+        ></path>
+        <path
+          d="M20 12L20 18"
+          stroke="#ffffff"
+          strokeWidth="1.5"
+          strokeLinecap="round"
+        ></path>
+        <path
+          d="M12 10C16.4183 10 20 8.20914 20 6C20 3.79086 16.4183 2 12 2C7.58172 2 4 3.79086 4 6C4 8.20914 7.58172 10 12 10Z"
+          stroke="#ffffff"
+          strokeWidth="1.5"
+        ></path>
+        <path
+          d="M20 12C20 14.2091 16.4183 16 12 16C7.58172 16 4 14.2091 4 12"
+          stroke="#ffffff"
+          strokeWidth="1.5"
+          strokeLinecap="round"
+        ></path>
+        <path
+          d="M20 18C20 20.2091 16.4183 22 12 22C7.58172 22 4 20.2091 4 18"
+          stroke="#ffffff"
+          strokeWidth="1.5"
+        ></path>
+      </g>
+    </svg>
+    <span className="font-nunito text-lg">Actualizar Stock</span>
+  </button>
+</div>
+
     </div>
   );
 };

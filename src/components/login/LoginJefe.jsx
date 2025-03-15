@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { db } from '../firebase/firebase';
 import { collection, query, where, getDocs } from 'firebase/firestore'; // Importamos Firestore
 import loginboss from '../../assets/loginboss.png';
@@ -46,6 +46,7 @@ const Login = () => {
 
     console.log(valorInput);
 
+   
     try {
       // Creamos la consulta para buscar al empleado con el PIN ingresado
       const empleadosRef = collection(db, 'empleados'); // Accedemos a la colección "empleados"
@@ -67,6 +68,7 @@ const Login = () => {
           if (empleado.rol === "jefe") {
             console.log("Jefe ingresó correctamente");
             navigate('/dashboard'); // Redirige a /dashboard
+            //generarEstadisticas();
           } else if (empleado.rol === "empleado") {
             // Si es empleado, mostramos "No autorizado"
             console.log("No autorizado");

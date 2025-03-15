@@ -2,7 +2,9 @@ import React, { useState } from 'react';
 import { Offcanvas, Button, Navbar, Nav } from 'react-bootstrap';
 import { Link } from 'react-router-dom';
 import Reloj from '../pedidos/Reloj';
-import Stock from './Stock';
+import Cocina from '../cocina/Cocina'
+import ProgresoConTabs from './ProgresoConTabs';
+
 
 const texto= 'Stock';
 
@@ -15,7 +17,7 @@ const LGStock = () => {
   return (
     <>
       {/* Navbar */}
-      <Navbar bg="[#F3F3F3]">
+      <Navbar bg="[#F3F3F3]" fixed='top'>
         
         <Navbar.Brand href="#"></Navbar.Brand>
 
@@ -33,10 +35,9 @@ const LGStock = () => {
         <Navbar.Toggle aria-controls="basic-navbar-nav" />
           <Navbar.Collapse id="basic-navbar-nav">
             <Nav className="ms-auto pr-3 pt-1 d-flex justify-content-between w-100">
-              {/* Contenedor que centra el texto 'hola' */}
-              <div className="d-flex justify-content-center flex-grow-1">
-                <h1 className="text-xl font-nunito font-extrabold text-gray-600">{texto}</h1>
-              </div>
+            <div className="flex justify-center items-center max-w-xl mx-auto">
+              <h1 className="text-xl font-nunito font-extrabold text-gray-600">{texto}</h1>
+            </div> 
 
               {/* Componente Reloj, que se coloca a la derecha */}
               <Reloj />
@@ -170,10 +171,11 @@ const LGStock = () => {
         </Offcanvas.Body>
       </Offcanvas>
 
-     <div>
+      <div className=''>
+        <ProgresoConTabs/>
+      </div>
 
-      <Stock/>
-     </div>
+  
 
 
 

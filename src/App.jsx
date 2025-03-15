@@ -14,14 +14,14 @@ import Layout from "./components/pedidos/Layout"
 import DataProvider from "./components/Context/DataContext"
 
 
-import LGCocina from "./components/cocina/LGCocina"
+
 import LGStock from "./components/stock/LGStock"
 import LGBuscadorPedidos from "./components/buscadorPedidos/LGBuscadorPedidos"
 import LGScanner from "./components/scanner/LGScanner"
 import CrearProductos from "./components/dashboard/CrearProductos"
 import ListarClientes from "./components/dashboard/ListarClientes"
 import Ordenes from "./components/ordenes/Ordenes"
-
+import Cocina from "./components/cocina/Cocina"
 
 
 
@@ -40,7 +40,7 @@ function App() {
         <Route path="/layout/:categoria" element={<Layout />}/>
         <Route path="/ordenes" element={<Ordenes/>} />
         <Route path="/freidora" element={<LGFreidora />} />
-        <Route path="/cocina" element={<LGCocina />} />
+        <Route path="/cocina" element={<Cocina />} />
         <Route path="/buscadorPedidos" element={<LGBuscadorPedidos />} />
         <Route path="/stock" element={<LGStock />} />
         <Route path="/scanner" element={<LGScanner />} />

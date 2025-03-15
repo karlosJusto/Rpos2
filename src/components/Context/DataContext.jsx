@@ -1,5 +1,5 @@
 import { createContext, useState, useEffect } from "react";
-import { collection, getDocs, doc, updateDoc, onSnapshot } from "firebase/firestore";
+import { collection, getDoc, doc, updateDoc, onSnapshot } from "firebase/firestore";
 import { db } from "../firebase/firebase";
 import { useParams } from "react-router-dom";
 
@@ -13,6 +13,8 @@ const DataProvider = ({ children }) => {
   // Función para actualizar el stock de un producto
   const actualizarStock = async (id_product, nuevoStock) => {
     const idString = String(id_product);
+    // Agregar un console.log para verificar el valor de id_product
+   // console.log("ID del producto recibido:", id_product);
     if (!idString) {
       console.error("El ID del producto es inválido");
       return;
