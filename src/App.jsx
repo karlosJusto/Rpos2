@@ -37,7 +37,6 @@ function App() {
   return (
    
     <DataProvider>
-      <ChickenOrderProvider>
      <BrowserRouter >
       <Routes>
         <Route path="/" element={<Home />} />
@@ -67,7 +66,6 @@ function App() {
 
       </Routes>    
      </BrowserRouter>
-     </ChickenOrderProvider>
     </DataProvider>
    
     

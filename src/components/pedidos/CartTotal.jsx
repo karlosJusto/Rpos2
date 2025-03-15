@@ -18,10 +18,7 @@ const CartTotal = ({ datosCliente, setDatosCliente }) => {
     const now = dayjs(); // Hora actual
     const minutos = now.minute();
     const siguienteBloque = Math.floor(minutos / 15) * 15;
-    const nuevaHora = now
-      .minute(siguienteBloque)
-      .second(0)
-      .millisecond(0);
+    const nuevaHora = now.minute(siguienteBloque).second(0).millisecond(0);
     return nuevaHora.isBefore(now) ? nuevaHora.add(15, 'minute') : nuevaHora;
   };
 
@@ -89,60 +86,11 @@ const CartTotal = ({ datosCliente, setDatosCliente }) => {
     }
   };
 
-  // Función para actualizar el daily calendar (chicken_calendar_byday) con el número de "Pollo Asado"
-  // Utiliza exactamente el campo fechahora del cliente sin redondear
+  // Función simplificada para actualizar el daily calendar (chicken_calendar_byday) con el número de "Pollo Asado"
+  // Lógica omitida por el momento; se implementará en el futuro
   const updateChickenCalendarPollo = async (fechahora, cantidad) => {
-    try {
-      // Parseamos la fecha del pedido con el formato "DD/MM/YYYY HH:mm"
-      const orderDate = dayjs(fechahora, 'DD/MM/YYYY HH:mm');
-      // El documento diario se identifica con formato "YYYY-MM-DD"
-      const dailyDocId = orderDate.format('YYYY-MM-DD');
-      // Se toma la hora del pedido, tal como viene en clientData.fechahora (por ejemplo, "17:32")
-      const timeSlot = orderDate.format('HH:mm');
-
-      const docRef = doc(db, 'chicken_calendar_byday', dailyDocId);
-
-      await runTransaction(db, async (transaction) => {
-        const docSnap = await transaction.get(docRef);
-        if (!docSnap.exists()) {
-          throw new Error('Documento diario no existe');
-        }
-        const data = docSnap.data();
-        const intervals = data.intervals;
-        console.log("Intervalos del daily calendar:", intervals);
-        // Buscar el intervalo cuyo "start" coincida exactamente con el timeSlot obtenido
-        const index = intervals.findIndex(interval => interval.start === timeSlot);
-        if (index === -1) {
-          throw new Error(`No se encontró el intervalo con start ${timeSlot}`);
-        }
-
-        const current = intervals[index].orderedCount;
-        const max = intervals[index].maxAllowed;
-
-        // Validación para no exceder el límite:
-        if (current < max) {
-          if (current + cantidad <= max) {
-            intervals[index].orderedCount = current + cantidad;
-          } else {
-            throw new Error('La cantidad de Pollo Asado excede el límite permitido en este intervalo');
-          }
-        } else if (current === max) {
-          if (cantidad === 1) {
-            intervals[index].orderedCount = current + 1;
-          } else {
-            throw new Error('Solo se permite pedir 1 Pollo Asado adicional en este intervalo');
-          }
-        } else {
-          throw new Error('El límite de Pollo Asado en este intervalo ya se ha alcanzado');
-        }
-
-        transaction.update(docRef, { intervals });
-      });
-      console.log('Chicken calendar actualizado correctamente para Pollo Asado');
-    } catch (error) {
-      console.error('Error actualizando chicken calendar para Pollo Asado:', error);
-      throw error; // Propagamos el error para impedir que se procese el pedido
-    }
+    console.log('Función updateChickenCalendarPollo omitida. Se actualizará en el futuro.');
+    return;
   };
 
   // Función para enviar el pedido a Firestore
@@ -179,7 +127,7 @@ const CartTotal = ({ datosCliente, setDatosCliente }) => {
           precio: (item.price || 0).toFixed(2),
           total: ((item.price || 0) * (item.cantidad || 1)).toFixed(2),
         })),
-        total_pedido: cart.reduce((acc, item) => acc + (item.price * item.cantidad || 0), 0).toFixed(2), // Redondeo a 2 decimales
+        total_pedido: cart.reduce((acc, item) => acc + (item.price * item.cantidad || 0), 0).toFixed(2),
         fechahora_realizado: new Date().toLocaleDateString('es-ES') + ' ' + new Date().toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' }),
       };
 
@@ -194,57 +142,53 @@ const CartTotal = ({ datosCliente, setDatosCliente }) => {
       });
 
       // Actualizar el stock de los productos de forma asincrónica
-    // Paso 1: Descontar el stock de pollos enteros (id_product = 1)
-await Promise.all(
-  cart.map((item) => {
-    if (item.id_product === 1) { // Solo descontamos el stock de pollos enteros
-      return updateStock(item.id_product, item.cantidad || 1);
-    } else {
-      return Promise.resolve(); // Si no es pollo entero, no hacemos nada
-    }
-  })
-);
+      // Paso 1: Descontar el stock de pollos enteros (id_product = 1)
+      await Promise.all(
+        cart.map((item) => {
+          if (item.id_product === 1) {
+            return updateStock(item.id_product, item.cantidad || 1);
+          } else {
+            return Promise.resolve();
+          }
+        })
+      );
 
-// Paso 2: Descontar el stock de medios pollos (id_product = 2)
-await Promise.all(
-  cart.map((item) => {
-    if (item.id_product === 2) { // Solo descontamos el stock de medios pollos
-      const cantidadDeMediosPollos = item.cantidad || 1;  // Tomamos la cantidad de medio pollo
-      const cantidadDePollosEnteros = cantidadDeMediosPollos / 2;  // Cada medio pollo equivale a 0.5 pollos enteros
-      // Descontamos el stock del pollo entero correspondiente
-      return updateStock(1, cantidadDePollosEnteros);
-    } else {
-      return Promise.resolve(); // Si no es medio pollo, no hacemos nada
-    }
-  })
-);
+      // Paso 2: Descontar el stock de medios pollos (id_product = 2)
+      await Promise.all(
+        cart.map((item) => {
+          if (item.id_product === 2) {
+            const cantidadDeMediosPollos = item.cantidad || 1;
+            const cantidadDePollosEnteros = cantidadDeMediosPollos / 2;
+            return updateStock(1, cantidadDePollosEnteros);
+          } else {
+            return Promise.resolve();
+          }
+        })
+      );
 
+      // Paso 1: Descontar el stock de costilla (id_product = 41)
+      await Promise.all(
+        cart.map((item) => {
+          if (item.id_product === 41) {
+            return updateStock(item.id_product, item.cantidad || 1);
+          } else {
+            return Promise.resolve();
+          }
+        })
+      );
 
-// Paso 1: Descontar el stock de costilla (id_product 41)
-await Promise.all(
-  cart.map((item) => {
-    if (item.id_product === 41) { // Solo descontamos el stock de pollos enteros (id_product 41)
-      return updateStock(item.id_product, item.cantidad || 1);
-    } else {
-      return Promise.resolve(); // Si no es pollo entero, no hacemos nada
-    }
-  })
-);
-
-// Paso 2: Descontar el stock de media costilla (id_product 48) sobre el stock de la costilla entera entero (id_product 41)
-await Promise.all(
-  cart.map((item) => {
-    if (item.id_product === 48) { // Solo descontamos el stock de medios pollos (id_product 48)
-      const cantidadDeMediaCostilla = item.cantidad || 1;  // Tomamos la cantidad de medio pollo
-      const cantidadDeCostillaEntera = cantidadDeMediaCostilla / 2;  // Cada medio pollo equivale a 0.5 pollos enteros
-      // Descontamos el stock del pollo entero correspondiente
-      return updateStock(41, cantidadDeCostillaEntera); // Descontamos de id_product 41
-    } else {
-      return Promise.resolve(); // Si no es medio pollo, no hacemos nada
-    }
-  })
-);
-      
+      // Paso 2: Descontar el stock de media costilla (id_product = 48) sobre el stock de la costilla entera (id_product 41)
+      await Promise.all(
+        cart.map((item) => {
+          if (item.id_product === 48) {
+            const cantidadDeMediaCostilla = item.cantidad || 1;
+            const cantidadDeCostillaEntera = cantidadDeMediaCostilla / 2;
+            return updateStock(41, cantidadDeCostillaEntera);
+          } else {
+            return Promise.resolve();
+          }
+        })
+      );
 
       // 4. Si el pedido contiene "Pollo Asado", actualizar el daily calendar
       const polloItem = pedidoData.productos.find(p => p.nombre === 'Pollo Asado');
@@ -254,8 +198,8 @@ await Promise.all(
       }
 
       console.log('Pedido guardado con éxito');
-      setCart([]); // Limpiar el carrito
-      setDatosCliente({ // Resetear los datos del cliente
+      setCart([]);
+      setDatosCliente({
         cliente: '',
         telefono: '',
         fechahora: '',
