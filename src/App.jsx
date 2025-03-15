@@ -25,6 +25,7 @@ import Listaproductos from "./components/dashboard/ListaProductos"
 import CalendarioPollos from "./components/dashboard/CalendarioPollos"
 import Empleados from "./components/dashboard/Empleados"
 import CrudEmpleados from "./components/dashboard/CrearEmpleado"
+import { ChickenOrderProvider } from './components/Context/ChickenOrderContext';
 
 
 
@@ -35,6 +36,7 @@ function App() {
   return (
    
     <DataProvider>
+      <ChickenOrderProvider>
      <BrowserRouter >
       <Routes>
         <Route path="/" element={<Home />} />
@@ -64,6 +66,7 @@ function App() {
 
       </Routes>    
      </BrowserRouter>
+     </ChickenOrderProvider>
     </DataProvider>
    
     
