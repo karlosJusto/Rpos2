@@ -1,20 +1,48 @@
 import React, { useState, useEffect } from 'react';
 import { Calendar, Clock, ChevronDown, Save } from 'lucide-react';
 import { db } from '../firebase/firebase';
-import { collection, onSnapshot, doc, updateDoc } from 'firebase/firestore';
-import { useChickenOrder } from '../Context/ChickenOrderContext'; // Asegúrate de importar el contexto
+import { collection, onSnapshot, doc, updateDoc, getDoc } from 'firebase/firestore';
+import { useChickenOrder } from '../Context/ChickenOrderContext';
 
 function CalendarioPollos() {
   const [days, setDays] = useState([]);
   const { dailyCalendar, loading, refreshDailyCalendar } = useChickenOrder();
 
-  // Función para normalizar el formato de hora a "HH:MM"
+  // Convierte una cadena de hora a formato "HH:MM"
   const normalizeTime = (timeStr) => {
     if (!timeStr) return '';
     return timeStr.includes(':') ? timeStr : `${timeStr.padStart(2, '0')}:00`;
   };
-  
-  // Escucha en tiempo real los cambios de la colección "calendar" y normaliza los horarios
+
+  // Función para generar intervalos en franjas de 15 minutos
+  const generateIntervalsForSchedule = (start, end, maxAllowed) => {
+    const [startHour, startMinute] = start.split(':').map(Number);
+    const [endHour, endMinute] = end.split(':').map(Number);
+    let current = startHour * 60 + startMinute;
+    const endTime = endHour * 60 + endMinute;
+    const intervals = [];
+    // Genera intervalos de 15 minutos mientras la franja completa esté dentro del rango
+    while (current + 15 <= endTime) {
+      const startStr =
+        String(Math.floor(current / 60)).padStart(2, '0') +
+        ':' +
+        String(current % 60).padStart(2, '0');
+      const endStr =
+        String(Math.floor((current + 15) / 60)).padStart(2, '0') +
+        ':' +
+        String((current + 15) % 60).padStart(2, '0');
+      intervals.push({
+        start: startStr,
+        end: endStr,
+        maxAllowed,
+        orderedCount: 0,
+      });
+      current += 15;
+    }
+    return intervals;
+  };
+
+  // Escucha en tiempo real los cambios de la colección "calendar"
   useEffect(() => {
     const unsubscribe = onSnapshot(collection(db, 'calendar'), (snapshot) => {
       const daysData = snapshot.docs.map((doc) => {
@@ -33,6 +61,7 @@ function CalendarioPollos() {
         }
         return { id: doc.id, ...data };
       });
+      console.log('Calendario (days) actualizado:', daysData);
       setDays(daysData);
     });
     return unsubscribe;
@@ -77,8 +106,97 @@ function CalendarioPollos() {
     );
   };
 
+  // Función para actualizar el documento dailyCalendar (en la colección "chicken_calendar_daily")
+  // Genera nuevos intervalos según la configuración y hace merge con aquellos intervalos que ya tienen pedidos.
+  const updateDailyCalendarIntervals = async () => {
+    try {
+      if (days.length === 0) {
+        console.warn("No hay datos en 'days', no se puede actualizar el dailyCalendar.");
+        return;
+      }
+      if (!dailyCalendar || !dailyCalendar.date) {
+        console.warn("No hay dailyCalendar o no tiene 'date' definida.");
+        return;
+      }
+      // El ID del documento es la fecha, ej. "2025-03-16"
+      const docId = dailyCalendar.date;
+      const docRef = doc(db, 'chicken_calendar_daily', docId);
+      const docSnap = await getDoc(docRef);
+      if (!docSnap.exists()) {
+        console.warn("El documento de dailyCalendar no existe para el día:", docId);
+        return;
+      }
+      const oldData = docSnap.data();
+      if (!oldData.intervals) {
+        console.warn("El documento no contiene 'intervals'.");
+        return;
+      }
+      console.log("DailyCalendar actual:", oldData);
+
+      // Se calcula el día de la semana a partir de la fecha (para buscar la configuración)
+      const dateObj = new Date(dailyCalendar.date + "T00:00:00");
+      const daysOfWeek = ["Domingo", "Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado"];
+      const dayName = daysOfWeek[dateObj.getDay()];
+      console.log("Día calculado:", dayName);
+
+      // Busca la configuración para el día (por ejemplo, Lunes, Martes, etc.)
+      const correspondingDay = days.find(day => day.name === dayName);
+      if (!correspondingDay) {
+        console.warn("No se encontró configuración para el día:", dayName);
+        return;
+      }
+
+      // Se generan nuevos intervalos para cada schedule activo de ese día.
+      let newIntervals = [];
+      if (correspondingDay.morningSchedule?.active) {
+        const intervalsMorning = generateIntervalsForSchedule(
+          correspondingDay.morningSchedule.start,
+          correspondingDay.morningSchedule.end,
+          correspondingDay.chickenAmount
+        );
+        newIntervals = newIntervals.concat(intervalsMorning);
+      }
+      if (correspondingDay.eveningSchedule?.active) {
+        const intervalsEvening = generateIntervalsForSchedule(
+          correspondingDay.eveningSchedule.start,
+          correspondingDay.eveningSchedule.end,
+          correspondingDay.chickenAmount
+        );
+        newIntervals = newIntervals.concat(intervalsEvening);
+      }
+      console.log("Nuevos intervalos generados:", newIntervals);
+
+      // Merge: se recorren los nuevos intervalos y se conserva un intervalo anterior si tiene pedidos
+      const mergedIntervals = newIntervals.map(newInt => {
+        const matchingOld = oldData.intervals.find(oldInt => oldInt.start === newInt.start && oldInt.end === newInt.end);
+        if (matchingOld && matchingOld.orderedCount > 0) {
+          console.log("Conservo intervalo con pedidos:", matchingOld);
+          return matchingOld;
+        }
+        return newInt;
+      });
+      // Se agregan aquellos intervalos viejos que no coinciden con los nuevos pero que tienen pedidos
+      oldData.intervals.forEach(oldInt => {
+        const existsInNew = newIntervals.some(newInt => newInt.start === oldInt.start && newInt.end === oldInt.end);
+        if (!existsInNew && oldInt.orderedCount > 0) {
+          console.log("Agregando intervalo antiguo con pedidos que no existe en la nueva configuración:", oldInt);
+          mergedIntervals.push(oldInt);
+        }
+      });
+      // Ordena los intervalos por hora de inicio
+      mergedIntervals.sort((a, b) => (a.start > b.start ? 1 : -1));
+      console.log("Intervalos finales a actualizar:", mergedIntervals);
+      
+      await updateDoc(docRef, { intervals: mergedIntervals });
+      console.log("DailyCalendar actualizado correctamente");
+    } catch (error) {
+      console.error("Error actualizando dailyCalendar:", error);
+    }
+  };
+
   const handleUpdate = async () => {
     try {
+      // Actualiza la configuración en la colección "calendar"
       await Promise.all(
         days.map((day) => {
           const dayRef = doc(db, 'calendar', day.id);
@@ -109,14 +227,15 @@ function CalendarioPollos() {
               : '';
           }
           const { id, ...data } = updatedData;
-          return updateDoc(dayRef, data);
+          return updateDoc(doc(db, 'calendar', day.id), data);
         })
       );
+      // Actualiza el dailyCalendar (generando nuevos intervalos y haciendo merge con los que tienen pedidos)
+      await updateDailyCalendarIntervals();
       alert('Cambios guardados en Firebase');
-      // Opcional: refrescar el dailyCalendar tras actualizar la configuración
       refreshDailyCalendar();
     } catch (error) {
-      console.error('Error updating documents:', error);
+      console.error('Error actualizando documentos:', error);
       alert('Error actualizando datos');
     }
   };
@@ -133,7 +252,7 @@ function CalendarioPollos() {
         {/* Contenido principal */}
         <div className="p-6">
           <h2 className="text-2xl font-bold text-gray-800 mb-6">Modo venta</h2>
-          {/* Aquí se mantiene la tabla de configuración */}
+          {/* Tabla de configuración */}
           <div className="overflow-x-auto">
             <table className="w-full border-collapse">
               <thead>
@@ -292,7 +411,7 @@ function CalendarioPollos() {
               Actualizar modo venta
             </button>
           </div>
-          {/* Opcional: sección para ver/actualizar el dailyCalendar */}
+          {/* Sección para ver/actualizar el dailyCalendar */}
           <div className="mt-8">
             <h3 className="text-xl font-semibold">Calendario diario de pedidos</h3>
             {loading ? (
@@ -319,7 +438,7 @@ function CalendarioPollos() {
                 </tbody>
               </table>
             ) : (
-              <p>{message}</p>
+              <p>No hay información del calendario diario</p>
             )}
             <button
               className="mt-4 bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded"

@@ -29,7 +29,7 @@ export const ChickenOrderProvider = ({ children }) => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Crea el documento diario en "chicken_calendar_byday" si aún no existe
+  // Crea el documento diario en "chicken_calendar_daily" si aún no existe
   const createDailyCalendar = async () => {
     console.log("AAAA?")
     const docRef = doc(db, 'chicken_calendar_daily', dayString);
@@ -120,7 +120,7 @@ export const ChickenOrderProvider = ({ children }) => {
 
   // Función para realizar un pedido en un intervalo concreto (por índice)
   const placeChickenOrder = async (intervalIndex, orderQuantity) => {
-    const docRef = doc(db, 'chicken_calendar_byday', dayString);
+    const docRef = doc(db, 'chicken_calendar_daily', dayString);
     try {
       await runTransaction(db, async (transaction) => {
         const docSnap = await transaction.get(docRef);
