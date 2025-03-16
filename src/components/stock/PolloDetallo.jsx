@@ -65,6 +65,8 @@ const PolloDetallo = () => {
          const stockActualizado = (item.entran || 0) + (item.stock || 0);
          const stockFinal = stockActualizado - (item.vd || 0) - (item.baja || 0) - (item.devueltos || 0);
 
+         console.log(stockFinal);
+
         // Aquí actualizamos todos los campos para ese día
         await updateDoc(docRef, {
           entran: item.entran,
@@ -117,7 +119,7 @@ const PolloDetallo = () => {
             return (
               <tr key={index}>
                 <td className="table-cell-width capitalize"> {item.diasemana} , {item.dia}</td>
-                <td className="table-cell-width w-36 font-extrabold">{item.stock}</td>
+                <td className="table-cell-width w-36 font-extrabold">{stockFinal}</td>
                 <td className="table-cell-width text-center w-32">
                   <input 
                     type="number" 

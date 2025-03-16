@@ -1348,28 +1348,28 @@ const handlePedidoRapido = (idProduct) => {
               )}
 
                {/* Si no tiene observaciones pero está pagado, mostrar solo el icono de pagado */}
-            {pedido.pagado && !pedido.observaciones && (
-              <div className="ml-2 p-2 gap-3 border-1 border-gray-700 bg-gray-300 rounded-md w-auto font-nunito flex justify-center items-center">
-                <img src={dinero} alt="importe pagado" className="w-5" />
-              </div>
-            )}
+               {pedido.pagado && !pedido.observaciones && (
+                    <div className={`ml-2 p-2 gap-3 border-1 border-gray-700 ${pedido.productos.every(producto => producto.entregado === producto.cantidad) ? 'bg-[#52be80]' : 'bg-gray-300'} rounded-md w-auto font-nunito flex justify-center items-center`}>
+                      <img src={dinero} alt="importe pagado" className="w-5" />
+                    </div>
+                  )}
 
-            {/* Mostrar las observaciones del pedido */}
-            {pedido.pagado && pedido.observaciones && (
-              <div className="ml-2 p-2 gap-3 border-1 border-gray-700 bg-gray-300 rounded-md w-auto font-nunito flex justify-center items-center">
-                <p className="flex items-center gap-3">
-                  <img src={dinero} alt="importe pagado" className="w-5" />
-                  Ob: {pedido.observaciones}
-                </p>
-              </div>
-            )}
+                  {/* Mostrar las observaciones del pedido */}
+                  {pedido.pagado && pedido.observaciones && (
+                    <div className={`ml-2 p-2 gap-3 border-1 border-gray-700 ${pedido.productos.every(producto => producto.entregado === producto.cantidad) ? 'bg-[#52be80]' : 'bg-gray-300'} rounded-md w-auto font-nunito flex justify-center items-center`}>
+                      <p className="flex items-center gap-3">
+                        <img src={dinero} alt="importe pagado" className="w-5" />
+                        Ob: {pedido.observaciones}
+                      </p>
+                    </div>
+                  )}
 
-              {/* Si tiene observaciones y no está pagado, mostrar solo las observaciones */}
-              {!pedido.pagado && pedido.observaciones && (
-              <div className="ml-2 p-2 gap-3 border-1 border-gray-700 bg-gray-300 rounded-md w-auto font-nunito flex justify-center items-center">
-                <p>Ob: {pedido.observaciones}</p>
-              </div>
-            )}
+                  {/* Si tiene observaciones y no está pagado, mostrar solo las observaciones */}
+                  {!pedido.pagado && pedido.observaciones && (
+                    <div className={`ml-2 p-2 gap-3 border-1 border-gray-700 ${pedido.productos.every(producto => producto.entregado === producto.cantidad) ? 'bg-[#52be80]' : 'bg-gray-300'} rounded-md w-auto font-nunito flex justify-center items-center`}>
+                      <p>Ob: {pedido.observaciones}</p>
+                    </div>
+              )}
 
 
             </div>

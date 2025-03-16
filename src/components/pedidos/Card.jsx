@@ -82,11 +82,13 @@ const Card = () => {
                 )}
               </div>
               <div className="flex items-center justify-between p-[0.5vw]">
-                <h2 className="text-gray-100 font-nunito text-[0.85vw] border-1 p-1 bg-gray-600 rounded-[0.375vw] mt-[0.50vw]">
-                   <span className={product.stock === 0 ? 'text-red-500' : 'text-gray-100'}>
-                   Stock: {product.stock}
-                  </span>
-                </h2>
+              {product.id_product !== 2 && (
+                    <h2 className="text-gray-100 font-nunito text-[0.85vw] border-1 p-1 bg-gray-600 rounded-[0.375vw] mt-[0.50vw]">
+                      <span className={product.stock === 0 ? 'text-red-500' : 'text-gray-100'}>
+                        Stock: {product.stock}
+                      </span>
+                    </h2>
+                  )}
                 <h2 className="text-[1.25vw] font-extrabold text-gray-700 font-nunito pt-2">
                   {product.price.toFixed(2)} €
                 </h2>

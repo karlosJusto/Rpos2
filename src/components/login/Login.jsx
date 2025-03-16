@@ -78,10 +78,15 @@ dayjs.locale('es');
   }
 };
 
+
+
 // Usamos useEffect para obtener el stock cuando el componente se monta
 useEffect(() => {
   obtenerStockProducto(1); // Llamamos a la función para obtener el stock del producto con product_id = 1
 }, []); // El array vacío hace que se ejecute solo una vez cuando el componente se monta
+
+
+
 
 
 
