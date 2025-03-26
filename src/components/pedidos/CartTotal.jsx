@@ -1,5 +1,4 @@
 import { useState, useContext, useEffect} from 'react';
-import { useState, useContext } from 'react';
 import { dataContext } from '../Context/DataContext';
 import { collection, getDocs, doc, getDoc, updateDoc, setDoc, runTransaction } from 'firebase/firestore';
 import { db } from '../firebase/firebase';
@@ -12,7 +11,6 @@ dayjs.extend(customParseFormat);
 
 const CartTotal = ({ datosCliente, setDatosCliente }) => {
   const { cart, setCart } = useContext(dataContext);
-
   const navigate = useNavigate();  // Declara el hook useNavigate
 
 
@@ -27,25 +25,6 @@ const CartTotal = ({ datosCliente, setDatosCliente }) => {
   const handleCloseModal2 = () => {
     setShowModal2(false); // Cerrar el modal
   };
-
-
-
-  const navigate = useNavigate();  // Declara el hook useNavigate
-
-
-  const [mensajeModal, setMensajeModal] = useState("");
-  const [showModal, setShowModal] = useState(false);
-  const [showModal2, setShowModal2] = useState(false);
-
-  const handleCloseModal = () => {
-    setShowModal(false); // Cerrar el modal
-  };
-  
-  const handleCloseModal2 = () => {
-    setShowModal2(false); // Cerrar el modal
-  };
-
-
 
   // Calcular el total del carrito
   const total = cart.reduce((acc, item) => acc + (item.price || 0) * (item.cantidad || 1), 0);
@@ -235,7 +214,7 @@ const CartTotal = ({ datosCliente, setDatosCliente }) => {
   };
 
   // Función para enviar el pedido a Firestore
-  const sendToFirestore = async () => {
+  const sendToFirestore = async ({confirmado}) => {
     try {
 
       if (!confirmado)
@@ -388,13 +367,14 @@ await Promise.all(
 
   return cart.length > 0 ? (
     <>
-      <div className="flex justify-end p-[0.5vw]">
+      <div className='flex justify-end p-[0.5vw]'>
         <a href="#" className="inline-flex items-center text-2xl font-extrabold text-gray-600 hover:underline dark:text-gray-400">
-          <span className="text-end">{total.toFixed(2)} €</span>
+          <span className='text-end'>{total.toFixed(2)} €</span>
         </a>
       </div>
-      <div className="flex text-center justify-center items-center">
-        <button onClick={sendToFirestore}
+
+      <div className='flex text-center justify-center items-center'>
+      <button onClick={() => sendToFirestore({ confirmado: false })}
           className="mt-[2vw] w-[10vw] tracking-wide bg-[#f2ac02] text-white py-[0.95vw] rounded-lg hover:bg-yellow-600 transition-all duration-300 ease-in-out flex items-center justify-center focus:shadow-outline focus:outline-none">
           <svg width="28px" height="28px" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
             <path d="M4 18V6" stroke="#ffffff" strokeWidth="1.5" strokeLinecap="round"></path>
@@ -409,6 +389,7 @@ await Promise.all(
           </span>
         </button>
       </div>
+
 
         {/* Modal confirmaciones */}
      <Modal show={showModal2} mensaje={mensajeModal}  onHide={handleCloseModal2} size="md" backdrop="static" keyboard={false} centered>
