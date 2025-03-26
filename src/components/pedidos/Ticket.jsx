@@ -1,6 +1,6 @@
 
 
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 
 import { Link } from "react-router-dom";
 import {useContext } from 'react'
@@ -13,12 +13,17 @@ import singluten from '../../assets/singluten.png';
 
 
 import ModalClientes from './ModalClientes';
+import Ordenes from '../ordenes/Ordenes';
 
 
 
 const Ticket = () => {
 
+
+
    const {cart} =useContext(dataContext);
+
+  
 
 
    //console.log(cart);
@@ -106,8 +111,8 @@ const Ticket = () => {
 
                     </Link>
 
-                    <Link className=' p-[0.30vw] rounded-lg   bg-[#f2ac02] '>
-                    <h1 className='p-[0.40vw]  font-nunito text-white'>18</h1>
+                    <Link className=' p-[0.30vw] rounded-lg   bg-green-700 '>
+                    <h1 className='p-[0.40vw]  font-nunito text-white'>10</h1>
                     </Link>
                 </div>
 

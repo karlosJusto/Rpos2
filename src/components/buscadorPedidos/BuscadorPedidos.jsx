@@ -1,6 +1,11 @@
 import React, { useState } from 'react';
 import { db } from "../firebase/firebase"; // Asegúrate de tener correctamente la configuración de Firebase
 import { collection, query, where, getDocs } from "firebase/firestore";
+import pagado from '../../assets/ticket/pagado.png'; // Imagen paid
+import metodopago from '../../assets/ticket/metodopago.png'; // Imagen pago
+import cliente from '../../assets/ticket/cliente.png'; // Imagen pago
+import phone from '../../assets/ticket/phone.png'; // Imagen phone
+import pedido from '../../assets/ticket/pedido.png'; // Imagen phone
 
 const BuscadorPedidos = () => {
   const [telefono, setTelefono] = useState('');
@@ -12,8 +17,18 @@ const BuscadorPedidos = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
+    // Declaramos las imágenes dentro del componente
+    const imagenes = {
+      telefono: phone,
+      nombre: cliente,
+      numeroPedido: pedido,
+      confirmacionTarjeta: metodopago,
+    };
+
   // Función para buscar los pedidos
   const buscarPedidos = async () => {
+
+
     setLoading(true);
     setError(null);
 
@@ -91,9 +106,10 @@ const BuscadorPedidos = () => {
 
   return (
     <div className="p-4 max-w-4xl mx-auto">
-      <div className="flex flex-wrap items-center gap-4 mb-4">
+      <div className="flex flex-wrap items-center justify-around gap-4 mb-4 -mt-8">
+        {/* Filtros de búsqueda */}
         <div className="w-full sm:w-auto">
-          <label htmlFor="criterio" className="block text-gray-700 font-nunito text-xl">Buscar por:</label>
+          <label htmlFor="criterio" className="block text-[#1C274C] font-extrabold font-nunito text-lg text-center">Buscar por:</label>
           <select
             id="criterio"
             value={criterio}
@@ -106,65 +122,121 @@ const BuscadorPedidos = () => {
             <option value="confirmacionTarjeta">Confirmación de Tarjeta</option>
           </select>
         </div>
-        <div className='pl-2 pr-2 pt-2'>
-          hola
+
+       {/* Mostrar la imagen basada en el criterio seleccionado */}
+       <div className="w-full sm:w-auto text-center">
+          <img
+            src={imagenes[criterio]} // Aquí se utiliza la imagen importada
+            alt="Imagen asociada al criterio"
+            className="w-12 h-12 mx-auto mt-4"
+          />
         </div>
 
+        {/* Inputs de búsqueda */}
         {criterio === 'telefono' && (
-          <div className="w-full sm:w-auto">
-            <label htmlFor="telefono" className="block text-gray-700">Teléfono</label>
-            <input
-              type="text"
-              id="telefono"
-              value={telefono}
-              onChange={(e) => setTelefono(e.target.value)}
-              className="w-full sm:w-auto p-3 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-yellow-500"
-              placeholder="Ingresa el teléfono"
-            />
-          </div>
-        )}
+  <div className="w-full sm:w-auto">
+    <label htmlFor="telefono" className="block text-[#1C274C] font-extrabold font-nunito text-lg text-center">Teléfono:</label>
+    <div className="relative">
+      <input
+        type="text"
+        id="telefono"
+        value={telefono}
+        onChange={(e) => setTelefono(e.target.value)}
+        className="w-full sm:w-auto p-3 pl-10 pr-10 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-yellow-500"
+        placeholder="Ingresa el teléfono"
+      />
+      {telefono && (
+        <button
+          onClick={() => setTelefono('')} // Función para borrar el input
+          className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500 hover:text-gray-800"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" className="w-5 h-5">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"/>
+          </svg>
+        </button>
+      )}
+    </div>
+  </div>
+)}
 
-        {criterio === 'nombre' && (
-          <div className="w-full sm:w-auto">
-            <label htmlFor="nombre" className="block text-gray-700">Nombre del Cliente</label>
-            <input
-              type="text"
-              id="nombre"
-              value={nombre}
-              onChange={(e) => setNombre(e.target.value)}
-              className="w-full sm:w-auto p-3 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-yellow-500"
-              placeholder="Ingresa el nombre del cliente"
-            />
-          </div>
-        )}
+{criterio === 'nombre' && (
+  <div className="w-full sm:w-auto">
+    <label htmlFor="nombre" className="block text-[#1C274C] font-extrabold font-nunito text-lg text-center">Nombre del Cliente:</label>
+    <div className="relative">
+      <input
+        type="text"
+        id="nombre"
+        value={nombre}
+        onChange={(e) => setNombre(e.target.value.toLowerCase())}
+        className="w-full sm:w-auto p-3 pl-10 pr-10 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-yellow-500"
+        placeholder="Ingresa el nombre del cliente"
+      />
+      {nombre && (
+        <button
+          onClick={() => setNombre('')} // Función para borrar el input
+          className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500 hover:text-gray-800"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" className="w-5 h-5">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"/>
+          </svg>
+        </button>
+      )}
+    </div>
+  </div>
+)}
 
-        {criterio === 'numeroPedido' && (
-          <div className="w-full sm:w-auto">
-            <label htmlFor="numeroPedido" className="block text-gray-700">Número de Pedido</label>
-            <input
-              type="text"
-              id="numeroPedido"
-              value={numeroPedido}
-              onChange={(e) => setNumeroPedido(e.target.value)}
-              className="w-full sm:w-auto p-3 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-yellow-500"
-              placeholder="Ingresa el número de pedido"
-            />
-          </div>
-        )}
+{criterio === 'numeroPedido' && (
+  <div className="w-full sm:w-auto">
+    <label htmlFor="numeroPedido" className="block text-[#1C274C] font-extrabold font-nunito text-lg text-center">Número de Pedido:</label>
+    <div className="relative">
+      <input
+        type="text"
+        id="numeroPedido"
+        value={numeroPedido}
+        onChange={(e) => setNumeroPedido(e.target.value)}
+        className="w-full text-center sm:w-auto p-3 pl-10 pr-10 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-yellow-500"
+        placeholder="Ingresa el número de pedido"
+      />
+      {numeroPedido && (
+        <button
+          onClick={() => setNumeroPedido('')} // Función para borrar el input
+          className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500 hover:text-gray-800"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" className="w-5 h-5">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"/>
+          </svg>
+        </button>
+      )}
+    </div>
+  </div>
+)}
 
-        {criterio === 'confirmacionTarjeta' && (
-          <div className="w-full sm:w-auto">
-            <label htmlFor="confirmacionTarjeta" className="block text-gray-700">Confirmación de Tarjeta</label>
-            <input
-              type="text"
-              id="confirmacionTarjeta"
-              value={confirmacionTarjeta}
-              onChange={(e) => setConfirmacionTarjeta(e.target.value)}
-              className="w-full sm:w-auto p-3 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-yellow-500"
-              placeholder="Ingresa la confirmación de tarjeta"
-            />
-          </div>
-        )}
+{criterio === 'confirmacionTarjeta' && (
+  <div className="w-full sm:w-auto">
+    <label htmlFor="confirmacionTarjeta" className="block text-[#1C274C] font-extrabold font-nunito text-lg text-center">Confirmación de Tarjeta:</label>
+    <div className="relative">
+      <input
+        type="text"
+        id="confirmacionTarjeta"
+        value={confirmacionTarjeta}
+        onChange={(e) => setConfirmacionTarjeta(e.target.value)}
+        className="w-full sm:w-auto p-3 pl-10 pr-10 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-yellow-500"
+        placeholder="Ingresa la confirmación de tarjeta"
+      />
+      {confirmacionTarjeta && (
+        <button
+          onClick={() => setConfirmacionTarjeta('')} // Función para borrar el input
+          className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500 hover:text-gray-800"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" className="w-5 h-5">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"/>
+          </svg>
+        </button>
+      )}
+    </div>
+  </div>
+)}
+
       </div>
 
       <button
@@ -183,32 +255,90 @@ const BuscadorPedidos = () => {
 
       {error && <p className="mt-4 text-red-600 text-center">{error}</p>}
 
-      <div className="mt-6 text-center">
+      <div className="mt-6 text-center font-nunito">
         {pedidos.length > 0 ? (
           <div className="space-y-4">
             {pedidos.map((pedido) => (
-              <div key={pedido.id} className="border p-4 rounded-md shadow-md hover:shadow-xl transition">
-                <h3 className="font-semibold text-xl text-yellow-500 pb-2">Pedido #{pedido.NumeroPedido}</h3>
-                <p><strong>Cliente:</strong> {pedido.cliente} | {pedido.telefono}</p>
-                <p><strong>Fecha Realizado:</strong> {pedido.fechahora_realizado}</p>
-                <p><strong>Fecha Recogida:</strong> {pedido.fechahora}</p>
-               
-                <p><strong>Estado:</strong> {pedido.pagado ? 'Pagado' : 'Pendiente'}</p>
-                <p className=''><strong>Total Pedido:</strong> {pedido.productos.reduce((acc, item) => acc + parseFloat(item.total), 0).toFixed(2)} €</p>
+              <div key={pedido.id} className="border p-4 rounded-md shadow-md hover:shadow-xl transition mt-4 relative">
+                {/* Mostrar la imagen "Paid" solo si el pedido está pagado */}
+                {pedido.pagado && (
+                  <img
+                    src={pagado} // Ruta a tu imagen
+                    alt="Pago Realizado"
+                    className="absolute top-80 right-10 w-60 h-60 transform rotate-90"
+                  />
+                )}
 
-                <div className="mt-4">
-                  <h4 className="font-semibold">Productos Comprados:</h4>
-                  <ul>
-                    {pedido.productos.map((producto, index) => (
-                      <li key={index} className="py-2">
-                        <p><strong>Nombre:</strong> {producto.nombre}</p>
-                        <p><strong>Cantidad:</strong> {producto.cantidad}</p>
-                        <p><strong>Precio Unitario:</strong> {producto.precio} €</p>
-                        <p><strong>Total:</strong> {producto.total} €</p>
-                        
-                      </li>
-                    ))}
-                  </ul>
+                {/* Información del Pedido */}
+                <table className="table table-striped table-bordered shadow-sm rounded-lg mb-4 font-nunito">
+                  <thead className="thead-dark">
+                    <tr>
+                      <th>Pedido</th>
+                      <th>Cliente</th>
+                      <th>Teléfono</th>
+                      <th>F.Realizado</th>
+                      <th>F.Recogida</th>
+                      <th>Empleado</th>
+                      <th>Origen</th>
+                      <th>Nº auto</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr className="hover:bg-light">
+                      <td className='font-extrabold'>{pedido.NumeroPedido}</td>
+                      <td>{pedido.cliente}</td>
+                      <td>{pedido.telefono}</td>
+                      <td>{pedido.fechahora_realizado}</td>
+                      <td>{pedido.fechahora}</td>
+                      <td>Alain</td>
+                      <td>{pedido.origen === 1 ? 'Online' : 'Tienda'}</td>
+                      <td>12345ABCD</td>
+                    </tr>
+                  </tbody>
+                </table>
+
+                {/* Tabla de Productos Comprados */}
+                <div>
+                  <h5 className="font-semibold text-lg text-yellow-500 pb-2">Productos Comprados</h5>
+                  <table className="table table-sm">
+                    <thead>
+                      <tr>
+                        <th>Producto</th>
+                        <th>Cantidad</th>
+                        <th>Precio</th>
+                        <th>Total</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {pedido.productos.map((producto, index) => (
+                        <tr key={index}>
+                          <td>{producto.nombre}</td>
+                          <td>{producto.cantidad}</td>
+                          <td>{producto.precio} €</td>
+                          <td>{producto.total} €</td>
+                        </tr>
+                      ))}
+                      {/* Fila de Total Pedido */}
+                      <tr className="font-extrabold">
+                        <td colSpan="3" className="text-right">Total Pedido:</td>
+                        <td>{pedido.productos.reduce((acc, item) => acc + parseFloat(item.total), 0).toFixed(2)} €</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* Tabla del Código QR */}
+                <div className="mt-6">
+                  <h5 className="font-semibold text-lg text-yellow-500 pb-2">Código QR del Pedido</h5>
+                  <table className="table table-sm border-none">
+                    <tbody>
+                      <tr>
+                        <td colSpan="2" className="text-center p-3 pb-1 border-0">
+                          <img src={pedido.codigoQR} alt={`Código QR del Pedido ${pedido.NumeroPedido}`} className="w-32 h-32 mx-auto" />
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
                 </div>
               </div>
             ))}

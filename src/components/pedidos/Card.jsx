@@ -56,6 +56,7 @@ const Card = () => {
   //console.log('Filtered Data by Search: ', filteredDataBySearch);
   //console.log('Filtered Data by Category: ', data_filter); 
 
+
   return (
     <>
       {data_filter.length > 0 ? (
@@ -81,14 +82,13 @@ const Card = () => {
                   <img src={vegetariano} alt="vegetariano" className="h-[1.5vw] w-[1.5vw] object-cover" />
                 )}
               </div>
-              <div className="flex items-center justify-between p-[0.5vw]">
-              {product.id_product !== 2 && (
-                    <h2 className="text-gray-100 font-nunito text-[0.85vw] border-1 p-1 bg-gray-600 rounded-[0.375vw] mt-[0.50vw]">
-                      <span className={product.stock === 0 ? 'text-red-500' : 'text-gray-100'}>
-                        Stock: {product.stock}
-                      </span>
-                    </h2>
-                  )}
+              <div className={`flex items-center ${product.id_product === 2 || product.id_product === 48 ? 'justify-end' : 'justify-between'} p-[0.5vw]`}>
+                <h2 className={`text-gray-100 font-nunito text-[0.85vw] border-1 p-1 bg-gray-600 rounded-[0.375vw] mt-[0.50vw] ${product.id_product === 2 || product.id_product === 48 ? 'hidden' : ''}`}>
+                  <span className={product.stock === 0 ? 'text-red-500' : 'text-gray-100'}>
+                    Stock: {product.stock}
+                  </span>
+                </h2>
+                
                 <h2 className="text-[1.25vw] font-extrabold text-gray-700 font-nunito pt-2">
                   {product.price.toFixed(2)} €
                 </h2>

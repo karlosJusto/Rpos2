@@ -1,12 +1,31 @@
-import { useState, useContext, useEffect } from 'react';
+import { useState, useContext, useEffect} from 'react';
 import { dataContext } from '../Context/DataContext';
 import { collection, getDocs, addDoc, doc, getDoc, updateDoc, setDoc } from 'firebase/firestore';
 import { db } from '../firebase/firebase';
-import { useLocation } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import dayjs from 'dayjs';
+import { Offcanvas, Button, Nav, Modal } from 'react-bootstrap';
+import { useNavigate } from 'react-router-dom';
 
 const CartTotal = ({ datosCliente, setDatosCliente }) => {
   const { cart, setCart } = useContext(dataContext);
+
+  const navigate = useNavigate();  // Declara el hook useNavigate
+
+
+  const [mensajeModal, setMensajeModal] = useState("");
+  const [showModal, setShowModal] = useState(false);
+  const [showModal2, setShowModal2] = useState(false);
+
+  const handleCloseModal = () => {
+    setShowModal(false); // Cerrar el modal
+  };
+  
+  const handleCloseModal2 = () => {
+    setShowModal2(false); // Cerrar el modal
+  };
+
+
 
   // Calcular el total
   const total = cart.reduce((acc, item) => acc + (item.price || 0) * (item.cantidad || 1), 0);
@@ -83,6 +102,8 @@ const CartTotal = ({ datosCliente, setDatosCliente }) => {
           );
         } else {
           console.log(`No hay suficiente stock para el producto ${productData.name || 'sin nombre'}`);
+          //setMensajeModal(`No hay suficiente stock para el producto ${productData.name || 'sin nombre'}`);
+          //setShowModal2(true);
         }
       } else {
         console.log('Producto no encontrado para el id:', productId);
@@ -92,16 +113,78 @@ const CartTotal = ({ datosCliente, setDatosCliente }) => {
     }
   };
 
+
+  const validateOrder = async () => {
+    const incluyePollo = cart.some(item => item.id_product === 1 || item.id_product === 2); // Suponiendo que el id de pollo es 1
+    
+    const clienteData = sanitizeClientData(datosCliente);
+  
+    if (!clienteData.telefono) {
+      setMensajeModal("El teléfono del cliente es obligatorio.");
+      setShowModal2(true);
+      return false;
+    }
+  
+    if (!clienteData.fechahora) {
+      setMensajeModal("No has seleccionado hora para el pedido.");
+      setShowModal2(true);
+      return false;
+    }
+
+    if (!incluyePollo) {
+      setMensajeModal("Comprueba...tu pedido no incluye pollo.");
+      setShowModal(true);
+      return false;
+    }
+  
+    // Verificar si hay suficiente stock para los productos
+    for (const item of cart) {
+      const productRef = doc(db, 'productos', item.id_product.toString());
+      const productSnap = await getDoc(productRef);
+      if (productSnap.exists()) {
+        const productData = productSnap.data();
+        const currentStock = productData.stock || 0;
+  
+        if (currentStock < item.cantidad) {
+          setMensajeModal(`No hay suficiente stock para el producto ${item.name || 'sin nombre'}. Solo quedan ${currentStock} unidades.`);
+          setShowModal2(true);
+          return false; // Detener la ejecución si hay falta de stock
+        }
+      } else {
+        setMensajeModal(`Producto no encontrado para el id: ${item.id_product}`);
+        setShowModal2(true);
+        return false;
+      }
+    }
+  
+    // Si no incluye pollo, mostramos el modal y detenemos el flujo
+   
+  
+    return true; // Si todo es correcto, retornamos verdadero
+  };
+
+
+
   // Función para enviar los datos a Firestore
-  const sendToFirestore = async () => {
+  const sendToFirestore = async ({confirmado}) => {
     try {
+
+      if (!confirmado)
+      {
+          const isValid = await validateOrder(); // Ejecutamos la validación
+          console.log("Es valido:"+isValid);
+
+          if (!isValid) {
+            console.log("entro");
+            // Si la validación falla, no seguimos con el proceso
+            return;
+          }
+       }
+
+
       const nextId = await getNextId();
       const clienteData = sanitizeClientData(datosCliente);
 
-      if (!clienteData.telefono) {
-        console.error('El teléfono del cliente es obligatorio');
-        return;
-      }
 
       const pedidoData = {
         NumeroPedido: nextId,
@@ -206,10 +289,24 @@ await Promise.all(
         celiaco: false,
         localidad: '',
       });
+
+
+           // Redirigir al usuario a la página "Ordenes" después de crear el pedido
+     navigate("/ordenes"); // Redirige a la página de ordenes
+       
+      
     } catch (error) {
       console.error('Error al guardar el pedido:', error);
     }
+
+
+
+
+
   };
+
+
+
 
   return cart.length > 0 ? (
     <>
@@ -220,7 +317,7 @@ await Promise.all(
       </div>
 
       <div className='flex text-center justify-center items-center'>
-        <button onClick={sendToFirestore}
+      <button onClick={() => sendToFirestore({ confirmado: false })}
           className="mt-[2vw] w-[10vw] tracking-wide bg-[#f2ac02] text-white py-[0.95vw] rounded-lg hover:bg-yellow-600 transition-all duration-300 ease-in-out flex items-center justify-center focus:shadow-outline focus:outline-none">
           <svg width="28px" height="28px" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
             <path d="M4 18V6" stroke="#ffffff" strokeWidth="1.5" strokeLinecap="round"></path>
@@ -235,6 +332,112 @@ await Promise.all(
           </span>
         </button>
       </div>
+
+        {/* Modal confirmaciones */}
+     <Modal show={showModal2} mensaje={mensajeModal}  onHide={handleCloseModal2} size="md" backdrop="static" keyboard={false} centered>
+       
+  
+
+       
+       <Modal.Body className="flex flex-col items-center ">
+          
+         
+         
+         <div className='p-2'>
+         <svg fill="#c81d0c  " width="75px" height="75px" viewBox="-5.5 0 32 32" version="1.1" xmlns="http://www.w3.org/2000/svg">
+
+              <g id="SVGRepo_bgCarrier" strokeWidth="0"/>
+
+              <g id="SVGRepo_tracerCarrier" strokeLinecap="round" strokeLinejoin="round"/>
+
+              <g id="SVGRepo_iconCarrier"> <path d="M10.16 25.92c-2.6 0-8.72-0.24-9.88-2.24-1.28-2.28 2.040-8.24 3.080-10.040 1.040-1.76 4.64-7.56 7.12-7.56 2.8 0 7.24 7.48 8.56 10.12 1.92 3.84 2.48 6.4 1.56 7.6-1.52 2.040-8.96 2.12-10.44 2.12zM10.48 7.72c-0.72 0-3.080 2.36-5.64 6.76-2.76 4.68-3.48 7.72-3.080 8.4 0.32 0.56 3.2 1.4 8.4 1.4 5.44 0 8.64-0.88 9.080-1.48 0.28-0.36 0.040-2.28-1.72-5.84-2.64-5.28-6.12-9.24-7.040-9.24zM10.52 19.2c-0.48 0-0.84-0.36-0.84-0.84v-6.36c0-0.48 0.36-0.84 0.84-0.84s0.84 0.36 0.84 0.84v6.32c0 0.48-0.4 0.88-0.84 0.88zM11.36 21.36c0 0.464-0.376 0.84-0.84 0.84s-0.84-0.376-0.84-0.84c0-0.464 0.376-0.84 0.84-0.84s0.84 0.376 0.84 0.84z"/> </g>
+
+              </svg>
+
+
+
+         </div>
+
+         <div>
+
+            <h1 className='font-nunito text-xl font-[2vw] p-2  text-center text-[#808b96]'>{mensajeModal}</h1>
+         </div>
+       
+        </Modal.Body>
+
+  
+
+
+       
+       <Modal.Footer className='no-border'>
+         <Button
+           variant="primary"
+          
+           className="bg-yellow-500 border-yellow-500 hover:bg-yellow-600 hover:border-yellow-600 p-2 font-nunito"
+           onClick={handleCloseModal2}
+         >
+           Aceptar
+         </Button>
+       </Modal.Footer>
+       
+   </Modal>
+
+       {/* Modal confirmaciones para producto pollo*/}
+   <Modal show={showModal} mensaje={mensajeModal}  onHide={handleCloseModal} size="md" backdrop="static" keyboard={false} centered>
+       
+  
+
+       
+       <Modal.Body className="flex flex-col items-center ">
+          
+         
+         
+         <div className='p-2'>
+         <svg fill="#c81d0c  " width="75px" height="75px" viewBox="-5.5 0 32 32" version="1.1" xmlns="http://www.w3.org/2000/svg">
+
+              <g id="SVGRepo_bgCarrier" strokeWidth="0"/>
+
+              <g id="SVGRepo_tracerCarrier" strokeLinecap="round" strokeLinejoin="round"/>
+
+              <g id="SVGRepo_iconCarrier"> <path d="M10.16 25.92c-2.6 0-8.72-0.24-9.88-2.24-1.28-2.28 2.040-8.24 3.080-10.040 1.040-1.76 4.64-7.56 7.12-7.56 2.8 0 7.24 7.48 8.56 10.12 1.92 3.84 2.48 6.4 1.56 7.6-1.52 2.040-8.96 2.12-10.44 2.12zM10.48 7.72c-0.72 0-3.080 2.36-5.64 6.76-2.76 4.68-3.48 7.72-3.080 8.4 0.32 0.56 3.2 1.4 8.4 1.4 5.44 0 8.64-0.88 9.080-1.48 0.28-0.36 0.040-2.28-1.72-5.84-2.64-5.28-6.12-9.24-7.040-9.24zM10.52 19.2c-0.48 0-0.84-0.36-0.84-0.84v-6.36c0-0.48 0.36-0.84 0.84-0.84s0.84 0.36 0.84 0.84v6.32c0 0.48-0.4 0.88-0.84 0.88zM11.36 21.36c0 0.464-0.376 0.84-0.84 0.84s-0.84-0.376-0.84-0.84c0-0.464 0.376-0.84 0.84-0.84s0.84 0.376 0.84 0.84z"/> </g>
+
+              </svg>
+
+
+
+         </div>
+
+         <div>
+
+            <h1 className='font-nunito text-xl font-[2vw] p-2  text-center text-[#808b96]'>{mensajeModal}</h1>
+         </div>
+       
+        </Modal.Body>
+
+  
+
+
+       
+       <Modal.Footer className='no-border p-4'>
+         <Button
+                     variant="secondary"
+                     className="p-3 bg-white font-nunito text-red-500 border-red-500 hover:text-red-600 hover:border-red-600"
+                     onClick={handleCloseModal}
+                   >
+                     Cancelar
+                   </Button>
+                   <Button
+                     variant="primary"
+                     onClick={async () => {
+                      await sendToFirestore({ confirmado: true }); // Llamada a la función sendToFirestore cuando el botón se presiona
+                    }}
+                     className="bg-yellow-500 border-yellow-500 hover:bg-yellow-600 hover:border-yellow-600 p-3 font-nunito"
+                   >
+                     Continuar
+                   </Button>
+       </Modal.Footer>
+       
+   </Modal>
     </>
   ) : (
     <h1></h1>

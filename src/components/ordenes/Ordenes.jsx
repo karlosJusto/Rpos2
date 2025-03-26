@@ -29,6 +29,8 @@ import { DesktopDatePicker } from '@mui/x-date-pickers/DesktopDatePicker';
 import { StaticDatePicker } from '@mui/x-date-pickers/StaticDatePicker';
 import { createTheme, ThemeProvider } from '@mui/material/styles';
 
+
+import Ticket from '../pedidos/Ticket';
 import PedidoRapido from './PedidoRapido';
 
 import dayjs from 'dayjs';
@@ -72,6 +74,8 @@ dayjs.extend(customParseFormat);
 
 //usamos la refencia del otro componente
 const pedidoRapidoRef = useRef();
+
+
 
 //pedidos rapidos pasandole el id producto 1 o 2
 const handlePedidoRapido = (idProduct) => {
@@ -171,15 +175,7 @@ const handlePedidoRapido = (idProduct) => {
 
 
 
-  // Filtrar los pedidos con origen=1
-  const contarPedidosOrigen = () => {
-    const cantidad = pedidos.filter(pedido => pedido.origen === 1).length;
-    setPedidosConOrigenUno(cantidad);
-    // Imprimir en consola la cantidad total de pedidos y la cantidad con origen = 1
-    console.log(`Total de pedidos encontrados: ${pedidosArray.length}`);
-    console.log(`Pedidos con origen = 1: ${contarPedidosOrigen}`);
-    
-  };
+
 
 
 
@@ -362,114 +358,93 @@ const handlePedidoRapido = (idProduct) => {
     
             useEffect(() => {
 
-             
-
-                // Si se pasa una fecha específica, usamos esa fecha; de lo contrario, usamos la fecha actual
-                const fechaAUsar = dateToPass ? dayjs(dateToPass).locale('es').tz('Europe/Madrid') : dayjs().locale('es').tz('Europe/Madrid');
-
-
-                // Obtener la hora actual en la zona horaria de Madrid
-                const currentTime = dayjs().locale('es').tz('Europe/Madrid');
-                const esHoy = currentTime.isSame(fechaAUsar, 'day'); // Comprobamos si la fecha es hoy
-
-               
-
-                // Turno completo (dia entero)
-                let fechaIncio = fechaAUsar.hour(0).minute(0).second(0);  // Desde las 18:01
-                let fechaFin= fechaAUsar.hour(23).minute(59).second(59);  // Desde las 18:01
-
-                //Si no viene del calendario seleccionar turno
-     
-                /*
-                if (!dateToPass) { 
-                       // Verifica si la hora actual es antes de las 18:00
-                       const isBefore6PM = currentTime.hour() < 18;
-                       if (isBefore6PM)
-                         fechaFin = fechaAUsar.hour(17).minute(59).second(59);
-                       else
-                         fechaIncio = fechaAUsar.hour(18).minute(0).second(1);
-                   
-                } */
-
-
-
-
-                 //console.log("**********fechaIncio:"+fechaIncio.format('DD/MM/YYYY HH:mm'));
-                 //console.log("**********fechaFin:"+fechaFin.format('DD/MM/YYYY HH:mm'));
-
-
-                // Creamos la referencia a la colección de pedidos
-                const pedidosRef = collection(db, 'pedidos');
-
-
-                // Creamos la consulta para filtrar pedidos por fecha y hora
-                const pedidosQuery = query(
-                  pedidosRef,
-                  where("fechahora", ">=", fechaIncio.format('DD/MM/YYYY HH:mm')), // Desde el inicio del día
-                  where("fechahora", "<=", fechaFin.format('DD/MM/YYYY HH:mm')) // Hasta las 18:00 o desde las 18:01
-                );
-                          
-              
-                  // Usamos `onSnapshot` para escuchar los cambios en la colección
-                  const unsubscribe = onSnapshot(pedidosQuery, (querySnapshot) => {
-                    // Mapear los documentos que llegan a la consulta
-                    const pedidosArray = querySnapshot.docs.map(doc => {
-                      const pedido = doc.data();
-                      return {
-                        id: doc.id, 
-                        NumeroPedido: pedido.NumeroPedido,
-                        cliente: pedido.cliente,
-                        direccion: pedido.direccion,
-                        productos: pedido.productos.map(producto => ({
-                          ...producto,
-                          entregado: producto.entregado || 0 // Asegúrate de que 'entregado' esté inicializado
-                        })),
-                        fechahora: pedido.fechahora,
-                        imagen: pedido.imagen,
-                        pagado: pedido.pagado,
-                        celiaco: pedido.celiaco,
-                        troceado: pedido.troceado,
-                        alias: pedido.alias,
-                        tostado: pedido.tostado,
-                        salsa: pedido.sinsalsa,
-                        extrasalsa: pedido.extrasalsa,
-                        observaciones: pedido.observaciones,
-                        origen: pedido.origen,
-                      };
-                    });
-
+              // Si se pasa una fecha específica, usamos esa fecha; de lo contrario, usamos la fecha actual
+              const fechaAUsar = dateToPass ? dayjs(dateToPass).locale('es').tz('Europe/Madrid') : dayjs().locale('es').tz('Europe/Madrid');
             
-                    
-              
-                    // Actualizamos el estado de los pedidos
-                    setPedidos(pedidosArray);
-
-                    //search pedidos
-
-                  // Filtramos los nombres de los clientes directamente desde los pedidos obtenidos
-                  const nombresClientes = pedidosArray.map(pedido => pedido.cliente).filter(cliente => cliente); // Filtra solo los valores válidos
-                  setClientes(nombresClientes);
-
-
-
-                   
-                    
-                   
-               
-
-
-                    
-              
-                    // Filtrar los pedidos con origen = 0
-                    const cantidadPedidosOrigenCero = pedidosArray.filter(pedido => pedido.origen === 1).length;
-                    setPedidosConOrigenUno(cantidadPedidosOrigenCero);  // Actualizamos el estado de los pedidos con origen = 1
-                            }, (error) => {
-                              console.error("Error al obtener los pedidos: ", error);
-                            });
-                        
-                            // Limpiar la suscripción cuando el componente se desmonta
-                            return () => unsubscribe();
-                      }, [dateToPass]); // Solo se ejecuta cuando `dateToPass` cambia
+              // Obtener la hora actual en la zona horaria de Madrid
+              const currentTime = dayjs().locale('es').tz('Europe/Madrid');
+              const esHoy = currentTime.isSame(fechaAUsar, 'day'); // Comprobamos si la fecha es hoy
+            
+              // Turno completo (dia entero)
+              let fechaIncio = fechaAUsar.hour(0).minute(0).second(0);  // Desde las 18:01
+              let fechaFin = fechaAUsar.hour(23).minute(59).second(59);  // Desde las 18:01
+            
+              // Creamos la referencia a la colección de pedidos
+              const pedidosRef = collection(db, 'pedidos');
+            
+              // Creamos la consulta para filtrar pedidos por fecha y hora
+              const pedidosQuery = query(
+                pedidosRef,
+                where("fechahora", ">=", fechaIncio.format('DD/MM/YYYY HH:mm')), // Desde el inicio del día
+                where("fechahora", "<=", fechaFin.format('DD/MM/YYYY HH:mm')) // Hasta las 18:00 o desde las 18:01
+              );
+            
+              // Usamos `onSnapshot` para escuchar los cambios en la colección
+              const unsubscribe = onSnapshot(pedidosQuery, (querySnapshot) => {
+                // Mapear los documentos que llegan a la consulta
+                const pedidosArray = querySnapshot.docs.map(doc => {
+                  const pedido = doc.data();
+                  return {
+                    id: doc.id,
+                    NumeroPedido: pedido.NumeroPedido,
+                    cliente: pedido.cliente,
+                    direccion: pedido.direccion,
+                    productos: pedido.productos.map(producto => ({
+                      ...producto,
+                      entregado: producto.entregado || 0, // Asegúrate de que 'entregado' esté inicializado
+                    })),
+                    fechahora: pedido.fechahora,
+                    imagen: pedido.imagen,
+                    pagado: pedido.pagado,
+                    celiaco: pedido.celiaco,
+                    troceado: pedido.troceado,
+                    alias: pedido.alias,
+                    tostado: pedido.tostado,
+                    salsa: pedido.sinsalsa,
+                    extrasalsa: pedido.extrasalsa,
+                    observaciones: pedido.observaciones,
+                    origen: pedido.origen,
+                  };
+                });
+            
+                // Actualizamos el estado de los pedidos
+                setPedidos(pedidosArray);
+            
+                // Filtramos los nombres de los clientes directamente desde los pedidos obtenidos
+                const nombresClientes = pedidosArray.map(pedido => pedido.cliente).filter(cliente => cliente); // Filtra solo los valores válidos
+                setClientes(nombresClientes);
+            
+                // Filtrar los pedidos con origen = 1
+                const pedidosConOrigenUno = pedidosArray.filter(pedido => pedido.origen === 1);
+            
+                // Contamos la cantidad de pedidos con origen = 1
+                let cantidadPedidosOrigenUno = pedidosConOrigenUno.length;
+            
+                // Comprobar si hay algún pedido con origen 1 que tenga productos con 'cantidad' === 'entregado'
+                pedidosConOrigenUno.forEach(pedido => {
+                  const productosConEntregadoIgualACantidad = pedido.productos.some(producto => producto.entregado === producto.cantidad);
+                  
+                  // Si encontramos algún producto con 'entregado' igual a 'cantidad', restamos 1 a la cantidad de pedidos con origen 1
+                  if (productosConEntregadoIgualACantidad) {
+                    cantidadPedidosOrigenUno -= 1; // Restamos 1
+                  }
+                });
+            
+                // Actualizamos el estado de los pedidos con origen 1
+                setPedidosConOrigenUno(cantidadPedidosOrigenUno);
+            
+                // Mostrar la cantidad de pedidos que quedan (puedes usar esta variable para mostrarla en la UI)
+               // console.log(`Cantidad de pedidos con origen 1 restantes: ${cantidadPedidosOrigenUno}`);
+            
+              }, (error) => {
+                console.error("Error al obtener los pedidos: ", error);
+              });
+            
+              // Limpiar la suscripción cuando el componente se desmonta
+              return () => unsubscribe();
+            
+            }, [dateToPass]); // Solo se ejecuta cuando `dateToPass` cambia
+            
 
 
            
@@ -669,11 +644,11 @@ const handlePedidoRapido = (idProduct) => {
       };
 
       // Llamar a guardarEstadisticasDiarias cada vez que el valor de numeroBarra cambie
-  useEffect(() => {
+ /* useEffect(() => {
     if (numeroBarra !== 0) {
       guardarEstadisticasDiarias();
     }
-  }, [numeroBarra]);  // Se ejecuta cada vez que 'numeroBarra' cambie
+  }, [numeroBarra]);  // Se ejecuta cada vez que 'numeroBarra' cambie*/
 
 
 
@@ -704,6 +679,11 @@ const handlePedidoRapido = (idProduct) => {
           };
       
           calcularLibres();  // Llamamos a la función de cálculo de 'libres'
+          if (numeroBarra !== 0)
+          {
+          guardarEstadisticasDiarias();
+          }
+
         }, [numeroBarra, totalProductosDespuesDeLas18, totalbloquesAntesdelas18]);
           
 
@@ -1057,7 +1037,7 @@ const handlePedidoRapido = (idProduct) => {
       </div>
     </div>
 
-    <div className="w-full bg-gray-700 mt-5 p-1 fixed flex">
+    <div className="w-full bg-gray-700 mt-5 p-1 fixed flex ">
     <div className="flex justify-start items-center"> {/* Alinea ambos divs horizontal y verticalmente */}
       <div className="ms-3 p-1">
         <svg width="28px" height="28px" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -1486,20 +1466,6 @@ const handlePedidoRapido = (idProduct) => {
       </svg>
       </Link>
 
-      <Link className='p-3  hover:bg-gray-100 hover:rounded-2xl ' to={"/scanner"}>
-
-      <svg width="40px" height="40px" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" stroke="#000000" strokeWidth="1.2">
-
-      <g id="SVGRepo_bgCarrier" strokeWidth="0"/>
-
-      <g id="SVGRepo_tracerCarrier" strokeLinecap="round" strokeLinejoin="round"/>
-
-      <g id="SVGRepo_iconCarrier"> <path d="M7.55556 4H5C4.44771 4 4 4.44772 4 5V7.55556M16.4444 4H19C19.5523 4 20 4.44772 20 5V7.55556M20 16.4444V19C20 19.5523 19.5523 20 19 20H16.4444M7.55556 20H5C4.44771 20 4 19.5523 4 19V16.4444M5.77778 12.8889H6.66667M8.44444 12.8889H9.33333M5.77778 11H10.1111C10.6634 11 11.1111 10.5523 11.1111 10V5.77778M12.8889 5.77778V11.1111M16.4444 11H18.2222M14.6667 11H15.1111M13.7778 12.8889H15.1111M17 12.8889H18.2222M18.2222 15H15.5556M15.5556 16.8889V18.2222M13.7778 15V18.2222M12 18.2222V12.8889H11.1111M10.2222 14.6667V18.2222M18.2222 17.7778V17.7778C18.2222 17.5323 18.0232 17.3333 17.7778 17.3333V17.3333C17.5323 17.3333 17.3333 17.5323 17.3333 17.7778V17.7778C17.3333 18.0232 17.5323 18.2222 17.7778 18.2222V18.2222C18.0232 18.2222 18.2222 18.0232 18.2222 17.7778ZM18.2222 6.77778V8.33333C18.2222 8.88562 17.7745 9.33333 17.2222 9.33333H15.6667C15.1144 9.33333 14.6667 8.88562 14.6667 8.33333V6.77778C14.6667 6.22549 15.1144 5.77778 15.6667 5.77778H17.2222C17.7745 5.77778 18.2222 6.22549 18.2222 6.77778ZM6.77778 9.33333H8.33333C8.88562 9.33333 9.33333 8.88562 9.33333 8.33333V6.77778C9.33333 6.22549 8.88562 5.77778 8.33333 5.77778H6.77778C6.22549 5.77778 5.77778 6.22549 5.77778 6.77778V8.33333C5.77778 8.88562 6.22549 9.33333 6.77778 9.33333ZM7.44444 18.2222H6.77778C6.22549 18.2222 5.77778 17.7745 5.77778 17.2222V15.6667C5.77778 15.1144 6.22549 14.6667 6.77778 14.6667H7.44444C7.99673 14.6667 8.44444 15.1144 8.44444 15.6667V17.2222C8.44444 17.7745 7.99673 18.2222 7.44444 18.2222Z" stroke="#757575" strokeLinecap="round" strokeLinejoin="round"/> </g>
-
-      </svg>
-                  
-      </Link>
-
 
 
       <Link className='p-3 mb-2 hover:bg-gray-100 hover:rounded-2xl' to={"/login"}>
@@ -1704,10 +1670,13 @@ const handlePedidoRapido = (idProduct) => {
    </Modal>
 
          
-    <PedidoRapido ref={pedidoRapidoRef} datosCliente={datosCliente} />
+     <PedidoRapido ref={pedidoRapidoRef} datosCliente={datosCliente} />
+   
+    
    
                         
    </>
+   
    
   );
 };

@@ -32,6 +32,8 @@ const PolloDetallo = () => {
 
         // Limitamos a los últimos 30 días
         const datosLimitados = datosOrdenados.slice(0, 30);
+        console.log("datosLimitados");
+        console.log(datosLimitados);
 
         setEstadisticas(datosLimitados); // Guarda los datos ordenados y limitados en el estado
       } catch (error) {
@@ -58,28 +60,37 @@ const PolloDetallo = () => {
   // Función para actualizar todos los campos en Firebase
   const handleActualizar = async () => {
     try {
+      let stockFinal=0;
       for (const item of estadisticas) {
         const docRef = doc(db, 'estadisticas_diarias', item.dia); // Referencia al documento en Firestore
 
          // Realizamos los cálculos antes de actualizar el documento
-         const stockActualizado = (item.entran || 0) + (item.stock || 0);
-         const stockFinal = stockActualizado - (item.vd || 0) - (item.baja || 0) - (item.devueltos || 0);
+         const stockActualizado = (item.entran || 0) + (item.stock_anterior || 0);
+          stockFinal = stockActualizado - (item.vd || 0) - (item.baja || 0) - (item.devueltos || 0);
 
-         console.log(stockFinal);
+         console.log("Stock_final:"+stockFinal);
 
         // Aquí actualizamos todos los campos para ese día
         await updateDoc(docRef, {
           entran: item.entran,
           baja: item.baja,
           devueltos: item.devueltos,
-          stockactualizado: stockActualizado,
-          stockfinal: stockFinal,
+          stock: stockFinal,
+          //stockactualizado: stockActualizado,
+          //stockfinal: stockFinal,
            // Calculo de total
         });
 
        //console.log(`Datos del día ${item.dia} actualizados correctamente.`);
        //alert(`Datos del día ${item.dia} actualizados correctamente.`);
       }
+
+      const docRef = doc(db, 'productos', '1'); // Referencia al documento en Firestore
+      await updateDoc(docRef, {
+        stock: stockFinal
+      });
+
+
       
     } catch (error) {
       console.error("Error al actualizar los datos en Firebase:", error);
@@ -90,6 +101,9 @@ const PolloDetallo = () => {
   if (loading) {
     return <p className="text-center">Cargando estadísticas...</p>;
   }
+
+
+
 
   return (
     <div className="container my-4">
@@ -104,59 +118,74 @@ const PolloDetallo = () => {
             <th>Salen</th>
             <th>Baja</th>
             <th>Devueltos</th>
-            <th>Stock</th>
+            <th className='text-blue-500'>Stock</th>
           </tr>
         </thead>
         <tbody className='text-center'>
           {/* Mapeamos los datos de las estadisticas y los mostramos en la tabla */}
           {estadisticas.map((item, index) => {
             // Calculamos stockActualizado y stockFinal dentro del JSX para cada fila
-              const stockActualizado = (item.entran || 0) + (item.stock || 0);
+              const stockActualizado = (item.entran || 0) + (item.stock_anterior || 0);
               const stockFinal = stockActualizado - (item.vd || 0) - (item.baja || 0) - (item.devueltos || 0);
 
             const isEditable = index >= estadisticas.length - 3; // Solo los últimos 3 días son editables
 
-            return (
-              <tr key={index}>
-                <td className="table-cell-width capitalize"> {item.diasemana} , {item.dia}</td>
-                <td className="table-cell-width w-36 font-extrabold">{stockFinal}</td>
-                <td className="table-cell-width text-center w-32">
-                  <input 
-                    type="number" 
-                    value={item.entran === 0 ? '0' : item.entran || ''} 
-                    onChange={(e) => handleInputChange(e, item.dia, 'entran')} 
-                    className="form-control w-24 mx-auto text-center"
-                    min="0" // Aseguramos que no pueda ser negativo
-                    disabled={!isEditable} // Deshabilitamos la edición si no es uno de los últimos 3 días
-                  />
-                </td>
+            // Verificamos si es lunes para insertar la fila vacía
+            const isMonday = item.diasemana.toLowerCase() === 'lunes';
 
-                <td className="table-cell-width w-40 font-extrabold">{stockActualizado}</td>
-                <td className="table-cell-width w-40">{item.vd || 0}</td>
-                <td className="table-cell-width w-32">
-                  <input 
-                    type="number" 
-                    value={item.baja === 0 ? '0' : item.baja || ''} 
-                    onChange={(e) => handleInputChange(e, item.dia, 'baja')} 
-                    className="form-control w-24 mx-auto text-center"
-                    min="0" // Aseguramos que no pueda ser negativo
-                    disabled={!isEditable} // Deshabilitamos la edición si no es uno de los últimos 3 días
-                  />
-                </td>
-                <td className="table-cell-width w-40 ">
-                  <input 
-                    type="number" 
-                    value={item.devueltos === 0 ? '0' : item.devueltos || ''} 
-                    onChange={(e) => handleInputChange(e, item.dia, 'devueltos')} 
-                    className="form-control w-24 mx-auto text-center"
-                    min="0" // Aseguramos que no pueda ser negativo
-                    disabled={!isEditable} // Deshabilitamos la edición si no es uno de los últimos 3 días
-                  />
-                </td>
-                <td className="table-cell-width w-40 font-extrabold">
-                  {stockFinal}
-                </td>
-              </tr>
+            return (
+              [
+                // Fila separadora cuando es lunes
+                isMonday && (
+                  <tr key={`separator-${item.dia}`} className="separator-row">
+                    <td colSpan="8" className="text-center py-2">
+                      <span className="text-yellow-500">Siguiente Semana  <span className='p-2'>📅</span></span>
+                    </td>
+                  </tr>
+                ),
+
+                // Fila con datos
+                <tr key={index} className="table-row">
+                  <td className="table-cell-width capitalize"> {item.diasemana} , {item.dia}</td>
+                  <td className="table-cell-width w-36 font-extrabold">{item.stock_anterior}</td>
+                  <td className="table-cell-width text-center w-32">
+                    <input 
+                      type="number" 
+                      value={item.entran === 0 ? '0' : item.entran || ''} 
+                      onChange={(e) => handleInputChange(e, item.dia, 'entran')} 
+                      className="form-control w-24 mx-auto text-center"
+                      min="0" // Aseguramos que no pueda ser negativo
+                      disabled={!isEditable} // Deshabilitamos la edición si no es uno de los últimos 3 días
+                    />
+                  </td>
+
+                  <td className="table-cell-width w-40 font-extrabold">{stockActualizado}</td>
+                  <td className="table-cell-width w-40">{item.vd || 0}</td>
+                  <td className="table-cell-width w-32">
+                    <input 
+                      type="number" 
+                      value={item.baja === 0 ? '0' : item.baja || ''} 
+                      onChange={(e) => handleInputChange(e, item.dia, 'baja')} 
+                      className="form-control w-24 mx-auto text-center"
+                      min="0" // Aseguramos que no pueda ser negativo
+                      disabled={!isEditable} // Deshabilitamos la edición si no es uno de los últimos 3 días
+                    />
+                  </td>
+                  <td className="table-cell-width w-40 ">
+                    <input 
+                      type="number" 
+                      value={item.devueltos === 0 ? '0' : item.devueltos || ''} 
+                      onChange={(e) => handleInputChange(e, item.dia, 'devueltos')} 
+                      className="form-control w-24 mx-auto text-center"
+                      min="0" // Aseguramos que no pueda ser negativo
+                      disabled={!isEditable} // Deshabilitamos la edición si no es uno de los últimos 3 días
+                    />
+                  </td>
+                  <td className="table-cell-width w-40 font-extrabold">
+                    {stockFinal}
+                  </td>
+                </tr>
+              ]
             );
           })}
         </tbody>

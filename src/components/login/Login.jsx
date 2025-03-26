@@ -119,8 +119,9 @@ const generarEstadisticasDiarias = async () => {
         vt: 0,
         vd: 0,
         stock: stock, // Usamos el valor de stock
-        stockactualizado:0,
-        stockfinal:0,
+        stock_anterior: stock,
+        //stockactualizado:0,
+        //stockfinal:0,
         entran: 0,
         baja: 0,
         devueltos: 0,
