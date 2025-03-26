@@ -54,7 +54,7 @@ const DataProvider = ({ children }) => {
 
   // Filtrar productos globalmente por el nombre
   const filteredData = data.filter((product) =>
-    product.name.toLowerCase().includes(buscar.toLowerCase())
+    product.name?.toLowerCase().includes(buscar.toLowerCase())
   );
 
   return (

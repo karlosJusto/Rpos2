@@ -21,7 +21,13 @@ import LGScanner from "./components/scanner/LGScanner"
 import CrearProductos from "./components/dashboard/CrearProductos"
 import ListarClientes from "./components/dashboard/ListarClientes"
 import Ordenes from "./components/ordenes/Ordenes"
+import Listaproductos from "./components/dashboard/ListaProductos"
+import CalendarioPollos from "./components/dashboard/CalendarioPollos"
+import Empleados from "./components/dashboard/Empleados"
+import CrudEmpleados from "./components/dashboard/CrearEmpleado"
+import { ChickenOrderProvider } from './components/Context/ChickenOrderContext';
 import Cocina from "./components/cocina/Cocina"
+
 
 
 
@@ -31,6 +37,7 @@ function App() {
   return (
    
     <DataProvider>
+      <ChickenOrderProvider>
      <BrowserRouter >
       <Routes>
         <Route path="/" element={<Home />} />
@@ -50,12 +57,17 @@ function App() {
 
         <Route path="/dashboard" element={<Dashboard />} />
         <Route path="/dashboard/crearProductos" element={<CrearProductos />} />
+        <Route path="/dashboard/listaProductos" element={<Listaproductos />} />
         <Route path="/dashboard/listarClientes" element={<ListarClientes />} />
+        <Route path="/dashboard/calendarioPollos" element={<CalendarioPollos />} />
+        <Route path="/dashboard/empleados" element={<Empleados />} />
+        <Route path="/dashboard/crearempleado" element={<CrudEmpleados />} />
 
        
 
       </Routes>    
      </BrowserRouter>
+      </ChickenOrderProvider>
     </DataProvider>
    
     
