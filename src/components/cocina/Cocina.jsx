@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { Header } from './components/Header';
 import { ProductCard } from './components/ProductCard';
 import { SaladTypeCard } from './components/SaladTypeCard';
@@ -8,7 +8,7 @@ import { collection, doc, onSnapshot, setDoc, updateDoc } from 'firebase/firesto
 const Cocina = () => {
   // Estado para productos de la colección "cocina"
   const [cocinaProducts, setCocinaProducts] = useState([]);
-  // Estado para los pedidos agregados según los productos de cocina
+  // Estado para los pedidos agrupados según los productos de cocina
   const [productsData, setProductsData] = useState([]);
   // Estado para ensaladas/ensaladillas
   const [saladsData, setSaladsData] = useState([]);
@@ -16,6 +16,11 @@ const Cocina = () => {
   const [selectedDate, setSelectedDate] = useState(new Date());
   // Estado para mostrar/ocultar el input de calendario
   const [showCalendar, setShowCalendar] = useState(false);
+
+  // Estado para evitar reprogramar alertas específicas en el mismo turno
+  const [alertScheduled, setAlertScheduled] = useState({ codillos: false, chorizo: false });
+  // Ref para almacenar los pedidos previos y detectar nuevos
+  const prevPedidosRef = useRef([]);
 
   // --- 1. Suscripción a la colección "cocina" ---
   useEffect(() => {
@@ -71,7 +76,6 @@ const Cocina = () => {
 
   // --- 4. Lógica para agrupar pedidos en ProductCard ---
   useEffect(() => {
-    // Se espera que cocinaProducts ya esté cargado
     if (cocinaProducts.length === 0) return;
     
     const pedidosRef = collection(db, 'pedidos');
@@ -100,7 +104,7 @@ const Cocina = () => {
         return true;
       });
 
-      // Generamos los IDs válidos desde la colección "cocina"
+      // Generar IDs válidos a partir de "cocina"
       const validProductIds = cocinaProducts.map(product => product.id);
 
       // Objeto para agrupar los pedidos por producto
@@ -125,7 +129,7 @@ const Cocina = () => {
                 hora: pedido.fechahora_realizado,
                 nombre: pedido.cliente,
                 cantidad: prod.cantidad,
-                descripcion:prod.observaciones || "",
+                descripcion: prod.observaciones || "",
               });
               aggregatedProducts[prod.id].pedidos += prod.cantidad;
             }
@@ -133,7 +137,7 @@ const Cocina = () => {
         }
       });
 
-      // Incluir todos los productos válidos, incluso sin pedidos, utilizando la info real de "cocina"
+      // Incluir todos los productos válidos, incluso sin pedidos
       validProductIds.forEach((id) => {
         if (!aggregatedProducts[id]) {
           const productInfo = cocinaProducts.find(p => p.id === id);
@@ -245,7 +249,7 @@ const Cocina = () => {
     return () => unsubscribe();
   }, [selectedDate, todayDocId]);
 
-  // Función para actualizar la cantidad de preparadas en Firebase
+  // --- Función para actualizar la cantidad de "preparadas" en Firebase ---
   const updateSaladCount = async (type, size, amount) => {
     const saladsRef = doc(db, 'ensaladas', todayDocId);
     try {
@@ -257,7 +261,75 @@ const Cocina = () => {
     }
   };
 
-  // --- 7. Configurar la grilla para ProductCard en función de los productos en "cocina" ---
+  // --- 7. Lógica para alertas de nuevos pedidos y actualización de la propiedad "visto" ---
+  useEffect(() => {
+    const pedidosRef = collection(db, 'pedidos');
+    const unsubscribe = onSnapshot(pedidosRef, (querySnapshot) => {
+      const currentPedidos = [];
+      querySnapshot.forEach((doc) => {
+        currentPedidos.push({ id: doc.id, ...doc.data() });
+      });
+
+      currentPedidos.forEach((pedido) => {
+        // Detectamos si el pedido es nuevo
+        const isNewOrder = !prevPedidosRef.current.find((p) => p.id === pedido.id);
+        // Se verifica si al menos uno de los productos no tiene la propiedad "visto" (o es false)
+        const hasUnseen = pedido.productos && pedido.productos.some(prod => !prod.visto);
+        if (isNewOrder && hasUnseen) {
+          const productosNombres = pedido.productos
+            ? pedido.productos.map(p => p.nombre).join(', ')
+            : 'Sin productos';
+          alert(`Nuevo pedido de ${pedido.cliente}. Productos: ${productosNombres}`);
+
+          // Programar alertas para productos específicos
+          if (pedido.productos && Array.isArray(pedido.productos)) {
+            pedido.productos.forEach((prod) => {
+              const nombreProd = prod.nombre.toLowerCase();
+              const now = new Date();
+              const { endTime } = getTurnoActual();
+
+              // Para "codillos" o "costillas": alert 30 minutos antes del fin del turno
+              if ((nombreProd.includes('codillo') || nombreProd.includes('costilla')) && !alertScheduled.codillos) {
+                const alertTime = new Date(endTime.getTime() - 30 * 60000);
+                const delay = alertTime.getTime() - now.getTime();
+                if (delay > 0) {
+                  setTimeout(() => {
+                    alert("¡Atención! Faltan 30 minutos para los CODILLOS Y COSTILLAS.");
+                  }, delay);
+                  setAlertScheduled(prev => ({ ...prev, codillos: true }));
+                }
+              }
+
+              // Para "chorizo" o "morcilla": alert 15 minutos antes del fin del turno
+              if ((nombreProd.includes('chorizo') || nombreProd.includes('morcilla')) && !alertScheduled.chorizo) {
+                const alertTime = new Date(endTime.getTime() - 15 * 60000);
+                const delay = alertTime.getTime() - now.getTime();
+                if (delay > 0) {
+                  setTimeout(() => {
+                    alert("¡Atención! Faltan 15 minutos para el CHORIZO Y MORCILLA.");
+                  }, delay);
+                  setAlertScheduled(prev => ({ ...prev, chorizo: true }));
+                }
+              }
+            });
+          }
+
+          // Después de 30 segundos, actualizamos el pedido en la colección "pedidos"
+          // modificando el campo "productos": se establece "visto" a true en cada producto
+          setTimeout(() => {
+            const updatedProductos = pedido.productos.map(prod => ({ ...prod, visto: true }));
+            updateDoc(doc(db, 'pedidos', pedido.id), { productos: updatedProductos })
+              .catch(err => console.error("Error updating pedido visto:", err));
+          }, 30000);
+        }
+      });
+      // Actualizamos la referencia de pedidos previos
+      prevPedidosRef.current = currentPedidos;
+    });
+    return () => unsubscribe();
+  }, [alertScheduled]);
+
+  // --- 8. Configurar la grilla para ProductCard según los productos en "cocina" ---
   const productCount = Math.min(cocinaProducts.length, 9);
   let gridClass = '';
   if (productCount === 4) {
