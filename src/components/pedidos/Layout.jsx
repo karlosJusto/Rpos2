@@ -1,34 +1,32 @@
+import { useState, useEffect } from "react";
+import { useLocation } from "react-router-dom";
 import Sidebar from "./Sidebar";
 import Navbar from "./Navbar";
 import Tabs from "./Tabs";
 import Card from "./Card";
 import Ticket from "./Ticket";
-import { useState, useEffect } from "react";
 import fondo from "../../assets/fondo.jpg";
-import ModalClientes from "./ModalClientes";
-
-// Importa Swiper para React
 import { Swiper, SwiperSlide } from "swiper/react";
 import "swiper/css";
 import "swiper/css/scrollbar";
 import "swiper/css/mousewheel";
-
-// Importa Firestore
 import { doc, getDoc } from "firebase/firestore";
-import { db } from "../firebase/firebase"; // Ajusta la ruta a tu configuración de Firebase
+import { db } from "../firebase/firebase";
 
 const Layout = ({ bloquesPedidos }) => {
+  const location = useLocation();
+  // Se recibe el pedido a editar (si existe) desde Ordenes
+  const orderToEdit = location.state?.orderToEdit || null;
+
   const [calendarData, setCalendarData] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  // Obtener la fecha actual en formato "YYYY-MM-DD"
   const today = new Date();
   const formattedDate = today.toISOString().split("T")[0];
 
   useEffect(() => {
     const fetchCalendar = async () => {
       try {
-        // Consulta el documento correspondiente a la fecha actual
         const docRef = doc(db, "chicken_calendar_daily", formattedDate);
         const docSnap = await getDoc(docRef);
         if (docSnap.exists()) {
@@ -45,17 +43,11 @@ const Layout = ({ bloquesPedidos }) => {
     fetchCalendar();
   }, [formattedDate]);
 
-  // Filtrar intervalos según turno:
-  // Turno Mañana: intervalos cuyo inicio es menor a las 18:00.
-  // Turno Tarde: intervalos cuyo inicio es a partir de las 18:00.
   const morningIntervals =
-    calendarData?.intervals.filter((interval) => interval.start < "18:00") ||
-    [];
+    calendarData?.intervals.filter((interval) => interval.start < "18:00") || [];
   const afternoonIntervals =
-    calendarData?.intervals.filter((interval) => interval.start >= "18:00") ||
-    [];
+    calendarData?.intervals.filter((interval) => interval.start >= "18:00") || [];
 
-  // Determinar si mostrar el turno mañana o tarde según la hora actual
   const currentHour = today.getHours();
   const isMorning = currentHour < 18;
 
@@ -79,7 +71,7 @@ const Layout = ({ bloquesPedidos }) => {
           <div className="p-[2.5vw] pl-[3vw] h-[64%] max-h-[75%] grid grid-cols-5 overflow-y-auto gap-4">
             <Card />
           </div>
-          {/* Contenedor del slider con fondo y recuadro blanco */}
+          {/* Slider con los intervalos */}
           <div className="w-full pt-[1vh] border-2 border-white rounded p-4 bg-white">
             {loading ? (
               <p>Cargando horarios...</p>
@@ -94,10 +86,9 @@ const Layout = ({ bloquesPedidos }) => {
                 <SwiperSlide>
                   <h2 className="text-xl font-bold mb-2">
                     {isMorning
-                      ? "Turno Mañana (hasta las 18:00)"
-                      : "Turno Tarde (desde las 18:00)"}
+                      ? "Turno Mañana"
+                      : "Turno Tarde "}
                   </h2>
-                  {/* Contenedor que permite que los botones se envuelvan a nuevas filas si es necesario */}
                   <div className="flex flex-wrap gap-2">
                     {(isMorning ? morningIntervals : afternoonIntervals).map(
                       (interval, index) => (
@@ -127,7 +118,8 @@ const Layout = ({ bloquesPedidos }) => {
         </div>
 
         <div className="bg-[#F3F3F3] w-[23%]">
-          <Ticket />
+          {/* Se pasa orderToEdit para indicar que se trata de un pedido a editar */}
+          <Ticket orderToEdit={orderToEdit} />
         </div>
       </div>
     </>
