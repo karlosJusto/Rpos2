@@ -40,6 +40,8 @@ import utc from 'dayjs/plugin/utc'; // Plugin para trabajar con fechas en UTC
 import customParseFormat from 'dayjs/plugin/customParseFormat';
 import { useNavigate } from "react-router-dom";
 
+import SonidoOnChange from './SonidoOnChange'; // Asegúrate de importar correctamente el componente
+
 
 
 
@@ -422,6 +424,7 @@ const handlePedidoRapido = (idProduct) => {
             
                 // Filtrar los pedidos con origen = 1
                 const pedidosConOrigenUno = pedidosArray.filter(pedido => pedido.origen === 1);
+                
             
                 // Contamos la cantidad de pedidos con origen = 1
                 let cantidadPedidosOrigenUno = pedidosConOrigenUno.length;
@@ -1228,11 +1231,15 @@ const handlePedidoRapido = (idProduct) => {
           ? "text-gray-900"  // Si la categoría es extras, gris
           : "text-gray-900";  // Si no es ninguna de las anteriores, gris
 
-        return (
-          <span key={index} className={`mr-2 font-extrabold font-nunito text-lg ${categoriaColor}`}>
-            {producto.nombre}: {producto.cantidad} ({producto.entregado}) 
-          </span>
-        );
+        // Solo mostramos el producto si pertenece a "comida" o "complementos" en la pantalla gris
+        if (producto.categoria === "comida" || producto.categoria === "complementos") {
+          return (
+            <span key={index} className={`mr-2 font-extrabold font-nunito text-lg ${categoriaColor}`}>
+              {producto.nombre}: {producto.cantidad} ({producto.entregado}) 
+            </span>
+          );
+        }
+        return null; // No se muestra el producto si no es de "comida" ni "complementos"
       })}
   </div>
 )}
@@ -1257,12 +1264,12 @@ const handlePedidoRapido = (idProduct) => {
           <div key={pedido.id} className={`w-full flex ${containerColor} p-[0.30vh] mb-1 rounded-md`}>
             <div className="flex items-center">
               <h3
-                className={`text-[0.70vw] font-semibold mr-4 text-center
+                className={`text-[0.75vw] font-semibold mr-4 text-center
                   ${pedido.origen === 1 ? 'text-green-700' : 
                   pedido.origen === 0 ? 'text-gray-600' : 'text-gray-700'}`}
               >
                 {pedido.NumeroPedido}
-                <p className="pt-1 w-16 text-[0.5vw] font-extrabold">{pedido.cliente ? pedido.cliente : 'Generico'}</p>
+                <p className="pt-1 w-16 text-[0.75vw] font-extrabold">{pedido.cliente ? pedido.cliente : 'Generico'}</p>
               </h3>
 
               {/* Botón para mostrar detalles */}
@@ -1684,6 +1691,7 @@ const handlePedidoRapido = (idProduct) => {
 
          
      <PedidoRapido ref={pedidoRapidoRef} datosCliente={datosCliente} />
+    
    
     
    

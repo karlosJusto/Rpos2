@@ -10,6 +10,8 @@ import 'dayjs/locale/es'; // Para trabajar con el locale en español
 import timezone from 'dayjs/plugin/timezone'; // Plugin para zona horaria
 import utc from 'dayjs/plugin/utc'; // Plugin para trabajar con fechas en UTC
 import customParseFormat from 'dayjs/plugin/customParseFormat';
+import SonidoOnChange from '../ordenes/SonidoOnChange';
+import Ordenes from '../ordenes/Ordenes';
 
 
 const Login = () => {
@@ -25,6 +27,8 @@ dayjs.locale('es');
   const [valorInput, setValorInput] = useState('');
   const [errorMessage, setErrorMessage] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+
 
   const navigate = useNavigate(); // Inicializa el hook useNavigate
 
@@ -171,12 +175,19 @@ const generarEstadisticasDiarias = async () => {
           // Ejemplo de cómo hacer algo con el dato
           if (empleado.rol === "jefe") {
             console.log("Jefe ingresó correctamente");
+          
             navigate('/layout/comida'); // Redirige a /dashboard
           } else if (empleado.rol === "empleado") {
             console.log("Operario ingresó correctamente");
-            navigate('/layout/comida'); // Redirige a /layout
+           
+            
+            navigate('/stock'); // Redirige a /layout
           }
         });
+
+        setIsLoggedIn(true);
+        console.log(setIsLoggedIn);
+
       }
     } catch (error) {
       setErrorMessage('Error al verificar el PIN. Intenta nuevamente.');
@@ -277,6 +288,10 @@ const generarEstadisticasDiarias = async () => {
       </section>
 
       <LoginJefe generarEstadisticas={generarEstadisticasDiarias} />
+      <SonidoOnChange isLoggedIn={isLoggedIn} />
+
+     
+
     </>
   );
 };

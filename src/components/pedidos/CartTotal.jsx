@@ -73,6 +73,22 @@ const updateSaladCounters = async (cartItems) => {
             return; // Saltar item inválido
         }
 
+  // Calcular hora optimizada
+  const obtenerHoraRedondeada = () => {
+    const now = dayjs(); // Hora actual
+    const minutos = now.minute();
+    const siguienteBloque = Math.floor(minutos / 15) * 15;
+    const nuevaHora = now
+      .minute(siguienteBloque)
+      .second(0)
+      .millisecond(0);
+    return nuevaHora.isBefore(now) ? nuevaHora.add(15, 'minute') : nuevaHora;
+    
+  };
+
+
+  //si no le pasamos hora es la hora mas 15 rendondeada
+  const fechahora = datosCliente.fechahora || obtenerHoraRedondeada().format('DD/MM/YYYY HH:mm');
         const nameLower = item.name.toLowerCase();
         const cantidad = item.cantidad;
         const isPequena = nameLower.includes("1/2"); // Determinar tamaño
