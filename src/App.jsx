@@ -29,6 +29,7 @@ import Empleados from "./components/dashboard/Empleados"
 import CrudEmpleados from "./components/dashboard/CrearEmpleado"
 import { OrderProvider } from './components/Context/OrderProviderContext';
 import Cocina from "./components/cocina/Cocina"
+import AdminCalendarioPage from "./components/dashboard/Calendario/AdminCalendarioPage"
 
 
 
@@ -61,7 +62,7 @@ function App() {
         <Route path="/dashboard/crearProductos" element={<CrearProductos />} />
         <Route path="/dashboard/listaProductos" element={<Listaproductos />} />
         <Route path="/dashboard/listarClientes" element={<ListarClientes />} />
-        <Route path="/dashboard/calendarioPollos" element={<CalendarTabs />} />
+        <Route path="/dashboard/calendarioPollos" element={<AdminCalendarioPage />} />
         <Route path="/dashboard/empleados" element={<Empleados />} />
         <Route path="/dashboard/crearempleado" element={<CrudEmpleados />} />
 
