@@ -91,26 +91,6 @@ const CartTotal = ({ datosCliente, setDatosCliente, orderToEdit }) => {
     }
   };
 
-  // Helpers para trabajar con los intervalos (no se modifican)
-  const convertTimeToMinutes = (timeStr) => {
-    const [hours, minutes] = timeStr.split(":").map(Number);
-    return hours * 60 + minutes;
-  };
-
-  const findClosestIntervalIndex = (intervals, targetTime) => {
-    const targetMinutes = convertTimeToMinutes(targetTime);
-    let closestIndex = 0;
-    let smallestDiff = Infinity;
-    intervals.forEach((interval, index) => {
-      const intervalMinutes = convertTimeToMinutes(interval.start);
-      const diff = Math.abs(intervalMinutes - targetMinutes);
-      if (diff < smallestDiff) {
-        smallestDiff = diff;
-        closestIndex = index;
-      }
-    });
-    return closestIndex;
-  };
 
   // Validaciones del pedido
   const validateOrder = async () => {
@@ -160,105 +140,213 @@ const CartTotal = ({ datosCliente, setDatosCliente, orderToEdit }) => {
     return true;
   };
 
-  // Funciones para actualizar calendarios (idénticas a las que ya tenías)
-  const updateChickenCalendarPollo = async (fechahora, cantidad) => {
-    try {
-      const orderDate = dayjs(fechahora, "DD/MM/YYYY HH:mm");
-      const dailyDocId = orderDate.format("YYYY-MM-DD");
-      const timeSlot = orderDate.format("HH:mm");
-      const docRef = doc(db, "chicken_calendar_daily", dailyDocId);
-
-      await runTransaction(db, async (transaction) => {
-        const docSnap = await transaction.get(docRef);
-        if (!docSnap.exists()) {
-          throw new Error("Documento diario no existe");
-        }
-        const data = docSnap.data();
-        const intervals = data.intervals;
-        let index = intervals.findIndex((interval) => interval.start === timeSlot);
-        if (index === -1) {
-          index = findClosestIntervalIndex(intervals, timeSlot);
-        }
-        const current = intervals[index].orderedCount;
-        const max = intervals[index].maxAllowed;
-        if (current + cantidad <= max) {
-          intervals[index].orderedCount = current + cantidad;
-        } else {
-          throw new Error("El límite de Pollo Asado en este intervalo ya se ha alcanzado");
-        }
-        transaction.update(docRef, { intervals });
-      });
-    } catch (error) {
-      console.error("Error actualizando chicken calendar para Pollo Asado:", error);
-      throw error;
+// Reemplaza esta función en CartTotal.jsx
+const updateChickenCalendarPollo = async (fechahora, cantidad) => {
+  try {
+    const orderDate = dayjs(fechahora, "DD/MM/YYYY HH:mm");
+    if (!orderDate.isValid()) {
+        throw new Error("Formato de fecha/hora inválido: " + fechahora);
     }
-  };
+    const dailyDocId = orderDate.format("YYYY-MM-DD");
+    const docRef = doc(db, "chicken_calendar_daily", dailyDocId);
 
-  const updateCostillaCalendar = async (fechahora, cantidad) => {
+    await runTransaction(db, async (transaction) => {
+      const docSnap = await transaction.get(docRef);
+      if (!docSnap.exists()) {
+        throw new Error(`Documento diario ${dailyDocId} para Pollos no existe. Verifica la configuración del calendario.`);
+      }
+      const data = docSnap.data();
+      const intervals = data.intervals || []; // Asegura que intervals sea un array
+      if (intervals.length === 0) {
+          throw new Error(`No hay intervalos definidos para Pollos el día ${dailyDocId}.`);
+      }
+
+      const requestedMinutes = orderDate.hour() * 60 + orderDate.minute();
+      let foundIntervalIndex = -1;
+
+      for (let i = 0; i < intervals.length; i++) {
+        const interval = intervals[i];
+        try {
+            const intervalStartMinutes = convertTimeToMinutes(interval.start);
+            const intervalEndMinutes = convertTimeToMinutes(interval.end);
+            if (requestedMinutes >= intervalStartMinutes && requestedMinutes < intervalEndMinutes) {
+                foundIntervalIndex = i;
+                break;
+            }
+        } catch(e) {
+             console.error(`Error procesando intervalo pollo [${i}]: ${JSON.stringify(interval)}`, e);
+             // Decide si continuar o lanzar error. Continuar podría saltarse un intervalo válido.
+             // throw new Error(`Error interno procesando intervalo ${interval.start}-${interval.end}`);
+        }
+      }
+
+      if (foundIntervalIndex === -1) {
+        throw new Error("La hora solicitada ("+ orderDate.format("HH:mm") +") está fuera del horario disponible para Pollos.");
+      }
+
+      const intervalIndex = foundIntervalIndex;
+      const current = intervals[intervalIndex].orderedCount || 0;
+      const max = intervals[intervalIndex].maxAllowed || 0;
+
+      if (current + cantidad <= max) {
+        intervals[intervalIndex].orderedCount = current + cantidad;
+      } else {
+        throw new Error(`El límite de Pollos en el intervalo ${intervals[intervalIndex].start}-${intervals[intervalIndex].end} ya se ha alcanzado (${current}/${max}).`);
+      }
+      transaction.update(docRef, { intervals });
+    });
+    console.log("Chicken calendar actualizado para Pollo Asado");
+  } catch (error) {
+    console.error("Error actualizando chicken calendar para Pollo Asado:", error);
+    // Re-lanza el error para que sendToFirestore lo capture y muestre al usuario
+    throw error;
+  }
+};
+
+// Reemplaza esta función en CartTotal.jsx
+const updateCostillaCalendar = async (fechahora, cantidad) => {
     try {
       const orderDate = dayjs(fechahora, "DD/MM/YYYY HH:mm");
+       if (!orderDate.isValid()) {
+           throw new Error("Formato de fecha/hora inválido: " + fechahora);
+       }
       const dailyDocId = orderDate.format("YYYY-MM-DD");
-      const timeSlot = orderDate.format("HH:mm");
       const docRef = doc(db, "costilla_calendar_daily", dailyDocId);
 
       await runTransaction(db, async (transaction) => {
         const docSnap = await transaction.get(docRef);
         if (!docSnap.exists()) {
-          throw new Error("Documento diario de costilla no existe");
+          throw new Error(`Documento diario ${dailyDocId} para Costillas no existe. Verifica la configuración del calendario.`);
         }
         const data = docSnap.data();
-        const intervals = data.intervals;
-        let index = intervals.findIndex((interval) => interval.start === timeSlot);
-        if (index === -1) {
-          index = findClosestIntervalIndex(intervals, timeSlot);
+        const intervals = data.intervals || [];
+         if (intervals.length === 0) {
+             throw new Error(`No hay intervalos definidos para Costillas el día ${dailyDocId}.`);
+         }
+
+        const requestedMinutes = orderDate.hour() * 60 + orderDate.minute();
+        let foundIntervalIndex = -1;
+
+        for (let i = 0; i < intervals.length; i++) {
+          const interval = intervals[i];
+           try {
+               const intervalStartMinutes = convertTimeToMinutes(interval.start);
+               const intervalEndMinutes = convertTimeToMinutes(interval.end);
+               if (requestedMinutes >= intervalStartMinutes && requestedMinutes < intervalEndMinutes) {
+                   foundIntervalIndex = i;
+                   break;
+               }
+           } catch(e) {
+                console.error(`Error procesando intervalo costilla [${i}]: ${JSON.stringify(interval)}`, e);
+           }
         }
-        const current = intervals[index].orderedCount;
-        const max = intervals[index].maxAllowed;
+
+        if (foundIntervalIndex === -1) {
+          throw new Error("La hora solicitada ("+ orderDate.format("HH:mm") +") está fuera del horario disponible para Costillas.");
+        }
+
+        const intervalIndex = foundIntervalIndex;
+        const current = intervals[intervalIndex].orderedCount || 0;
+        const max = intervals[intervalIndex].maxAllowed || 0;
+
+        // La cantidad de costilla puede ser decimal (ej. 0.5 para media costilla)
+        // Asegúrate que la comparación y la suma manejen decimales si es necesario.
+        // Firestore maneja números decimales, así que debería estar bien.
         if (current + cantidad <= max) {
-          intervals[index].orderedCount = current + cantidad;
+          intervals[intervalIndex].orderedCount = current + cantidad;
         } else {
-          throw new Error("El límite de Costilla en este intervalo ya se ha alcanzado");
+          throw new Error(`El límite de Costillas en el intervalo ${intervals[intervalIndex].start}-${intervals[intervalIndex].end} ya se ha alcanzado (${current}/${max}).`);
         }
         transaction.update(docRef, { intervals });
       });
+      console.log("Costilla calendar actualizado");
     } catch (error) {
       console.error("Error actualizando costilla calendar:", error);
       throw error;
     }
-  };
+};
 
-  const updateCodilloCalendar = async (fechahora, cantidad) => {
+// Reemplaza esta función en CartTotal.jsx
+const updateCodilloCalendar = async (fechahora, cantidad) => {
     try {
       const orderDate = dayjs(fechahora, "DD/MM/YYYY HH:mm");
+       if (!orderDate.isValid()) {
+           throw new Error("Formato de fecha/hora inválido: " + fechahora);
+       }
       const dailyDocId = orderDate.format("YYYY-MM-DD");
-      const timeSlot = orderDate.format("HH:mm");
       const docRef = doc(db, "codillo_calendar_daily", dailyDocId);
 
       await runTransaction(db, async (transaction) => {
         const docSnap = await transaction.get(docRef);
         if (!docSnap.exists()) {
-          throw new Error("Documento diario de codillo no existe");
+          throw new Error(`Documento diario ${dailyDocId} para Codillos no existe. Verifica la configuración del calendario.`);
         }
         const data = docSnap.data();
-        const intervals = data.intervals;
-        let index = intervals.findIndex((interval) => interval.start === timeSlot);
-        if (index === -1) {
-          index = findClosestIntervalIndex(intervals, timeSlot);
+        const intervals = data.intervals || [];
+         if (intervals.length === 0) {
+             throw new Error(`No hay intervalos definidos para Codillos el día ${dailyDocId}.`);
+         }
+
+        const requestedMinutes = orderDate.hour() * 60 + orderDate.minute();
+        let foundIntervalIndex = -1;
+
+        for (let i = 0; i < intervals.length; i++) {
+          const interval = intervals[i];
+          try {
+              const intervalStartMinutes = convertTimeToMinutes(interval.start);
+              const intervalEndMinutes = convertTimeToMinutes(interval.end);
+              if (requestedMinutes >= intervalStartMinutes && requestedMinutes < intervalEndMinutes) {
+                  foundIntervalIndex = i;
+                  break;
+              }
+          } catch(e) {
+               console.error(`Error procesando intervalo codillo [${i}]: ${JSON.stringify(interval)}`, e);
+          }
         }
-        const current = intervals[index].orderedCount;
-        const max = intervals[index].maxAllowed;
+
+        if (foundIntervalIndex === -1) {
+          throw new Error("La hora solicitada ("+ orderDate.format("HH:mm") +") está fuera del horario disponible para Codillos.");
+        }
+
+        const intervalIndex = foundIntervalIndex;
+        const current = intervals[intervalIndex].orderedCount || 0;
+        const max = intervals[intervalIndex].maxAllowed || 0;
+
         if (current + cantidad <= max) {
-          intervals[index].orderedCount = current + cantidad;
+          intervals[intervalIndex].orderedCount = current + cantidad;
         } else {
-          throw new Error("El límite de Codillo en este intervalo ya se ha alcanzado");
+          throw new Error(`El límite de Codillos en el intervalo ${intervals[intervalIndex].start}-${intervals[intervalIndex].end} ya se ha alcanzado (${current}/${max}).`);
         }
         transaction.update(docRef, { intervals });
       });
+      console.log("Codillo calendar actualizado");
     } catch (error) {
       console.error("Error actualizando codillo calendar:", error);
       throw error;
     }
-  };
+};
+
+// También necesitas la función auxiliar convertTimeToMinutes si no la tenías global
+// Asegúrate de que esté definida ANTES de las funciones que la usan.
+const convertTimeToMinutes = (timeStr) => {
+  try {
+      // Maneja casos donde timeStr pueda ser inválido o vacío
+      if (!timeStr || !timeStr.includes(':')) {
+          console.warn("Formato de tiempo inválido para convertir a minutos:", timeStr);
+          // Devuelve un valor que probablemente falle las comparaciones o lanza error
+          return -1; // O podrías lanzar un error: throw new Error('Invalid time format');
+      }
+      const [hours, minutes] = timeStr.split(":").map(Number);
+      if (isNaN(hours) || isNaN(minutes)) {
+           console.warn("Resultado NaN al convertir tiempo a minutos:", timeStr);
+           return -1; // O lanza error
+      }
+      return hours * 60 + minutes;
+  } catch (e) {
+      console.error("Error en convertTimeToMinutes para:", timeStr, e);
+      return -1; // O lanza error
+  }
+};
 
   // Función para enviar el pedido (o actualizarlo si se está editando)
   const sendToFirestore = async ({ confirmado }) => {
