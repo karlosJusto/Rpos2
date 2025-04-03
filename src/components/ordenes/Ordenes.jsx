@@ -38,6 +38,7 @@ import 'dayjs/locale/es'; // Para trabajar con el locale en español
 import timezone from 'dayjs/plugin/timezone'; // Plugin para zona horaria
 import utc from 'dayjs/plugin/utc'; // Plugin para trabajar con fechas en UTC
 import customParseFormat from 'dayjs/plugin/customParseFormat';
+import { useNavigate } from "react-router-dom";
 
 import SonidoOnChange from './SonidoOnChange'; // Asegúrate de importar correctamente el componente
 
@@ -46,7 +47,12 @@ import SonidoOnChange from './SonidoOnChange'; // Asegúrate de importar correct
 
 
 const Ordenes = () => {
+  const navigate = useNavigate();
 
+  // Función para editar pedido
+  const handleEditOrder = (pedido) => {
+    navigate('/layout/comida', { state: { orderToEdit: pedido } });
+  };
   //ajustamos la hora
   const obtenerHoraRedondeada = () => {
     const now = dayjs(); // Hora actual
@@ -1583,6 +1589,13 @@ const handlePedidoRapido = (idProduct) => {
               className="p-3 cursor-pointer hover:bg-yellow-500 rounded-lg" 
               //onClick={() => handleIconClick("2")}
             >
+            <button
+                onClick={() => handleEditOrder(pedidoSeleccionado)}
+                className="p-3 cursor-pointer hover:bg-yellow-500 rounded-lg"
+              >
+                {/* SVG o texto de editar */}
+                <p>Editar</p>
+              </button>
               <svg width="4vw" height="4vw" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
 
                 <g id="SVGRepo_bgCarrier" strokeWidth="0"/>

@@ -1,29 +1,45 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { Header } from './components/Header';
 import { ProductCard } from './components/ProductCard';
 import { SaladTypeCard } from './components/SaladTypeCard';
 import { db } from '../firebase/firebase';
-import { collection, doc, onSnapshot, setDoc, updateDoc } from 'firebase/firestore';
+import { 
+  collection, 
+  doc, 
+  onSnapshot, 
+  setDoc, 
+  updateDoc, 
+  getDoc 
+  //, query, where  // Si decides usar un campo timestamp
+} from 'firebase/firestore';
+
+// Función para formatear la fecha en "dd/mm/yyyy" (con ceros a la izquierda)
+const formatDate = (date) => {
+  const d = new Date(date);
+  let day = d.getDate();
+  let month = d.getMonth() + 1;
+  const year = d.getFullYear();
+  day = day < 10 ? `0${day}` : day;
+  month = month < 10 ? `0${month}` : month;
+  return `${day}/${month}/${year}`;
+};
 
 const Cocina = () => {
-  // Estado para productos de la colección "cocina"
+  // Estados para productos, pedidos, ensaladas y fecha
   const [cocinaProducts, setCocinaProducts] = useState([]);
-  // Estado para los pedidos agregados según los productos de cocina
   const [productsData, setProductsData] = useState([]);
-  // Estado para ensaladas/ensaladillas
   const [saladsData, setSaladsData] = useState([]);
-  // Estado para la fecha seleccionada (por defecto, la fecha actual)
   const [selectedDate, setSelectedDate] = useState(new Date());
-  // Estado para mostrar/ocultar el input de calendario
   const [showCalendar, setShowCalendar] = useState(false);
+  const [alertScheduled, setAlertScheduled] = useState({ codillos: false, chorizo: false });
+  const prevPedidosRef = useRef([]);
 
-  // --- 1. Suscripción a la colección "cocina" ---
+  // Suscripción a la colección "cocina"
   useEffect(() => {
     const cocinaRef = collection(db, 'cocina');
     const unsubscribeCocina = onSnapshot(cocinaRef, (querySnapshot) => {
       const productos = [];
       querySnapshot.forEach((doc) => {
-        // Se asume que el id del documento es numérico (si no, omite parseInt)
         productos.push({ id: parseInt(doc.id), ...doc.data() });
       });
       setCocinaProducts(productos);
@@ -31,7 +47,7 @@ const Cocina = () => {
     return () => unsubscribeCocina();
   }, []);
 
-  // --- 2. Función para determinar el turno actual ---
+  // Función para determinar el turno actual
   const getTurnoActual = () => {
     const now = new Date();
     const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
@@ -50,15 +66,17 @@ const Cocina = () => {
     return { startTime, endTime };
   };
 
-  // --- 3. Manejo del cambio de fecha desde el calendario ---
+  // Manejo del cambio de fecha desde el calendario
   const handleDateChange = (e) => {
     const newDate = new Date(e.target.value);
     setSelectedDate(newDate);
     setShowCalendar(false);
   };
 
-  // Determinar el texto del turno
-  const isToday = selectedDate.toISOString().split('T')[0] === new Date().toISOString().split('T')[0];
+  const selectedDateStr = formatDate(selectedDate);
+  const todayStr = formatDate(new Date());
+  const isToday = selectedDateStr === todayStr;
+
   let turnoText = '';
   if (isToday) {
     const now = new Date();
@@ -69,9 +87,8 @@ const Cocina = () => {
     turnoText = 'Mostrando todos los pedidos del día';
   }
 
-  // --- 4. Lógica para agrupar pedidos en ProductCard ---
+  // Agrupación de pedidos para ProductCard
   useEffect(() => {
-    // Se espera que cocinaProducts ya esté cargado
     if (cocinaProducts.length === 0) return;
     
     const pedidosRef = collection(db, 'pedidos');
@@ -81,16 +98,11 @@ const Cocina = () => {
         pedidos.push({ id: doc.id, ...doc.data() });
       });
 
-      // Convertir la fecha seleccionada a "dd/mm/yyyy"
-      const selectedDateStr = selectedDate.toLocaleDateString('es-ES');
-      const todayStr = new Date().toLocaleDateString('es-ES');
-
-      // Filtrar pedidos del día seleccionado y, en caso de hoy, por turno
       const pedidosDelDia = pedidos.filter((pedido) => {
-        if (!pedido.fechahora_realizado) return false;
-        const [fechaPedido, horaPedido] = pedido.fechahora_realizado.split(' ');
+        if (!pedido.fechahora) return false;
+        const [fechaPedido, horaPedido] = pedido.fechahora.split(' ');
         if (fechaPedido !== selectedDateStr) return false;
-        if (selectedDateStr === todayStr) {
+        if (isToday) {
           const { startTime, endTime } = getTurnoActual();
           const [day, month, year] = fechaPedido.split('/');
           const [hour, minute] = horaPedido.split(':');
@@ -100,10 +112,7 @@ const Cocina = () => {
         return true;
       });
 
-      // Generamos los IDs válidos desde la colección "cocina"
       const validProductIds = cocinaProducts.map(product => product.id);
-
-      // Objeto para agrupar los pedidos por producto
       const aggregatedProducts = {};
 
       pedidosDelDia.forEach((pedido) => {
@@ -113,7 +122,7 @@ const Cocina = () => {
               if (!aggregatedProducts[prod.id]) {
                 aggregatedProducts[prod.id] = {
                   name: prod.nombre,
-                  stock: 8, // valor por defecto; se actualizará si se encuentra en cocinaProducts
+                  stock: 8, // valor por defecto
                   pedidos: 0,
                   orders: [],
                 };
@@ -122,10 +131,10 @@ const Cocina = () => {
                 idPedido: pedido.id,
                 idProducto: prod.id,
                 producto: prod,
-                hora: pedido.fechahora_realizado,
+                hora: pedido.fechahora,
                 nombre: pedido.cliente,
                 cantidad: prod.cantidad,
-                descripcion:prod.observaciones || "",
+                descripcion: prod.observaciones || "",
               });
               aggregatedProducts[prod.id].pedidos += prod.cantidad;
             }
@@ -133,7 +142,6 @@ const Cocina = () => {
         }
       });
 
-      // Incluir todos los productos válidos, incluso sin pedidos, utilizando la info real de "cocina"
       validProductIds.forEach((id) => {
         if (!aggregatedProducts[id]) {
           const productInfo = cocinaProducts.find(p => p.id === id);
@@ -146,18 +154,17 @@ const Cocina = () => {
         }
       });
 
-      // Ordenar los productos según el orden definido en cocinaProducts
       const sortedProducts = cocinaProducts.map(product => aggregatedProducts[product.id]);
       setProductsData(sortedProducts);
     });
 
     return () => unsubscribe();
-  }, [selectedDate, cocinaProducts]);
+  }, [selectedDate, cocinaProducts, selectedDateStr, isToday]);
 
-  // --- 5. Lógica para ensaladas y ensaladillas ---
-  // Se usa la fecha seleccionada como id de documento (formato "dd-mm-yyyy")
-  const todayDocId = selectedDate.toLocaleDateString('es-ES').replace(/\//g, '-');
+  // --- Lógica para ensaladas/ensaladillas ---
+  const todayDocId = selectedDateStr.replace(/\//g, '-');
 
+  // Suscripción al documento de ensaladas (inicializa usando merge)
   useEffect(() => {
     const saladsRef = doc(db, 'ensaladas', todayDocId);
     const unsubscribe = onSnapshot(saladsRef, (docSnapshot) => {
@@ -175,14 +182,15 @@ const Cocina = () => {
             pequenas: { preparadas: 10, pedidas: 0 },
           },
         };
-        setDoc(saladsRef, initialData);
+        // Usar merge para que no se sobrescriban datos ya existentes
+        setDoc(saladsRef, initialData, { merge: true });
         setSaladsData([initialData]);
       }
     });
     return () => unsubscribe();
   }, [todayDocId]);
 
-  // --- 6. Actualizar "pedidas" en ensaladas/ensaladillas ---
+  // Actualización condicional de "pedidas" en ensaladas/ensaladillas:
   useEffect(() => {
     const pedidosRef = collection(db, 'pedidos');
     const unsubscribe = onSnapshot(pedidosRef, (querySnapshot) => {
@@ -191,14 +199,11 @@ const Cocina = () => {
         pedidos.push({ id: doc.id, ...doc.data() });
       });
 
-      const selectedDateStr = selectedDate.toLocaleDateString('es-ES');
-      const todayStr = new Date().toLocaleDateString('es-ES');
-
       const pedidosDelDia = pedidos.filter((pedido) => {
-        if (!pedido.fechahora_realizado) return false;
-        const [fechaPedido, horaPedido] = pedido.fechahora_realizado.split(' ');
+        if (!pedido.fechahora) return false;
+        const [fechaPedido, horaPedido] = pedido.fechahora.split(' ');
         if (fechaPedido !== selectedDateStr) return false;
-        if (selectedDateStr === todayStr) {
+        if (isToday) {
           const { startTime, endTime } = getTurnoActual();
           const [day, month, year] = fechaPedido.split('/');
           const [hour, minute] = horaPedido.split(':');
@@ -216,6 +221,8 @@ const Cocina = () => {
       pedidosDelDia.forEach((pedido) => {
         if (pedido.productos && Array.isArray(pedido.productos)) {
           pedido.productos.forEach((prod) => {
+            // Suponiendo que prod.id === 12 para ensaladas y prod.id === 13 para ensaladillas,
+            // y que el campo 'size' ya se define (por ejemplo, "pequeñas" o "grandes")
             if (prod.id === 12) {
               if (prod.size && prod.size.toLowerCase().includes('peque')) {
                 ensaladasPedidasPeq += prod.cantidad;
@@ -235,17 +242,39 @@ const Cocina = () => {
       });
 
       const saladsRef = doc(db, 'ensaladas', todayDocId);
-      updateDoc(saladsRef, {
-        "ensaladas.grandes.pedidas": ensaladasPedidasGr,
-        "ensaladas.pequenas.pedidas": ensaladasPedidasPeq,
-        "ensaladillas.grandes.pedidas": ensaladillasPedidasGr,
-        "ensaladillas.pequenas.pedidas": ensaladillasPedidasPeq,
-      }).catch(err => console.error("Error updating salad pedidas:", err));
+      // Leer el documento actual y actualizar solo si al menos uno de los nuevos totales NO es 0
+      getDoc(saladsRef)
+        .then((docSnapshot) => {
+          if (docSnapshot.exists()) {
+            const currentData = docSnapshot.data();
+            const currentEnsGr = currentData.ensaladas?.grandes?.pedidas || 0;
+            const currentEnsPeq = currentData.ensaladas?.pequenas?.pedidas || 0;
+            const currentEnsadGr = currentData.ensaladillas?.grandes?.pedidas || 0;
+            const currentEnsadPeq = currentData.ensaladillas?.pequenas?.pedidas || 0;
+
+            // Solo actualizamos si al menos uno de los nuevos totales es mayor que 0
+            if (
+              (ensaladasPedidasGr > 0 || ensaladasPedidasPeq > 0 || ensaladillasPedidasGr > 0 || ensaladillasPedidasPeq > 0) &&
+              (currentEnsGr !== ensaladasPedidasGr ||
+              currentEnsPeq !== ensaladasPedidasPeq ||
+              currentEnsadGr !== ensaladillasPedidasGr ||
+              currentEnsadPeq !== ensaladillasPedidasPeq)
+            ) {
+              updateDoc(saladsRef, {
+                "ensaladas.grandes.pedidas": ensaladasPedidasGr,
+                "ensaladas.pequenas.pedidas": ensaladasPedidasPeq,
+                "ensaladillas.grandes.pedidas": ensaladillasPedidasGr,
+                "ensaladillas.pequenas.pedidas": ensaladillasPedidasPeq,
+              }).catch(err => console.error("Error updating salad pedidas:", err));
+            }
+          }
+        })
+        .catch(err => console.error("Error reading current salad doc:", err));
     });
     return () => unsubscribe();
-  }, [selectedDate, todayDocId]);
+  }, [selectedDate, todayDocId, selectedDateStr, isToday]);
 
-  // Función para actualizar la cantidad de preparadas en Firebase
+  // Función para actualizar la cantidad de "preparadas"
   const updateSaladCount = async (type, size, amount) => {
     const saladsRef = doc(db, 'ensaladas', todayDocId);
     try {
@@ -257,7 +286,65 @@ const Cocina = () => {
     }
   };
 
-  // --- 7. Configurar la grilla para ProductCard en función de los productos en "cocina" ---
+  // Lógica para alertas y marcar pedidos como "visto"
+  useEffect(() => {
+    const pedidosRef = collection(db, 'pedidos');
+    const unsubscribe = onSnapshot(pedidosRef, (querySnapshot) => {
+      const currentPedidos = [];
+      querySnapshot.forEach((doc) => {
+        currentPedidos.push({ id: doc.id, ...doc.data() });
+      });
+
+      currentPedidos.forEach((pedido) => {
+        const isNewOrder = !prevPedidosRef.current.find((p) => p.id === pedido.id);
+        const hasUnseen = pedido.productos && pedido.productos.some(prod => !prod.visto);
+        if (isNewOrder && hasUnseen) {
+          const productosNombres = pedido.productos
+            ? pedido.productos.map(p => p.nombre).join(', ')
+            : 'Sin productos';
+          console.log(`Nuevo pedido de ${pedido.cliente}. Productos: ${productosNombres}`);
+
+          if (pedido.productos && Array.isArray(pedido.productos)) {
+            pedido.productos.forEach((prod) => {
+              const nombreProd = prod.nombre.toLowerCase();
+              const now = new Date();
+              const { endTime } = getTurnoActual();
+
+              if ((nombreProd.includes('codillo') || nombreProd.includes('costilla')) && !alertScheduled.codillos) {
+                const alertTime = new Date(endTime.getTime() - 30 * 60000);
+                const delay = alertTime.getTime() - now.getTime();
+                if (delay > 0) {
+                  setTimeout(() => {
+                    console.log("¡Atención! Faltan 30 minutos para los CODILLOS Y COSTILLAS.");
+                  }, delay);
+                  setAlertScheduled(prev => ({ ...prev, codillos: true }));
+                }
+              }
+              if ((nombreProd.includes('chorizo') || nombreProd.includes('pimientos')) && !alertScheduled.chorizo) {
+                const alertTime = new Date(endTime.getTime() - 15 * 60000);
+                const delay = alertTime.getTime() - now.getTime();
+                if (delay > 0) {
+                  setTimeout(() => {
+                    alert("¡Atención! Faltan 15 minutos para el CHORIZO Y MORCILLA.");
+                  }, delay);
+                  setAlertScheduled(prev => ({ ...prev, chorizo: true }));
+                }
+              }
+            });
+          }
+          setTimeout(() => {
+            const updatedProductos = pedido.productos.map(prod => ({ ...prod, visto: true }));
+            updateDoc(doc(db, 'pedidos', pedido.id), { productos: updatedProductos })
+              .catch(err => console.error("Error updating pedido visto:", err));
+          }, 30000);
+        }
+      });
+      prevPedidosRef.current = currentPedidos;
+    });
+    return () => unsubscribe();
+  }, [alertScheduled]);
+
+  // Configuración de la grilla para ProductCard
   const productCount = Math.min(cocinaProducts.length, 9);
   let gridClass = '';
   if (productCount === 4) {
@@ -273,7 +360,7 @@ const Cocina = () => {
   return (
     <div className="h-screen bg-gray-100 flex flex-col">
       <Header />
-      {/* Botón, calendario y texto de turno */}
+      {/* Botón, calendario y turno */}
       <div className="p-4 flex items-center space-x-4">
         <button 
           className="px-4 py-2 bg-[#f2ac02] text-white rounded"
