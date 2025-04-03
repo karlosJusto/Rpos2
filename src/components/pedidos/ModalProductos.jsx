@@ -277,7 +277,7 @@ const ModalProductos = ({show, handleClose, product,isNuevoProducto}) => {
   )}
 
   {/* Condición para el checkbox "Celiaco" */}
-  {[10, 49, 3, 50].includes(product?.id_product) && (
+  {product && [10, 49, 3, 50].includes(Number(product.id_product)) && (
   <div className="form-check form-check-inline border-2 p-[1vw] border-gray-200 rounded-xl">
     <input 
       className="form-check-input m-1" 
@@ -285,7 +285,7 @@ const ModalProductos = ({show, handleClose, product,isNuevoProducto}) => {
       id="celiaco"  
       name="celiaco" 
       value="option3" 
-      checked={celiaco} // Siempre desmarcado
+      checked={celiaco} 
       onChange={(e) => setCeliaco(e.target.checked)} 
       disabled={false} 
     />

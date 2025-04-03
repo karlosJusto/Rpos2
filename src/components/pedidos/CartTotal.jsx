@@ -39,8 +39,11 @@ const CartTotal = ({ datosCliente, setDatosCliente }) => {
       .second(0)
       .millisecond(0);
     return nuevaHora.isBefore(now) ? nuevaHora.add(15, 'minute') : nuevaHora;
+    
   };
 
+
+  //si no le pasamos hora es la hora mas 15 rendondeada
   const fechahora = datosCliente.fechahora || obtenerHoraRedondeada().format('DD/MM/YYYY HH:mm');
 
   // Función para obtener el número de pedido secuencial
@@ -110,47 +113,58 @@ const CartTotal = ({ datosCliente, setDatosCliente }) => {
     const incluyePollo = cart.some(item => item.id_product === 1 || item.id_product === 2); // Suponiendo que el id de pollo es 1
     
     const clienteData = sanitizeClientData(datosCliente);
-  
-    if (!clienteData.telefono) {
-      setMensajeModal("El teléfono del cliente es obligatorio.");
-      setShowModal2(true);
-      return false;
-    }
-  
-    if (!clienteData.fechahora) {
-      setMensajeModal("No has seleccionado hora para el pedido.");
-      setShowModal2(true);
-      return false;
-    }
 
-    if (!incluyePollo) {
-      setMensajeModal("Comprueba...tu pedido no incluye pollo.");
-      setShowModal(true);
-      return false;
+    let mensajesError = ""; // Inicia una variable para acumular los mensajes
+
+    // Comprobación para el teléfono del cliente
+    if (!clienteData.telefono) {
+      mensajesError += " ❌ El teléfono del cliente es obligatorio." ; // Agrega el mensaje con salto de línea
     }
-  
-    // Verificar si hay suficiente stock para los productos
+    
+    // Comprobación para otro posible error, por ejemplo, stock
     for (const item of cart) {
       const productRef = doc(db, 'productos', item.id_product.toString());
       const productSnap = await getDoc(productRef);
       if (productSnap.exists()) {
         const productData = productSnap.data();
         const currentStock = productData.stock || 0;
-  
+    
         if (currentStock < item.cantidad) {
-          setMensajeModal(`No hay suficiente stock para el producto ${item.name || 'sin nombre'}. Solo quedan ${currentStock} unidades.`);
-          setShowModal2(true);
-          return false; // Detener la ejecución si hay falta de stock
+          mensajesError += ` ❌ No hay suficiente stock para el producto ${item.name || 'sin nombre'}. Solo quedan ${currentStock} unidades.\n`;
         }
       } else {
-        setMensajeModal(`Producto no encontrado para el id: ${item.id_product}`);
-        setShowModal2(true);
-        return false;
+        mensajesError += `Producto no encontrado para el id: ${item.id_product}\n`;
       }
     }
+    
+    // Si hay errores, mostrar el modal
+    if (mensajesError.trim() !== "") {
+      setMensajeModal(mensajesError.trim());
+      setShowModal2(true); // Mostrar el modal con los errores
+      return false; // Detener la ejecución
+    }
+
   
-    // Si no incluye pollo, mostramos el modal y detenemos el flujo
-   
+    let mensajesError1 = ""; // Variable para almacenar todos los mensajes de error
+
+    // Comprobamos si falta la fecha
+    if (!clienteData.fechahora) {
+      const horaRedondeada = obtenerHoraRedondeada().format('HH:mm'); // Obtener la hora redondeada
+      mensajesError1 += `❗️No has seleccionado hora para el pedido. La hora del pedido será: ${horaRedondeada} `; // Añadir al mensaje de error
+    }
+    
+    // Comprobamos si falta el pollo en el pedido
+    if (!incluyePollo) {
+      mensajesError1 += "❗️Comprueba... tu pedido no incluye pollo."; // Añadir al mensaje de error
+    }
+    
+    // Si hay algún error, mostramos el modal
+    if (mensajesError1) {
+      setMensajeModal(mensajesError1.trim()); // Establece los mensajes concatenados
+      setShowModal(true); // Mostrar el modal con los mensajes
+      return false; // Detener la ejecución
+    }
+     
   
     return true; // Si todo es correcto, retornamos verdadero
   };
@@ -159,6 +173,7 @@ const CartTotal = ({ datosCliente, setDatosCliente }) => {
 
   // Función para actualizar el daily calendar (chicken_calendar_byday) con el número de "Pollo Asado"
   // Utiliza exactamente el campo fechahora del cliente sin redondear
+  /*
   const updateChickenCalendarPollo = async (fechahora, cantidad) => {
     try {
       // Parseamos la fecha del pedido con el formato "DD/MM/YYYY HH:mm"
@@ -211,12 +226,13 @@ const CartTotal = ({ datosCliente, setDatosCliente }) => {
       console.error('Error actualizando chicken calendar para Pollo Asado:', error);
       throw error; // Propagamos el error para impedir que se procese el pedido
     }
-  };
+  };*/
 
   // Función para enviar el pedido a Firestore
   const sendToFirestore = async ({confirmado}) => {
     try {
 
+     
       if (!confirmado)
       {
           const isValid = await validateOrder(); // Ejecutamos la validación
@@ -328,12 +344,12 @@ await Promise.all(
 );
       
 
-      // 4. Si el pedido contiene "Pollo Asado", actualizar el daily calendar
+     /* // 4. Si el pedido contiene "Pollo Asado", actualizar el daily calendar
       const polloItem = pedidoData.productos.find(p => p.nombre === 'Pollo Asado');
       if (polloItem) {
         const cantidadPollo = polloItem.cantidad || 1;
         await updateChickenCalendarPollo(pedidoData.fechahora, cantidadPollo);
-      }
+      }*/
 
       console.log('Pedido guardado con éxito');
       setCart([]); // Limpiar el carrito
@@ -374,7 +390,7 @@ await Promise.all(
       </div>
 
       <div className='flex text-center justify-center items-center'>
-      <button onClick={() => sendToFirestore({ confirmado: false })}
+      <button onClick={() => sendToFirestore({ confirmado: false})}
           className="mt-[2vw] w-[10vw] tracking-wide bg-[#f2ac02] text-white py-[0.95vw] rounded-lg hover:bg-yellow-600 transition-all duration-300 ease-in-out flex items-center justify-center focus:shadow-outline focus:outline-none">
           <svg width="28px" height="28px" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
             <path d="M4 18V6" stroke="#ffffff" strokeWidth="1.5" strokeLinecap="round"></path>
@@ -401,16 +417,20 @@ await Promise.all(
           
          
          
-         <div className='p-2'>
-         <svg fill="#c81d0c  " width="75px" height="75px" viewBox="-5.5 0 32 32" version="1.1" xmlns="http://www.w3.org/2000/svg">
+         <div className='p-1'>
+         <svg fill="#c81d0c" width="100px" height="100px" viewBox="0 0 22 22" version="1.1" xmlns="http://www.w3.org/2000/svg">
 
               <g id="SVGRepo_bgCarrier" strokeWidth="0"/>
 
               <g id="SVGRepo_tracerCarrier" strokeLinecap="round" strokeLinejoin="round"/>
 
-              <g id="SVGRepo_iconCarrier"> <path d="M10.16 25.92c-2.6 0-8.72-0.24-9.88-2.24-1.28-2.28 2.040-8.24 3.080-10.040 1.040-1.76 4.64-7.56 7.12-7.56 2.8 0 7.24 7.48 8.56 10.12 1.92 3.84 2.48 6.4 1.56 7.6-1.52 2.040-8.96 2.12-10.44 2.12zM10.48 7.72c-0.72 0-3.080 2.36-5.64 6.76-2.76 4.68-3.48 7.72-3.080 8.4 0.32 0.56 3.2 1.4 8.4 1.4 5.44 0 8.64-0.88 9.080-1.48 0.28-0.36 0.040-2.28-1.72-5.84-2.64-5.28-6.12-9.24-7.040-9.24zM10.52 19.2c-0.48 0-0.84-0.36-0.84-0.84v-6.36c0-0.48 0.36-0.84 0.84-0.84s0.84 0.36 0.84 0.84v6.32c0 0.48-0.4 0.88-0.84 0.88zM11.36 21.36c0 0.464-0.376 0.84-0.84 0.84s-0.84-0.376-0.84-0.84c0-0.464 0.376-0.84 0.84-0.84s0.84 0.376 0.84 0.84z"/> </g>
+              <g id="SVGRepo_iconCarrier">
 
-              </svg>
+              <path d="M12.1458333,9.85416667 L12.1458333,6.74047388 C12.1458333,6.4826434 11.9382041,6.28571429 11.6820804,6.28571429 L10.3179196,6.28571429 C10.0656535,6.28571429 9.85416667,6.48931709 9.85416667,6.74047388 L9.85416667,9.85416667 L6.74047388,9.85416667 C6.4826434,9.85416667 6.28571429,10.0617959 6.28571429,10.3179196 L6.28571429,11.6820804 C6.28571429,11.9343465 6.48931709,12.1458333 6.74047388,12.1458333 L9.85416667,12.1458333 L9.85416667,15.2595261 C9.85416667,15.5173566 10.0617959,15.7142857 10.3179196,15.7142857 L11.6820804,15.7142857 C11.9343465,15.7142857 12.1458333,15.5106829 12.1458333,15.2595261 L12.1458333,12.1458333 L15.2595261,12.1458333 C15.5173566,12.1458333 15.7142857,11.9382041 15.7142857,11.6820804 L15.7142857,10.3179196 C15.7142857,10.0656535 15.5106829,9.85416667 15.2595261,9.85416667 L12.1458333,9.85416667 Z" id="Combined-Shape" transform="translate(11.000000, 11.000000) rotate(-45.000000) translate(-11.000000, -11.000000) "/>
+
+              </g>
+
+          </svg>
 
 
 
@@ -418,7 +438,7 @@ await Promise.all(
 
          <div>
 
-            <h1 className='font-nunito text-xl font-[2vw] p-2  text-center text-[#808b96]'>{mensajeModal}</h1>
+            <h1 className='font-nunito text-xl font-[2vw] p-1  text-center text-[#808b96]'>{mensajeModal}</h1>
          </div>
        
         </Modal.Body>
@@ -431,7 +451,7 @@ await Promise.all(
          <Button
            variant="primary"
           
-           className="bg-yellow-500 border-yellow-500 hover:bg-yellow-600 hover:border-yellow-600 p-2 font-nunito"
+           className="bg-yellow-500 border-yellow-500  hover:bg-yellow-600 hover:border-yellow-600 p-[0.7vw] font-nunito"
            onClick={handleCloseModal2}
          >
            Aceptar

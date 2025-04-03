@@ -32,7 +32,7 @@ const Stock = () => {
   const handleStockChange = (id_product, e) => {
     setNuevoStock({
       ...nuevoStock,
-      [id_product]: parseInt(e.target.value) || 0, // Actualizamos el stock para el producto correspondiente
+      [id_product]: parseFloat(e.target.value) || 0, // Actualizamos el stock para el producto correspondiente
     });
   };
 
@@ -182,6 +182,7 @@ const Stock = () => {
                         value={nuevoStock[producto.id_product] || ""}
                         onChange={(e) => handleStockChange(producto.id_product, e)}
                         min="0"
+                        step="any" // Permite decimales
                         placeholder="Nuevo stock"
                         className="px-2 py-1 border border-gray-300 rounded-md w-20 text-center focus:ring-yellow-500 focus:border-yellow-500"
                       />

@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { db } from '../firebase/firebase'; // Importa la instancia de Firebase
 import { collection, getDocs, doc, setDoc, updateDoc } from 'firebase/firestore'; // Importa las funciones necesarias 
 import Table from 'react-bootstrap/Table';
+import dayjs from 'dayjs';
 
 const PolloDetallo = () => {
   const [estadisticas, setEstadisticas] = useState([]); // Estado para almacenar los datos
@@ -25,15 +26,15 @@ const PolloDetallo = () => {
 
         // Ordenamos los datos por la fecha del día (aseguramos que 'dia' esté en formato YYYY-MM-DD)
         const datosOrdenados = datos.sort((a, b) => {
-          const fechaA = new Date(a.dia); // Convertimos el día en objeto Date
-          const fechaB = new Date(b.dia); // Convertimos el día en objeto Date
+          const fechaA = dayjs(a.dia, 'DD-MM-YYYY'); // Usamos dayjs para convertir a objeto Date
+          const fechaB = dayjs(b.dia, 'DD-MM-YYYY'); // Usamos dayjs para convertir a objeto Date
           return fechaA - fechaB; // Ordenar de los más antiguos a los más recientes
         });
 
         // Limitamos a los últimos 30 días
-        const datosLimitados = datosOrdenados.slice(0, 30);
-        console.log("datosLimitados");
-        console.log(datosLimitados);
+        const datosLimitados = datosOrdenados.slice(-15);
+        //console.log("datosLimitados");
+       // console.log(datosLimitados);
 
         setEstadisticas(datosLimitados); // Guarda los datos ordenados y limitados en el estado
       } catch (error) {
