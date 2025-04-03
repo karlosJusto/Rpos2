@@ -20,7 +20,6 @@ const CartElements = () => {
       {cart.map((product, index) => {
         // Unificamos la propiedad de precio usando "precio" o "price"
         const precioProducto = product.precio ?? product.price;
-        debugger
         return (
           <ul className="my-[1vh] space-y-3" key={product.id_cart}>
             <li onClick={() => handleShow(product)}>
