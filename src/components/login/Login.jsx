@@ -78,10 +78,15 @@ dayjs.locale('es');
   }
 };
 
+
+
 // Usamos useEffect para obtener el stock cuando el componente se monta
 useEffect(() => {
   obtenerStockProducto(1); // Llamamos a la función para obtener el stock del producto con product_id = 1
 }, []); // El array vacío hace que se ejecute solo una vez cuando el componente se monta
+
+
+
 
 
 
@@ -114,8 +119,9 @@ const generarEstadisticasDiarias = async () => {
         vt: 0,
         vd: 0,
         stock: stock, // Usamos el valor de stock
-        stockactualizado:0,
-        stockfinal:0,
+        stock_anterior: stock,
+        //stockactualizado:0,
+        //stockfinal:0,
         entran: 0,
         baja: 0,
         devueltos: 0,

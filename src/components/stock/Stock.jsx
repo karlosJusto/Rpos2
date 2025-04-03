@@ -24,6 +24,10 @@ const Stock = () => {
 
   const [search, setSearch] = useState(""); // Estado para la búsqueda de productos
 
+  const clearSearch = () => {
+    setSearch('');
+  };
+
   // Manejador para actualizar el stock de un producto
   const handleStockChange = (id_product, e) => {
     setNuevoStock({
@@ -101,14 +105,37 @@ const Stock = () => {
       <div className="w-full max-w-7xl mb-24">
         {/* Campo de búsqueda */}
         <div className="mb-6 flex justify-center">
-          <input
-            type="text"
-            placeholder="Buscar producto..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="px-4 py-2 border border-gray-300 rounded-md w-full sm:w-1/2 lg:w-1/3 focus:ring-yellow-500 focus:border-yellow-500"
-          />
-        </div>
+              <div className="relative w-full sm:w-1/2 lg:w-1/3">
+                <input
+                  type="text"
+                  placeholder="Buscar producto..."
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  className="px-4 py-2 border border-gray-300 rounded-md w-full focus:ring-yellow-500 focus:border-yellow-500 pr-10"
+                />
+
+                {/* SVG de borrar (X) */}
+                {search && (
+                  <svg
+                    onClick={clearSearch}
+                    xmlns="http://www.w3.org/2000/svg"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-900 cursor-pointer"
+                    width="20" height="20"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth="2"
+                      d="M6 18L18 6M6 6l12 12"
+                    />
+                  </svg>
+                )}
+              </div>
+            </div>
+
 
         {/* Mostramos los productos agrupados por categoría */}
         {categoriasOrdenadas.map((categoria) => (

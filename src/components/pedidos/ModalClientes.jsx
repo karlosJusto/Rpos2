@@ -87,6 +87,19 @@ const ModalClientes = ({ show, handleClose, onSave }) => {
     handleClose();
   };
 
+
+  const handleSubmitClose = () => {
+    setFormData({
+      cliente: '',  // Asumiendo que "cliente" es uno de los campos
+      telefono: '',
+      fechahora: '',
+      observaciones: '',
+      pagado: false,  // Si el estado tiene esta propiedad
+      celiaco: false,  // Si el estado tiene esta propiedad
+    });
+    handleClose(); // Función que probablemente cierra el modal o formulario
+  };
+
   return (
     <>
       <Modal show={show} onHide={handleClose} size="xl" backdrop="static" keyboard={false} centered>
@@ -99,21 +112,21 @@ const ModalClientes = ({ show, handleClose, onSave }) => {
             <div className="form-floating mb-3 w-[25vw]">
               <input
                 type="text"
-                className="form-control border-2 border-gray-200 font-nunito focus:border-yellow-500 focus:ring-0"
+                className="form-control border-2 border-gray-200 font-nunito font-extrabold focus:border-yellow-500 focus:ring-0"
                 id="nombre"
                 placeholder="Nombre"
                 value={formData.cliente}
                 onChange={handleInputChange}
                 name="cliente"
               />
-              <label className="text-gray-500" htmlFor="floatingInput">
+              <label className="text-gray-500 font-extrabold" htmlFor="floatingInput">
                 Nombre
               </label>
             </div>
             <div className="form-floating w-[25vw]">
               <input
                 type="phone"
-                className="form-control border-2 border-gray-200 font-nunito focus:border-yellow-500 focus:ring-0"
+                className="form-control border-2 border-gray-200 font-nunito font-extrabold focus:border-yellow-500 focus:ring-0"
                 id="telefono"
                 placeholder="Teléfono"
                 maxLength={9}
@@ -121,17 +134,17 @@ const ModalClientes = ({ show, handleClose, onSave }) => {
                 onChange={handleInputChange}
                 name="telefono"
               />
-              <label className="text-gray-500" htmlFor="floatingPhone">
+              <label className="text-gray-500 font-extrabold " htmlFor="floatingPhone">
                 Teléfono
               </label>
             </div>
           </div>
 
           {/* Lista de clientes con scroll */}
-          <div className="max-h-60 overflow-y-auto mt-4">
+          <div className="max-h-40 overflow-y-auto mt-4">
             {filteredClientes.length > 0 ? (
               filteredClientes.map((cliente, index) => (
-                <div key={index} className="py-2 px-3 border-b border-gray-300 cursor-pointer" onClick={() => {
+                <div key={index} className="py-2 px-4 cursor-pointer" onClick={() => {
                   setFormData({
                     cliente: cliente.cliente || '',
                     telefono: cliente.telefono || '',
@@ -144,15 +157,15 @@ const ModalClientes = ({ show, handleClose, onSave }) => {
                 }}>
                   {/* Otros campos del formulario */}
                   <div className="px-[3.5vw] mt-[2vh]">
-                    <div className="grid grid-cols-2 text-center h-[2vh] bg-red-400">
-                      <h1 className="text-lg font-nunito text-gray-500">{cliente.cliente}</h1>
-                      <h1 className="text-lg font-nunito text-gray-500">{cliente.telefono}</h1>
+                    <div className="grid grid-cols-2 text-center h-[2vh]">
+                      <h1 className="text-lg font-nunito text-gray-500 ">{cliente.cliente}</h1>
+                      <h1 className="text-lg font-nunito text-gray-500 ">{cliente.telefono}</h1>
                     </div>
                   </div>
                 </div>
               ))
             ) : (
-              <p>No se encontraron resultados</p>
+              <p className='text-center'>No se encontraron resultados</p>
             )}
           </div>
 
@@ -165,9 +178,9 @@ const ModalClientes = ({ show, handleClose, onSave }) => {
 
           {/* Observaciones */}
           <div className='px-[4.5vh]'>
-            <label htmlFor="textarea" className="form-label text-gray-500 text-lg font-nunito "></label>
+            <label htmlFor="textarea" className="form-label text-gray-500 text-lg font-nunito font-extrabold "></label>
             <textarea
-              className="form-control text-lg font-nunito border-2 border-gray-200"
+              className="form-control text-lg font-nunito border-2 border-gray-200 "
               value={formData.observaciones || ""}  // Usamos formData.observaciones aquí
               onChange={(e) => setFormData({ ...formData, observaciones: e.target.value })}  // Actualiza formData.observaciones
               id="observaciones"
@@ -214,7 +227,7 @@ const ModalClientes = ({ show, handleClose, onSave }) => {
           <Button
             variant="secondary"
             className="p-3 bg-white font-nunito text-gray-500 border-gray-300 hover:text-yellow-600 hover:border-yellow-600"
-            onClick={handleClose}
+            onClick={handleSubmitClose}
           >
             Cancelar
           </Button>

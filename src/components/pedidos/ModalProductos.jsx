@@ -241,26 +241,59 @@ const ModalProductos = ({show, handleClose, product,isNuevoProducto}) => {
  )}
 
 
-    <div className='text-center justify-center items-center font-nunito  p-4'>
-
-                  
-                  <div className="form-check form-check-inline border-2 p-[1vw] border-gray-200 rounded-xl ">
-                    <input className="form-check-input m-1" type="checkbox" id="tostado" name="tostado" value="option1" checked={tostado} onChange={(e) => setTostado(e.target.checked)} disabled={product?.name !== "Pollo Asado" && product?.name !== "1/2 Pollo Asado"}   />
-                    <label  className="form-check-label text-lg font-nunito text-gray-900 font-bold" htmlFor="tostado">Tostado</label>
-                  </div>
-               
-              
-                  <div className="form-check form-check-inline border-2 p-[1vw] border-gray-200 rounded-xl ">
-                    <input className="form-check-input m-1" type="checkbox" id="troceado"  name="troceado" value="option2" checked={troceado} onChange={(e) => setTroceado(e.target.checked)} disabled={product?.name !== "Pollo Asado" && product?.name !== "1/2 Pollo Asado"}  />
-                    <label className="form-check-label text-lg font-nunito text-gray-900 font-bold" htmlFor="troceado">Troceado</label>
-                  </div>
-               
-                  <div className="form-check form-check-inline border-2 p-[1vw] border-gray-200 rounded-xl " >
-                    <input className="form-check-input m-1" type="checkbox" id="celiaco"  name="celiaco" value="option3" checked={celiaco} onChange={(e) => setCeliaco(e.target.checked)}  disabled={!product?.gluten_free} />
-                    <label className="form-check-label text-lg font-nunito text-gray-900 font-bold" htmlFor="celiaco">Celiaco</label>
-                  </div>
-      
+<div className='text-center justify-center items-center font-nunito p-4'>
+  {/* Condición para el checkbox "Tostado" */}
+  {(product?.name === "Pollo Asado" || product?.name === "1/2 Pollo Asado") && (
+    <div className="form-check form-check-inline border-2 p-[1vw] border-gray-200 rounded-xl">
+      <input 
+        className="form-check-input m-1" 
+        type="checkbox" 
+        id="tostado" 
+        name="tostado" 
+        value="option1" 
+        checked={tostado} 
+        onChange={(e) => setTostado(e.target.checked)} 
+        disabled={false} 
+      />
+      <label className="form-check-label text-lg font-nunito text-gray-900 font-bold" htmlFor="tostado">Tostado</label>
     </div>
+  )}
+  
+  {/* Condición para el checkbox "Troceado" */}
+  {(product?.name === "Pollo Asado" || product?.name === "1/2 Pollo Asado") && (
+    <div className="form-check form-check-inline border-2 p-[1vw] border-gray-200 rounded-xl">
+      <input 
+        className="form-check-input m-1" 
+        type="checkbox" 
+        id="troceado"  
+        name="troceado" 
+        value="option2" 
+        checked={troceado} 
+        onChange={(e) => setTroceado(e.target.checked)} 
+        disabled={false} 
+      />
+      <label className="form-check-label text-lg font-nunito text-gray-900 font-bold" htmlFor="troceado">Troceado</label>
+    </div>
+  )}
+
+  {/* Condición para el checkbox "Celiaco" */}
+  {[10, 49, 3, 50].includes(product?.id_product) && (
+  <div className="form-check form-check-inline border-2 p-[1vw] border-gray-200 rounded-xl">
+    <input 
+      className="form-check-input m-1" 
+      type="checkbox" 
+      id="celiaco"  
+      name="celiaco" 
+      value="option3" 
+      checked={celiaco} // Siempre desmarcado
+      onChange={(e) => setCeliaco(e.target.checked)} 
+      disabled={false} 
+    />
+    <label className="form-check-label text-lg font-nunito text-gray-900 font-bold" htmlFor="celiaco">Celiaco</label>
+  </div>
+)}
+</div>
+
 
     
 

@@ -22,11 +22,14 @@ import CrearProductos from "./components/dashboard/CrearProductos"
 import ListarClientes from "./components/dashboard/ListarClientes"
 import Ordenes from "./components/ordenes/Ordenes"
 import Listaproductos from "./components/dashboard/ListaProductos"
-import CalendarioPollos from "./components/dashboard/CalendarioPollos"
+import CalendarioPollos from "./components/dashboard/Calendario/CalendarioPollos"
+import CalendarTabs from "./components/dashboard/Calendario/CalendarioTabs"
+
 import Empleados from "./components/dashboard/Empleados"
 import CrudEmpleados from "./components/dashboard/CrearEmpleado"
-import { ChickenOrderProvider } from './components/Context/ChickenOrderContext';
+import { OrderProvider } from './components/Context/OrderProviderContext';
 import Cocina from "./components/cocina/Cocina"
+import AdminCalendarioPage from "./components/dashboard/Calendario/AdminCalendarioPage"
 
 
 
@@ -37,7 +40,7 @@ function App() {
   return (
    
     <DataProvider>
-      <ChickenOrderProvider>
+      <OrderProvider>
      <BrowserRouter >
       <Routes>
         <Route path="/" element={<Home />} />
@@ -59,7 +62,7 @@ function App() {
         <Route path="/dashboard/crearProductos" element={<CrearProductos />} />
         <Route path="/dashboard/listaProductos" element={<Listaproductos />} />
         <Route path="/dashboard/listarClientes" element={<ListarClientes />} />
-        <Route path="/dashboard/calendarioPollos" element={<CalendarioPollos />} />
+        <Route path="/dashboard/calendarioPollos" element={<AdminCalendarioPage />} />
         <Route path="/dashboard/empleados" element={<Empleados />} />
         <Route path="/dashboard/crearempleado" element={<CrudEmpleados />} />
 
@@ -67,7 +70,7 @@ function App() {
 
       </Routes>    
      </BrowserRouter>
-      </ChickenOrderProvider>
+      </OrderProvider>
     </DataProvider>
    
     
