@@ -3,7 +3,25 @@ import { Header } from './components/Header';
 import { ProductCard } from './components/ProductCard';
 import { SaladTypeCard } from './components/SaladTypeCard';
 import { db } from '../firebase/firebase';
-import { collection, doc, onSnapshot, setDoc, updateDoc } from 'firebase/firestore';
+import { 
+  collection, 
+  doc, 
+  onSnapshot, 
+  setDoc, 
+  updateDoc 
+  //, query, where  // Si decides usar un campo timestamp
+} from 'firebase/firestore';
+
+// Función para formatear la fecha en "dd/mm/yyyy" (con ceros a la izquierda)
+const formatDate = (date) => {
+  const d = new Date(date);
+  let day = d.getDate();
+  let month = d.getMonth() + 1;
+  const year = d.getFullYear();
+  day = day < 10 ? `0${day}` : day;
+  month = month < 10 ? `0${month}` : month;
+  return `${day}/${month}/${year}`;
+};
 
 const Cocina = () => {
   // Estado para productos de la colección "cocina"
@@ -16,13 +34,12 @@ const Cocina = () => {
   const [selectedDate, setSelectedDate] = useState(new Date());
   // Estado para mostrar/ocultar el input de calendario
   const [showCalendar, setShowCalendar] = useState(false);
-
   // Estado para evitar reprogramar alertas específicas en el mismo turno
   const [alertScheduled, setAlertScheduled] = useState({ codillos: false, chorizo: false });
   // Ref para almacenar los pedidos previos y detectar nuevos
   const prevPedidosRef = useRef([]);
 
-  // --- 1. Suscripción a la colección "cocina" ---
+  // Suscripción a la colección "cocina"
   useEffect(() => {
     const cocinaRef = collection(db, 'cocina');
     const unsubscribeCocina = onSnapshot(cocinaRef, (querySnapshot) => {
@@ -36,7 +53,7 @@ const Cocina = () => {
     return () => unsubscribeCocina();
   }, []);
 
-  // --- 2. Función para determinar el turno actual ---
+  // Función para determinar el turno actual
   const getTurnoActual = () => {
     const now = new Date();
     const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
@@ -55,15 +72,19 @@ const Cocina = () => {
     return { startTime, endTime };
   };
 
-  // --- 3. Manejo del cambio de fecha desde el calendario ---
+  // Manejo del cambio de fecha desde el calendario
   const handleDateChange = (e) => {
     const newDate = new Date(e.target.value);
     setSelectedDate(newDate);
     setShowCalendar(false);
   };
 
+  // Formateamos la fecha seleccionada para que tenga el mismo formato que en la base de datos
+  const selectedDateStr = formatDate(selectedDate);
+  const todayStr = formatDate(new Date());
+  const isToday = selectedDateStr === todayStr;
+
   // Determinar el texto del turno
-  const isToday = selectedDate.toISOString().split('T')[0] === new Date().toISOString().split('T')[0];
   let turnoText = '';
   if (isToday) {
     const now = new Date();
@@ -74,10 +95,24 @@ const Cocina = () => {
     turnoText = 'Mostrando todos los pedidos del día';
   }
 
-  // --- 4. Lógica para agrupar pedidos en ProductCard ---
+  // Lógica para agrupar pedidos en ProductCard
   useEffect(() => {
     if (cocinaProducts.length === 0) return;
     
+    // Si tienes un campo timestamp (por ejemplo, 'fechahoraTimestamp') en tus documentos, puedes usarlo para filtrar solo los pedidos del día:
+    /*
+    const startOfDay = new Date(selectedDate);
+    startOfDay.setHours(0, 0, 0, 0);
+    const endOfDay = new Date(selectedDate);
+    endOfDay.setHours(23, 59, 59, 999);
+    const pedidosRef = collection(db, 'pedidos');
+    const q = query(
+      pedidosRef,
+      where('fechahoraTimestamp', '>=', startOfDay),
+      where('fechahoraTimestamp', '<=', endOfDay)
+    );
+    */
+    // Mientras tanto, usaremos la suscripción a toda la colección y filtramos por el campo 'fechahora' (cadena formateada como "dd/mm/yyyy hh:mm")
     const pedidosRef = collection(db, 'pedidos');
     const unsubscribe = onSnapshot(pedidosRef, (querySnapshot) => {
       const pedidos = [];
@@ -85,16 +120,12 @@ const Cocina = () => {
         pedidos.push({ id: doc.id, ...doc.data() });
       });
 
-      // Convertir la fecha seleccionada a "dd/mm/yyyy"
-      const selectedDateStr = selectedDate.toLocaleDateString('es-ES');
-      const todayStr = new Date().toLocaleDateString('es-ES');
-
-      // Filtrar pedidos del día seleccionado y, en caso de hoy, por turno
+      // Filtrar pedidos del día seleccionado usando el campo 'fechahora'
       const pedidosDelDia = pedidos.filter((pedido) => {
-        if (!pedido.fechahora_realizado) return false;
-        const [fechaPedido, horaPedido] = pedido.fechahora_realizado.split(' ');
+        if (!pedido.fechahora) return false;
+        const [fechaPedido, horaPedido] = pedido.fechahora.split(' ');
         if (fechaPedido !== selectedDateStr) return false;
-        if (selectedDateStr === todayStr) {
+        if (isToday) {
           const { startTime, endTime } = getTurnoActual();
           const [day, month, year] = fechaPedido.split('/');
           const [hour, minute] = horaPedido.split(':');
@@ -126,7 +157,7 @@ const Cocina = () => {
                 idPedido: pedido.id,
                 idProducto: prod.id,
                 producto: prod,
-                hora: pedido.fechahora_realizado,
+                hora: pedido.fechahora, // Se usa la hora de entrega
                 nombre: pedido.cliente,
                 cantidad: prod.cantidad,
                 descripcion: prod.observaciones || "",
@@ -156,11 +187,10 @@ const Cocina = () => {
     });
 
     return () => unsubscribe();
-  }, [selectedDate, cocinaProducts]);
+  }, [selectedDate, cocinaProducts, selectedDateStr, isToday]);
 
-  // --- 5. Lógica para ensaladas y ensaladillas ---
-  // Se usa la fecha seleccionada como id de documento (formato "dd-mm-yyyy")
-  const todayDocId = selectedDate.toLocaleDateString('es-ES').replace(/\//g, '-');
+  // Lógica para ensaladas y ensaladillas
+  const todayDocId = selectedDateStr.replace(/\//g, '-');
 
   useEffect(() => {
     const saladsRef = doc(db, 'ensaladas', todayDocId);
@@ -186,7 +216,7 @@ const Cocina = () => {
     return () => unsubscribe();
   }, [todayDocId]);
 
-  // --- 6. Actualizar "pedidas" en ensaladas/ensaladillas ---
+  // Actualizar "pedidas" en ensaladas/ensaladillas
   useEffect(() => {
     const pedidosRef = collection(db, 'pedidos');
     const unsubscribe = onSnapshot(pedidosRef, (querySnapshot) => {
@@ -195,14 +225,11 @@ const Cocina = () => {
         pedidos.push({ id: doc.id, ...doc.data() });
       });
 
-      const selectedDateStr = selectedDate.toLocaleDateString('es-ES');
-      const todayStr = new Date().toLocaleDateString('es-ES');
-
       const pedidosDelDia = pedidos.filter((pedido) => {
-        if (!pedido.fechahora_realizado) return false;
-        const [fechaPedido, horaPedido] = pedido.fechahora_realizado.split(' ');
+        if (!pedido.fechahora) return false;
+        const [fechaPedido, horaPedido] = pedido.fechahora.split(' ');
         if (fechaPedido !== selectedDateStr) return false;
-        if (selectedDateStr === todayStr) {
+        if (isToday) {
           const { startTime, endTime } = getTurnoActual();
           const [day, month, year] = fechaPedido.split('/');
           const [hour, minute] = horaPedido.split(':');
@@ -247,9 +274,9 @@ const Cocina = () => {
       }).catch(err => console.error("Error updating salad pedidas:", err));
     });
     return () => unsubscribe();
-  }, [selectedDate, todayDocId]);
+  }, [selectedDate, todayDocId, selectedDateStr, isToday]);
 
-  // --- Función para actualizar la cantidad de "preparadas" en Firebase ---
+  // Función para actualizar la cantidad de "preparadas" en Firebase
   const updateSaladCount = async (type, size, amount) => {
     const saladsRef = doc(db, 'ensaladas', todayDocId);
     try {
@@ -261,7 +288,7 @@ const Cocina = () => {
     }
   };
 
-  // --- 7. Lógica para alertas de nuevos pedidos y actualización de la propiedad "visto" ---
+  // Lógica para alertas de nuevos pedidos y actualización de la propiedad "visto"
   useEffect(() => {
     const pedidosRef = collection(db, 'pedidos');
     const unsubscribe = onSnapshot(pedidosRef, (querySnapshot) => {
@@ -271,9 +298,9 @@ const Cocina = () => {
       });
 
       currentPedidos.forEach((pedido) => {
-        // Detectamos si el pedido es nuevo
+        // Detectar si el pedido es nuevo
         const isNewOrder = !prevPedidosRef.current.find((p) => p.id === pedido.id);
-        // Se verifica si al menos uno de los productos no tiene la propiedad "visto" (o es false)
+        // Verificar si al menos uno de los productos no tiene la propiedad "visto"
         const hasUnseen = pedido.productos && pedido.productos.some(prod => !prod.visto);
         if (isNewOrder && hasUnseen) {
           const productosNombres = pedido.productos
@@ -288,7 +315,7 @@ const Cocina = () => {
               const now = new Date();
               const { endTime } = getTurnoActual();
 
-              // Para "codillos" o "costillas": alert 30 minutos antes del fin del turno
+              // Alerta para "codillos" o "costillas": 30 minutos antes del fin del turno
               if ((nombreProd.includes('codillo') || nombreProd.includes('costilla')) && !alertScheduled.codillos) {
                 const alertTime = new Date(endTime.getTime() - 30 * 60000);
                 const delay = alertTime.getTime() - now.getTime();
@@ -299,14 +326,13 @@ const Cocina = () => {
                   setAlertScheduled(prev => ({ ...prev, codillos: true }));
                 }
               }
-
-              // Para "chorizo" o "morcilla": alert 15 minutos antes del fin del turno
-              if ((nombreProd.includes('chorizo') || nombreProd.includes('morcilla')) && !alertScheduled.chorizo) {
+              // Alerta para "chorizo" o "morcilla": 15 minutos antes del fin del turno
+              if ((nombreProd.includes('chorizo') || nombreProd.includes('pimientos')) && !alertScheduled.chorizo) {
                 const alertTime = new Date(endTime.getTime() - 15 * 60000);
                 const delay = alertTime.getTime() - now.getTime();
                 if (delay > 0) {
                   setTimeout(() => {
-                    console.log("¡Atención! Faltan 15 minutos para el CHORIZO Y MORCILLA.");
+                    alert("¡Atención! Faltan 15 minutos para el CHORIZO Y MORCILLA.");
                   }, delay);
                   setAlertScheduled(prev => ({ ...prev, chorizo: true }));
                 }
@@ -314,8 +340,7 @@ const Cocina = () => {
             });
           }
 
-          // Después de 30 segundos, actualizamos el pedido en la colección "pedidos"
-          // modificando el campo "productos": se establece "visto" a true en cada producto
+          // Después de 30 segundos, actualizamos el pedido para marcarlo como "visto"
           setTimeout(() => {
             const updatedProductos = pedido.productos.map(prod => ({ ...prod, visto: true }));
             updateDoc(doc(db, 'pedidos', pedido.id), { productos: updatedProductos })
@@ -329,7 +354,7 @@ const Cocina = () => {
     return () => unsubscribe();
   }, [alertScheduled]);
 
-  // --- 8. Configurar la grilla para ProductCard según los productos en "cocina" ---
+  // Configurar la grilla para ProductCard según los productos en "cocina"
   const productCount = Math.min(cocinaProducts.length, 9);
   let gridClass = '';
   if (productCount === 4) {
