@@ -279,7 +279,7 @@ const Cocina = () => {
           const productosNombres = pedido.productos
             ? pedido.productos.map(p => p.nombre).join(', ')
             : 'Sin productos';
-          alert(`Nuevo pedido de ${pedido.cliente}. Productos: ${productosNombres}`);
+          console.log(`Nuevo pedido de ${pedido.cliente}. Productos: ${productosNombres}`);
 
           // Programar alertas para productos específicos
           if (pedido.productos && Array.isArray(pedido.productos)) {
@@ -294,7 +294,7 @@ const Cocina = () => {
                 const delay = alertTime.getTime() - now.getTime();
                 if (delay > 0) {
                   setTimeout(() => {
-                    alert("¡Atención! Faltan 30 minutos para los CODILLOS Y COSTILLAS.");
+                    console.log("¡Atención! Faltan 30 minutos para los CODILLOS Y COSTILLAS.");
                   }, delay);
                   setAlertScheduled(prev => ({ ...prev, codillos: true }));
                 }
@@ -306,7 +306,7 @@ const Cocina = () => {
                 const delay = alertTime.getTime() - now.getTime();
                 if (delay > 0) {
                   setTimeout(() => {
-                    alert("¡Atención! Faltan 15 minutos para el CHORIZO Y MORCILLA.");
+                    console.log("¡Atención! Faltan 15 minutos para el CHORIZO Y MORCILLA.");
                   }, delay);
                   setAlertScheduled(prev => ({ ...prev, chorizo: true }));
                 }
