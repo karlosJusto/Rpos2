@@ -1,6 +1,6 @@
 import React, { useState, useContext } from "react"; // Import React
 import { dataContext } from "../Context/DataContext"; // Asegúrate que la ruta sea correcta
-import { doc, getDoc, updateDoc, setDoc, runTransaction } from "firebase/firestore";
+import { doc, getDoc, updateDoc, setDoc, runTransaction, FieldValue, increment } from "firebase/firestore"; // *** IMPORTAR increment ***
 import { db } from "../firebase/firebase"; // Asegúrate que la ruta sea correcta
 import { useNavigate } from "react-router-dom";
 import dayjs from "dayjs";
@@ -54,6 +54,113 @@ const convertTimeToMinutes = (timeStr) => {
   }
 };
 
+
+// --- Función para Actualizar Contadores de Ensaladas/Ensaladillas ---
+const updateSaladCounters = async (cartItems) => {
+    const todayId = dayjs().format("DD-MM-YYYY"); // Documento ID es la fecha actual
+    const docRef = doc(db, "ensaladas", todayId);
+    console.log(`Preparando actualización de contadores de ensaladas para ${todayId}...`);
+  
+    let incrementEnsaladaGrande = 0;
+    let incrementEnsaladaPequena = 0;
+    let incrementEnsaladillaGrande = 0;
+    let incrementEnsaladillaPequena = 0;
+
+    // Calcular incrementos basados en el carrito
+    cartItems.forEach(item => {
+        if (!item || !item.name || typeof item.cantidad !== 'number' || item.cantidad <= 0) {
+            console.warn("Item inválido o sin cantidad en updateSaladCounters, omitiendo:", item);
+            return; // Saltar item inválido
+        }
+
+        const nameLower = item.name.toLowerCase();
+        const cantidad = item.cantidad;
+        const isPequena = nameLower.includes("1/2"); // Determinar tamaño
+
+        // IMPORTANTE: Asume que los nombres distinguen claramente ensaladas de ensaladillas.
+        // Si hay ambigüedad (ej. "Ensalada de Ensaladilla"), ajusta esta lógica o usa categorías/IDs.
+        if (nameLower.includes("ensaladilla")) {
+            if (isPequena) {
+                incrementEnsaladillaPequena += cantidad;
+            } else {
+                incrementEnsaladillaGrande += cantidad;
+            }
+        } else if (nameLower.includes("ensalada")) { // `else if` para evitar contar dos veces si nombre incluye ambas
+             if (isPequena) {
+                incrementEnsaladaPequena += cantidad;
+            } else {
+                incrementEnsaladaGrande += cantidad;
+            }
+        }
+    });
+
+    // Si no hay ensaladas/saladillas en este pedido, no hacer nada
+    if (incrementEnsaladaGrande === 0 && incrementEnsaladaPequena === 0 && incrementEnsaladillaGrande === 0 && incrementEnsaladillaPequena === 0) {
+        console.log("No se encontraron ensaladas/saladillas en el pedido. Omitiendo actualización de contadores.");
+        return;
+    }
+
+    console.log("Incrementos calculados:", {
+        ensaladaG: incrementEnsaladaGrande, ensaladaP: incrementEnsaladaPequena,
+        ensaladillaG: incrementEnsaladillaGrande, ensaladillaP: incrementEnsaladillaPequena
+    });
+
+    // Usar transacción para actualizar/crear el documento diario
+    try {
+        await runTransaction(db, async (transaction) => {
+            const docSnap = await transaction.get(docRef);
+
+            if (!docSnap.exists()) {
+                // --- Documento NO existe: Crear con estructura inicial + incrementos ---
+                console.log(`Documento ${todayId} no existe en 'ensaladas'. Creando...`);
+                const initialData = {
+                    ensaladas: {
+                        grandes: { pedidas: incrementEnsaladaGrande, preparadas: 0 }, // Iniciar preparadas en 0
+                        pequenas: { pedidas: incrementEnsaladaPequena, preparadas: 0 }
+                    },
+                    ensaladillas: {
+                        grandes: { pedidas: incrementEnsaladillaGrande, preparadas: 0 },
+                        pequenas: { pedidas: incrementEnsaladillaPequena, preparadas: 0 }
+                    },
+                    // Opcional: añadir timestamp de creación
+                    // createdAt: serverTimestamp() // Necesitarías importar serverTimestamp
+                };
+                transaction.set(docRef, initialData);
+                console.log(`Documento ${todayId} creado con valores iniciales.`);
+
+            } else {
+                // --- Documento SÍ existe: Actualizar contadores 'pedidas' usando increment ---
+                console.log(`Documento ${todayId} existe. Actualizando contadores...`);
+                const updateData = {};
+                // Usar notación de puntos y FieldValue.increment para actualizaciones atómicas
+                if (incrementEnsaladaGrande > 0) updateData['ensaladas.grandes.pedidas'] = increment(incrementEnsaladaGrande);
+                if (incrementEnsaladaPequena > 0) updateData['ensaladas.pequenas.pedidas'] = increment(incrementEnsaladaPequena);
+                if (incrementEnsaladillaGrande > 0) updateData['ensaladillas.grandes.pedidas'] = increment(incrementEnsaladillaGrande);
+                if (incrementEnsaladillaPequena > 0) updateData['ensaladillas.pequenas.pedidas'] = increment(incrementEnsaladillaPequena);
+
+                // Opcional: añadir timestamp de última actualización
+                // updateData['lastUpdatedAt'] = serverTimestamp();
+
+                if (Object.keys(updateData).length > 0) {
+                    transaction.update(docRef, updateData);
+                    console.log(`Contadores 'pedidas' en ${todayId} actualizados.`);
+                } else {
+                    console.log("No se realizaron actualizaciones (incrementos eran 0 después del cálculo inicial)."); // Caso improbable si ya se filtró antes
+                }
+            }
+        });
+        console.log(`Transacción de contadores de ensaladas para ${todayId} completada con éxito.`);
+
+    } catch (error) {
+        // Capturar y loguear errores de la transacción específica de ensaladas
+        console.error(`Error Crítico durante la transacción de contadores de ensaladas (${todayId}):`, error);
+        // Considera si este error debe detener el flujo o solo ser logueado.
+        // Por ahora, solo se loguea para no interrumpir el flujo principal si el pedido ya se guardó.
+        // Podrías lanzar el error si esta actualización es absolutamente crítica: throw error;
+    }
+};
+
+
 // --- Componente Principal ---
 const CartTotal = ({ datosCliente, setDatosCliente, orderToEdit }) => {
   // --- Contexto y Navegación ---
@@ -81,14 +188,28 @@ const CartTotal = ({ datosCliente, setDatosCliente, orderToEdit }) => {
   );
 
   // --- Obtener Hora Redondeada por Defecto ---
-  // Calcula la hora actual redondeada al próximo cuarto de hora si no se especifica una hora.
   const obtenerHoraRedondeada = () => {
     const now = dayjs(); // Considera usar dayjs.tz() si configuraste zona horaria
     const minutos = now.minute();
-    const siguienteBloque = Math.floor(minutos / 15) * 15; // Redondear hacia abajo al último 1/4 hora
-    const nuevaHora = now.minute(siguienteBloque).second(0).millisecond(0);
-    // Si la hora redondeada ya pasó, añadir 15 min para el siguiente bloque
-    return nuevaHora.isBefore(now) ? nuevaHora.add(15, "minute") : nuevaHora;
+    // Redondear hacia abajo al último 1/4 hora y sumar 15 minutos para asegurar que sea futuro o actual bloque
+    const siguienteBloque = Math.floor(minutos / 15) * 15;
+    let nuevaHora = now.minute(siguienteBloque).second(0).millisecond(0);
+    // Si la hora resultante es estrictamente anterior a la actual, añade 15 min
+    if (nuevaHora.isBefore(now)) {
+         nuevaHora = nuevaHora.add(15, 'minute');
+    }
+    // Caso especial: Si redondea a :00 y ya pasó, debe ir a :15
+    // Esto se maneja ahora con la comprobación isBefore
+
+    // Asegurarse que la hora final no sea en el pasado inmediato
+    const diffMinutes = nuevaHora.diff(now, 'minute');
+     // Permitir un pequeño margen (ej. 2 minutos) para horas muy cercanas al cálculo
+    if (diffMinutes < -2) {
+        console.warn("Hora redondeada calculada está en el pasado, ajustando al siguiente bloque.");
+        nuevaHora = nuevaHora.add(15, 'minute');
+    }
+
+    return nuevaHora;
   };
   // Determina la hora final del pedido: usa la del cliente si existe, si no, calcula la redondeada.
   const fechahora = datosCliente.fechahora || obtenerHoraRedondeada().format("DD/MM/YYYY HH:mm");
@@ -135,16 +256,19 @@ const CartTotal = ({ datosCliente, setDatosCliente, orderToEdit }) => {
   // --- Función de Actualizar Stock (Robusta y Transaccional) ---
    const updateStock = async (productId, cantidadVendida) => {
      // Validación temprana de parámetros
-     if (productId == null || typeof productId !== "number") {
-       console.error("ID de producto inválido detectado en updateStock:", productId);
-       throw new Error(`Intento de actualizar stock con ID inválido: ${productId}`);
+     // Permitir ID de producto como string o número, pero convertir a string para la referencia
+     const productIdStr = productId?.toString();
+     if (!productIdStr) {
+         console.error("ID de producto inválido detectado en updateStock:", productId);
+         throw new Error(`Intento de actualizar stock con ID inválido: ${productId}`);
      }
+
      if (cantidadVendida <= 0) {
-         console.warn(`Intento de actualizar stock para ID ${productId} con cantidad no positiva: ${cantidadVendida}. No se hará nada.`);
+         console.warn(`Intento de actualizar stock para ID ${productIdStr} con cantidad no positiva: ${cantidadVendida}. No se hará nada.`);
          return; // No continuar si la cantidad no es positiva
      }
 
-     const productRef = doc(db, "productos", productId.toString()); // Referencia al documento del producto
+     const productRef = doc(db, "productos", productIdStr); // Usar ID como string
 
      try {
        // Usar transacción para garantizar la atomicidad de la lectura y escritura del stock
@@ -153,35 +277,35 @@ const CartTotal = ({ datosCliente, setDatosCliente, orderToEdit }) => {
            const productSnap = await transaction.get(productRef);
            if (!productSnap.exists()) {
                // Error grave si el producto no se encuentra durante la transacción
-               console.error(`Error Crítico: Producto con ID ${productId} no encontrado en Firestore al intentar actualizar stock.`);
-               throw new Error(`Producto con ID ${productId} no encontrado para actualizar stock.`);
+               console.error(`Error Crítico: Producto con ID ${productIdStr} no encontrado en Firestore al intentar actualizar stock.`);
+               throw new Error(`Producto con ID ${productIdStr} no encontrado para actualizar stock.`);
            }
            const productData = productSnap.data();
            const currentStock = productData.stock; // Stock actual
 
             // Validar que el stock sea un número
             if (typeof currentStock !== 'number' || isNaN(currentStock)) {
-                 console.error(`Error Crítico: El stock para el producto ID ${productId} no es un número válido (${currentStock}).`);
-                 throw new Error(`Stock inválido para el producto ${productData.name || 'ID ' + productId}.`);
+                 console.error(`Error Crítico: El stock para el producto ID ${productIdStr} no es un número válido (${currentStock}).`);
+                 throw new Error(`Stock inválido para el producto ${productData.name || 'ID ' + productIdStr}.`);
             }
 
            // Validar si hay suficiente stock DENTRO de la transacción
            if (currentStock < cantidadVendida) {
-                console.warn(`Stock insuficiente detectado en transacción para ${productData.name || 'ID ' + productId}. Necesario: ${cantidadVendida}, Disponible: ${currentStock}`);
+                console.warn(`Stock insuficiente detectado en transacción para ${productData.name || 'ID ' + productIdStr}. Necesario: ${cantidadVendida}, Disponible: ${currentStock}`);
                 // Lanzar error para abortar la transacción y el proceso
-                throw new Error(`Stock insuficiente para ${productData.name || 'ID ' + productId}. Solo quedan ${currentStock}.`);
+                throw new Error(`Stock insuficiente para ${productData.name || 'ID ' + productIdStr}. Solo quedan ${currentStock}.`);
            }
 
            // Calcular y actualizar el nuevo stock
            const newStock = currentStock - cantidadVendida;
-           console.log(`Stock OK. Actualizando ${productId}: ${currentStock} -> ${newStock}`);
+           console.log(`Stock OK. Actualizando ${productIdStr}: ${currentStock} -> ${newStock}`);
            transaction.update(productRef, { stock: newStock }); // Escribir el nuevo stock
        });
        // Si la transacción se completa con éxito
-        console.log(`Stock actualizado correctamente via transacción para ID: ${productId}, cantidad deducida: ${cantidadVendida}`);
+        console.log(`Stock actualizado correctamente via transacción para ID: ${productIdStr}, cantidad deducida: ${cantidadVendida}`);
      } catch (error) {
        // Capturar y loguear errores de la transacción
-       console.error(`Error durante la transacción de actualización de stock para ID ${productId}:`, error);
+       console.error(`Error durante la transacción de actualización de stock para ID ${productIdStr}:`, error);
        // Re-lanzar el error para que la función llamante (sendToFirestore) lo maneje
        throw error;
      }
@@ -216,30 +340,32 @@ const CartTotal = ({ datosCliente, setDatosCliente, orderToEdit }) => {
         const idsConStockCritico = [1, 41, 50]; // Ejemplo: Pollo entero, Costilla entera, Codillo
 
         for (const idToCheck of idsConStockCritico) {
-            // Calcular la cantidad total necesaria para este ID de stock, considerando items relacionados
-            let cantidadNecesaria = 0;
-            if (idToCheck === 1) { // Stock de pollos (ID 1) afectado por ID 1 y ID 2
-                cantidadNecesaria = currentCart.reduce((sum, i) => {
-                   if (i?.id_product === 1) return sum + (i.cantidad || 0);
-                   if (i?.id_product === 2) return sum + (i.cantidad || 0) / 2; // Medio pollo = 0.5 stock
-                   return sum;
-                }, 0);
-            } else if (idToCheck === 41) { // Stock de costillas (ID 41) afectado por ID 41 y ID 48
-                cantidadNecesaria = currentCart.reduce((sum, i) => {
-                   if (i?.id_product === 41) return sum + (i.cantidad || 0);
-                   if (i?.id_product === 48) return sum + (i.cantidad || 0) / 2; // Media costilla = 0.5 stock
-                   return sum;
-                }, 0);
-            } else { // Otros IDs con stock propio (ej. ID 50)
-                cantidadNecesaria = currentCart.reduce((sum, i) => {
-                   if (i?.id_product === idToCheck) return sum + (i.cantidad || 0);
-                   return sum;
-                }, 0);
-            }
+             // Obtener referencia del producto (convertir ID a string)
+             const productRef = doc(db, "productos", idToCheck.toString());
+
+             // Calcular la cantidad total necesaria para este ID de stock, considerando items relacionados
+             let cantidadNecesaria = 0;
+             if (idToCheck === 1) { // Stock de pollos (ID 1) afectado por ID 1 y ID 2
+                 cantidadNecesaria = currentCart.reduce((sum, i) => {
+                    if (i?.id_product === 1) return sum + (i.cantidad || 0);
+                    if (i?.id_product === 2) return sum + (i.cantidad || 0) / 2; // Medio pollo = 0.5 stock
+                    return sum;
+                 }, 0);
+             } else if (idToCheck === 41) { // Stock de costillas (ID 41) afectado por ID 41 y ID 48
+                 cantidadNecesaria = currentCart.reduce((sum, i) => {
+                    if (i?.id_product === 41) return sum + (i.cantidad || 0);
+                    if (i?.id_product === 48) return sum + (i.cantidad || 0) / 2; // Media costilla = 0.5 stock
+                    return sum;
+                 }, 0);
+             } else { // Otros IDs con stock propio (ej. ID 50)
+                 cantidadNecesaria = currentCart.reduce((sum, i) => {
+                    if (i?.id_product === idToCheck) return sum + (i.cantidad || 0);
+                    return sum;
+                 }, 0);
+             }
 
             // Si se necesita este item, verificar su stock
             if (cantidadNecesaria > 0) {
-                const productRef = doc(db, "productos", idToCheck.toString());
                 const productSnap = await getDoc(productRef); // Lectura no transaccional
 
                 if (productSnap.exists()) {
@@ -285,7 +411,6 @@ const CartTotal = ({ datosCliente, setDatosCliente, orderToEdit }) => {
    };
 
   // --- Función Auxiliar para Validar Disponibilidad de Calendario ---
-  // Valida si la hora/cantidad es válida para un tipo de producto, lanza LimitExceededError si se supera el límite.
   const validateCalendarAvailability = async (productType, fechahora, cantidad) => {
     // Log inicial y validación de cantidad
     console.log(`Validando calendario para ${productType} a las ${fechahora} (Cantidad: ${cantidad})`);
@@ -299,7 +424,7 @@ const CartTotal = ({ datosCliente, setDatosCliente, orderToEdit }) => {
     }
 
     // Determinar colección y nombre del producto
-    const dailyDocId = orderDate.format("YYYY-MM-DD");
+    const dailyDocId = orderDate.format("YYYY-MM-DD"); // Cambiado a formato estándar ISO para ID
     let collectionName = "", productName = "";
     switch (productType) {
         case 'pollo': collectionName = "chicken_calendar_daily"; productName = "Pollos"; break;
@@ -323,12 +448,16 @@ const CartTotal = ({ datosCliente, setDatosCliente, orderToEdit }) => {
         // Encontrar el intervalo correspondiente a la hora del pedido
         const requestedMinutes = orderDate.hour() * 60 + orderDate.minute();
         let foundIntervalIndex = -1;
-         for (let i = 0; i < intervals.length; i++) { /* ... búsqueda de intervalo ... */
+         for (let i = 0; i < intervals.length; i++) {
               const interval = intervals[i];
-              if (!interval?.start || !interval?.end) continue;
+              if (!interval?.start || !interval?.end) continue; // Saltar si el intervalo no tiene start/end
               const startMin = convertTimeToMinutes(interval.start);
               const endMin = convertTimeToMinutes(interval.end);
-              if (startMin !== -1 && endMin !== -1 && requestedMinutes >= startMin && requestedMinutes < endMin) { foundIntervalIndex = i; break; }
+              // Incluye startMin, excluye endMin
+              if (startMin !== -1 && endMin !== -1 && requestedMinutes >= startMin && requestedMinutes < endMin) {
+                  foundIntervalIndex = i;
+                  break;
+               }
          }
         if (foundIntervalIndex === -1) { throw new Error(`Hora ${orderDate.format("HH:mm")} fuera de horario para ${productName}.`); }
 
@@ -364,8 +493,6 @@ const CartTotal = ({ datosCliente, setDatosCliente, orderToEdit }) => {
   }
 
 // --- Función Base para ACTUALIZAR Calendario (MODIFICADA para override UNIVERSAL) ---
-  // Actualiza el contador en Firestore. Si ignoreLimit es true, SIEMPRE actualiza
-  // el contador, incluso superando el límite 'maxAllowed'.
   const updateCalendarBase = async (collectionName, productName, fechahora, cantidad, ignoreLimit = false) => {
     // Omitir si la cantidad es cero o negativa
     if (cantidad <= 0) {
@@ -380,7 +507,7 @@ const CartTotal = ({ datosCliente, setDatosCliente, orderToEdit }) => {
         throw new Error(`Fecha/hora inválida al actualizar calendario ${productName}`);
     }
 
-    // Referencia al documento diario
+    // Referencia al documento diario (usar YYYY-MM-DD)
     const dailyDocId = orderDate.format("YYYY-MM-DD");
     const docRef = doc(db, collectionName, dailyDocId);
 
@@ -396,7 +523,7 @@ const CartTotal = ({ datosCliente, setDatosCliente, orderToEdit }) => {
 
             // Validar estructura de datos leída
             const data = docSnap.data();
-            const intervals = data.intervals;
+            let intervals = data.intervals; // Hacer una copia modificable si es necesario (no en este caso)
             if (!Array.isArray(intervals)) {
                 console.error(`Error Crítico: 'intervals' no es un array en ${collectionName}/${dailyDocId}.`);
                 throw new Error(`Estructura de calendario inválida para ${productName} el ${dailyDocId}.`);
@@ -439,8 +566,9 @@ const CartTotal = ({ datosCliente, setDatosCliente, orderToEdit }) => {
                 if (ignoreLimit) { // ...y se pidió ignorar...
                     // *** SIEMPRE actualizar, para TODOS los productos, superando el límite ***
                     console.warn(`%cOVERRIDE UNIVERSAL: Límite de ${productName} (${max}) excedido en ${intervalLabel}, pero se ignoró. Incrementando contador a ${finalOrderedCount}.`, 'color: red; font-weight:bold;');
+                    // Actualizar directamente el array de intervalos (Firestore maneja la actualización del campo)
                     intervals[intervalIndex].orderedCount = finalOrderedCount; // Establecer el nuevo conteo
-                    transaction.update(docRef, { intervals: intervals }); // Guardar el cambio
+                    transaction.update(docRef, { intervals: intervals }); // Guardar el array modificado
                 } else {
                     // Si se supera y NO se ignora (Salvaguarda - no debería ocurrir si validación OK)
                     console.error(`Salvaguarda Transacción: Límite de ${productName} (${max}) excedido en ${intervalLabel} y NO se indicó ignorar.`);
@@ -449,10 +577,10 @@ const CartTotal = ({ datosCliente, setDatosCliente, orderToEdit }) => {
             } else {
                 // Si NO se supera el límite, actualizar normalmente
                 console.log(`Actualizando contador para ${productName} - Intervalo ${intervalLabel}: ${current} -> ${finalOrderedCount}`);
+                // Actualizar directamente el array de intervalos
                 intervals[intervalIndex].orderedCount = finalOrderedCount; // Establecer nuevo conteo
-                transaction.update(docRef, { intervals: intervals }); // Guardar el cambio
+                transaction.update(docRef, { intervals: intervals }); // Guardar el array modificado
             }
-            // La llamada a transaction.update() ahora ocurre en ambos casos (excepto el error de salvaguarda)
 
         }); // Fin de runTransaction
 
@@ -481,7 +609,6 @@ const updateCodilloCalendar = (fechahora, cantidad, ignoreLimit = false) => upda
     Ignorar Límites Calendario: ${ignoreCalendarLimits}
     Editando Pedido: ${orderToEdit ? orderToEdit.NumeroPedido : 'No'}
     Estado Submitting Actual: ${isSubmitting}`, 'color: blue; font-weight: bold;');
-
     // Prevenir doble submit (más robusto)
     if (isSubmitting) {
         console.warn("Submit bloqueado: ya hay un proceso en curso (isSubmitting=true).");
@@ -588,11 +715,17 @@ const updateCodilloCalendar = (fechahora, cantidad, ignoreLimit = false) => upda
             }
             // Devolver objeto formateado
             return {
-                id: item.id_product, nombre: item.name || "Sin Nombre", cantidad: item.cantidad,
-                alias: item.alias || "", observaciones: item.observaciones || "",
-                celiaco: item.celiaco || clienteData.celiaco || false, tostado: item.tostado || 0,
-                salsa: item.sinsalsa || false, extrasalsa: item.extrasalsa || false,
-                entregado: item.entregado || 0, troceado: item.troceado || false,
+                id: item.id_product, // Mantener como número o string según esté en BD productos
+                nombre: item.name || "Sin Nombre",
+                cantidad: item.cantidad,
+                alias: item.alias || "",
+                observaciones: item.observaciones || "",
+                celiaco: item.celiaco || clienteData.celiaco || false,
+                tostado: item.tostado || 0,
+                salsa: item.sinsalsa || false,
+                extrasalsa: item.extrasalsa || false,
+                entregado: item.entregado || 0,
+                troceado: item.troceado || false,
                 categoria: item.categoria || "No especificada",
                 // Guardar precios como strings formateados a 2 decimales
                 precio: item.price.toFixed(2),
@@ -609,11 +742,12 @@ const updateCodilloCalendar = (fechahora, cantidad, ignoreLimit = false) => upda
         if (!pedidoId) { throw new Error("Falta ID para actualizar pedido."); }
         console.log(`Actualizando Firestore para pedido ID: ${pedidoId}`);
         const pedidoRef = doc(db, "pedidos", pedidoId.toString());
-        const updateData = { /* ... objeto con datos a actualizar ... */
+        const updateData = {
           cliente: clienteData.cliente, telefono: clienteData.telefono, fechahora: horaPedido,
           observaciones: clienteData.observaciones, pagado: clienteData.pagado, celiaco: clienteData.celiaco,
           localidad: clienteData.localidad, productos: mappedProducts, total_pedido: totalPedido,
           fechahora_modificado: nowString,
+          // No actualizar fechahora_realizado, empleado, origen al editar (a menos que sea necesario)
         };
         await updateDoc(pedidoRef, updateData);
         console.log(`Firestore: Pedido ID ${pedidoId} actualizado.`);
@@ -621,11 +755,12 @@ const updateCodilloCalendar = (fechahora, cantidad, ignoreLimit = false) => upda
       } else { // --- Crear Pedido Nuevo ---
         pedidoId = await getNextId(); // Obtener ID aquí, justo antes de crear
         console.log(`Creando nuevo pedido en Firestore con ID: ${pedidoId}`);
-        const pedidoData = { /* ... objeto completo del nuevo pedido ... */
+        const pedidoData = {
            NumeroPedido: pedidoId, cliente: clienteData.cliente, telefono: clienteData.telefono,
            fechahora: horaPedido, observaciones: clienteData.observaciones, pagado: clienteData.pagado,
-           celiaco: clienteData.celiaco, localidad: clienteData.localidad, empleado: "", origen: 0,
+           celiaco: clienteData.celiaco, localidad: clienteData.localidad, empleado: "", origen: 0, // Valores por defecto
            productos: mappedProducts, total_pedido: totalPedido, fechahora_realizado: nowString,
+           // No incluir fechahora_modificado al crear
         };
         await setDoc(doc(db, "pedidos", pedidoId.toString()), pedidoData);
         console.log(`Firestore: Pedido nuevo ID ${pedidoId} creado.`);
@@ -648,10 +783,11 @@ const updateCodilloCalendar = (fechahora, cantidad, ignoreLimit = false) => upda
           let stockCostillas = currentCart.reduce((sum, item) => { if (item?.id_product === 41) return sum + (item.cantidad || 0); if (item?.id_product === 48) return sum + (item.cantidad || 0) / 2; return sum; }, 0);
           if (stockCostillas > 0) { stockUpdatePromises.push(updateStock(41, stockCostillas)); }
 
-          // Otros items con stock individual (ej. ID 50)
+          // Otros items con stock individual (ej. ID 50 - Codillo)
            const otrosItemsConStockIds = [50]; // Definir IDs aquí
            currentCart.forEach(item => {
                 if (item && item.cantidad > 0 && otrosItemsConStockIds.includes(item.id_product)) {
+                     // Pasar id_product directamente (updateStock lo convierte a string si es necesario)
                      stockUpdatePromises.push(updateStock(item.id_product, item.cantidad));
                 }
            });
@@ -709,8 +845,22 @@ const updateCodilloCalendar = (fechahora, cantidad, ignoreLimit = false) => upda
            return; // Detener
       }
 
+      // --- PASO 5.5: Actualizar Contadores de Ensaladas/Ensaladillas (NUEVO) ---
+      console.log("Iniciando actualización de contadores de ensaladas/ensaladillas...");
+      try {
+          // Llamar a la nueva función pasando el carrito actual
+          await updateSaladCounters(currentCart);
+          console.log("Actualización de contadores de ensaladas/ensaladillas intentada (ver logs anteriores para éxito/error).");
+          // No se maneja error aquí porque la función interna ya lo loguea y decidimos no detener el flujo por ello.
+      } catch (saladError) {
+           // Este catch es por si updateSaladCounters lanzara un error inesperado (aunque no debería si se maneja internamente)
+           console.error(`Error INESPERADO al llamar a updateSaladCounters para pedido ${pedidoId}:`, saladError);
+           // No mostrar modal adicional, ya que el error principal se logueó dentro de la función.
+      }
+
+
       // --- PASO 6: Limpiar Estado y Navegar (Éxito Total) ---
-      // Si se llega aquí, todo el proceso fue exitoso
+      // Si se llega aquí, todo el proceso fue exitoso (o los errores no críticos fueron solo logueados)
       console.log(`%c---- ÉXITO TOTAL Pedido ID: ${pedidoId} ---- Limpiando estado y navegando...`, 'color: green; font-weight: bold; font-size: 1.1em;');
       setCart([]); // Vaciar carrito del estado global
       setDatosCliente({ // Resetear datos del formulario
@@ -758,6 +908,7 @@ const updateCodilloCalendar = (fechahora, cantidad, ignoreLimit = false) => upda
       <div className="flex justify-end p-[0.5vw]">
         <a
           href="#"
+          onClick={(e) => e.preventDefault()} // Mejor práctica para enlaces placeholder
           className="inline-flex items-center text-2xl font-extrabold text-gray-600 hover:underline dark:text-gray-400"
         >
           <span className="text-end">{total.toFixed(2)} €</span>
@@ -774,8 +925,8 @@ const updateCodilloCalendar = (fechahora, cantidad, ignoreLimit = false) => upda
           // Clases CSS (ajusta según tu framework o estilos)
           className={`w-full sm:w-auto min-w-[150px] px-6 py-3 tracking-wide bg-[#f2ac02] text-white font-bold rounded-lg shadow-md hover:bg-yellow-600 focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:ring-opacity-50 transition-all duration-300 ease-in-out flex items-center justify-center ${isSubmitting ? 'opacity-50 cursor-not-allowed' : 'hover:scale-105'}`}
         >
-          {/* Icono opcional */}
-          {/* <svg className="w-5 h-5 mr-2 animate-spin" ...>...</svg> */}
+          {/* Icono opcional - Descomentar si quieres un spinner */}
+          {/* isSubmitting && <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg> */}
           <span className="ml-1 font-nunito text-lg">
             {/* Texto dinámico del botón */}
             {isSubmitting ? 'Procesando...' : (orderToEdit ? "Actualizar Pedido" : "Generar Pedido")}
@@ -791,7 +942,12 @@ const updateCodilloCalendar = (fechahora, cantidad, ignoreLimit = false) => upda
              <Modal.Title className="font-nunito text-xl text-center text-[#e74c3c]">Error / Aviso</Modal.Title>
          </Modal.Header>
         <Modal.Body className="flex flex-col items-center p-4">
-          {/* Puedes añadir un icono aquí */}
+          {/* Puedes añadir un icono de error aquí */}
+          <div className="text-red-500 mb-3">
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-10 w-10" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+          </div>
           <p className="font-nunito text-lg p-2 text-center text-gray-700">{mensajeModal}</p>
         </Modal.Body>
         <Modal.Footer className="border-t-0 justify-center">
@@ -808,6 +964,12 @@ const updateCodilloCalendar = (fechahora, cantidad, ignoreLimit = false) => upda
              <Modal.Title className="font-nunito text-xl text-center text-orange-600">Confirmación Requerida</Modal.Title>
          </Modal.Header>
         <Modal.Body className="flex flex-col items-center p-4">
+          {/* Icono de pregunta/aviso */}
+          <div className="text-orange-500 mb-3">
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-10 w-10" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+          </div>
           <p className="font-nunito text-lg p-2 text-center text-gray-700">{mensajeModal}</p>
           <p className="font-nunito text-md text-center text-gray-500 mt-2">¿Deseas continuar igualmente?</p>
         </Modal.Body>

@@ -8,7 +8,8 @@ import {
   doc, 
   onSnapshot, 
   setDoc, 
-  updateDoc 
+  updateDoc, 
+  getDoc 
   //, query, where  // Si decides usar un campo timestamp
 } from 'firebase/firestore';
 
@@ -24,19 +25,13 @@ const formatDate = (date) => {
 };
 
 const Cocina = () => {
-  // Estado para productos de la colección "cocina"
+  // Estados para productos, pedidos, ensaladas y fecha
   const [cocinaProducts, setCocinaProducts] = useState([]);
-  // Estado para los pedidos agrupados según los productos de cocina
   const [productsData, setProductsData] = useState([]);
-  // Estado para ensaladas/ensaladillas
   const [saladsData, setSaladsData] = useState([]);
-  // Estado para la fecha seleccionada (por defecto, la fecha actual)
   const [selectedDate, setSelectedDate] = useState(new Date());
-  // Estado para mostrar/ocultar el input de calendario
   const [showCalendar, setShowCalendar] = useState(false);
-  // Estado para evitar reprogramar alertas específicas en el mismo turno
   const [alertScheduled, setAlertScheduled] = useState({ codillos: false, chorizo: false });
-  // Ref para almacenar los pedidos previos y detectar nuevos
   const prevPedidosRef = useRef([]);
 
   // Suscripción a la colección "cocina"
@@ -45,7 +40,6 @@ const Cocina = () => {
     const unsubscribeCocina = onSnapshot(cocinaRef, (querySnapshot) => {
       const productos = [];
       querySnapshot.forEach((doc) => {
-        // Se asume que el id del documento es numérico (si no, omite parseInt)
         productos.push({ id: parseInt(doc.id), ...doc.data() });
       });
       setCocinaProducts(productos);
@@ -79,12 +73,10 @@ const Cocina = () => {
     setShowCalendar(false);
   };
 
-  // Formateamos la fecha seleccionada para que tenga el mismo formato que en la base de datos
   const selectedDateStr = formatDate(selectedDate);
   const todayStr = formatDate(new Date());
   const isToday = selectedDateStr === todayStr;
 
-  // Determinar el texto del turno
   let turnoText = '';
   if (isToday) {
     const now = new Date();
@@ -95,24 +87,10 @@ const Cocina = () => {
     turnoText = 'Mostrando todos los pedidos del día';
   }
 
-  // Lógica para agrupar pedidos en ProductCard
+  // Agrupación de pedidos para ProductCard
   useEffect(() => {
     if (cocinaProducts.length === 0) return;
     
-    // Si tienes un campo timestamp (por ejemplo, 'fechahoraTimestamp') en tus documentos, puedes usarlo para filtrar solo los pedidos del día:
-    /*
-    const startOfDay = new Date(selectedDate);
-    startOfDay.setHours(0, 0, 0, 0);
-    const endOfDay = new Date(selectedDate);
-    endOfDay.setHours(23, 59, 59, 999);
-    const pedidosRef = collection(db, 'pedidos');
-    const q = query(
-      pedidosRef,
-      where('fechahoraTimestamp', '>=', startOfDay),
-      where('fechahoraTimestamp', '<=', endOfDay)
-    );
-    */
-    // Mientras tanto, usaremos la suscripción a toda la colección y filtramos por el campo 'fechahora' (cadena formateada como "dd/mm/yyyy hh:mm")
     const pedidosRef = collection(db, 'pedidos');
     const unsubscribe = onSnapshot(pedidosRef, (querySnapshot) => {
       const pedidos = [];
@@ -120,7 +98,6 @@ const Cocina = () => {
         pedidos.push({ id: doc.id, ...doc.data() });
       });
 
-      // Filtrar pedidos del día seleccionado usando el campo 'fechahora'
       const pedidosDelDia = pedidos.filter((pedido) => {
         if (!pedido.fechahora) return false;
         const [fechaPedido, horaPedido] = pedido.fechahora.split(' ');
@@ -135,10 +112,7 @@ const Cocina = () => {
         return true;
       });
 
-      // Generar IDs válidos a partir de "cocina"
       const validProductIds = cocinaProducts.map(product => product.id);
-
-      // Objeto para agrupar los pedidos por producto
       const aggregatedProducts = {};
 
       pedidosDelDia.forEach((pedido) => {
@@ -148,7 +122,7 @@ const Cocina = () => {
               if (!aggregatedProducts[prod.id]) {
                 aggregatedProducts[prod.id] = {
                   name: prod.nombre,
-                  stock: 8, // valor por defecto; se actualizará si se encuentra en cocinaProducts
+                  stock: 8, // valor por defecto
                   pedidos: 0,
                   orders: [],
                 };
@@ -157,7 +131,7 @@ const Cocina = () => {
                 idPedido: pedido.id,
                 idProducto: prod.id,
                 producto: prod,
-                hora: pedido.fechahora, // Se usa la hora de entrega
+                hora: pedido.fechahora,
                 nombre: pedido.cliente,
                 cantidad: prod.cantidad,
                 descripcion: prod.observaciones || "",
@@ -168,7 +142,6 @@ const Cocina = () => {
         }
       });
 
-      // Incluir todos los productos válidos, incluso sin pedidos
       validProductIds.forEach((id) => {
         if (!aggregatedProducts[id]) {
           const productInfo = cocinaProducts.find(p => p.id === id);
@@ -181,7 +154,6 @@ const Cocina = () => {
         }
       });
 
-      // Ordenar los productos según el orden definido en cocinaProducts
       const sortedProducts = cocinaProducts.map(product => aggregatedProducts[product.id]);
       setProductsData(sortedProducts);
     });
@@ -189,9 +161,10 @@ const Cocina = () => {
     return () => unsubscribe();
   }, [selectedDate, cocinaProducts, selectedDateStr, isToday]);
 
-  // Lógica para ensaladas y ensaladillas
+  // --- Lógica para ensaladas/ensaladillas ---
   const todayDocId = selectedDateStr.replace(/\//g, '-');
 
+  // Suscripción al documento de ensaladas (inicializa usando merge)
   useEffect(() => {
     const saladsRef = doc(db, 'ensaladas', todayDocId);
     const unsubscribe = onSnapshot(saladsRef, (docSnapshot) => {
@@ -209,14 +182,15 @@ const Cocina = () => {
             pequenas: { preparadas: 10, pedidas: 0 },
           },
         };
-        setDoc(saladsRef, initialData);
+        // Usar merge para que no se sobrescriban datos ya existentes
+        setDoc(saladsRef, initialData, { merge: true });
         setSaladsData([initialData]);
       }
     });
     return () => unsubscribe();
   }, [todayDocId]);
 
-  // Actualizar "pedidas" en ensaladas/ensaladillas
+  // Actualización condicional de "pedidas" en ensaladas/ensaladillas:
   useEffect(() => {
     const pedidosRef = collection(db, 'pedidos');
     const unsubscribe = onSnapshot(pedidosRef, (querySnapshot) => {
@@ -247,6 +221,8 @@ const Cocina = () => {
       pedidosDelDia.forEach((pedido) => {
         if (pedido.productos && Array.isArray(pedido.productos)) {
           pedido.productos.forEach((prod) => {
+            // Suponiendo que prod.id === 12 para ensaladas y prod.id === 13 para ensaladillas,
+            // y que el campo 'size' ya se define (por ejemplo, "pequeñas" o "grandes")
             if (prod.id === 12) {
               if (prod.size && prod.size.toLowerCase().includes('peque')) {
                 ensaladasPedidasPeq += prod.cantidad;
@@ -266,17 +242,39 @@ const Cocina = () => {
       });
 
       const saladsRef = doc(db, 'ensaladas', todayDocId);
-      updateDoc(saladsRef, {
-        "ensaladas.grandes.pedidas": ensaladasPedidasGr,
-        "ensaladas.pequenas.pedidas": ensaladasPedidasPeq,
-        "ensaladillas.grandes.pedidas": ensaladillasPedidasGr,
-        "ensaladillas.pequenas.pedidas": ensaladillasPedidasPeq,
-      }).catch(err => console.error("Error updating salad pedidas:", err));
+      // Leer el documento actual y actualizar solo si al menos uno de los nuevos totales NO es 0
+      getDoc(saladsRef)
+        .then((docSnapshot) => {
+          if (docSnapshot.exists()) {
+            const currentData = docSnapshot.data();
+            const currentEnsGr = currentData.ensaladas?.grandes?.pedidas || 0;
+            const currentEnsPeq = currentData.ensaladas?.pequenas?.pedidas || 0;
+            const currentEnsadGr = currentData.ensaladillas?.grandes?.pedidas || 0;
+            const currentEnsadPeq = currentData.ensaladillas?.pequenas?.pedidas || 0;
+
+            // Solo actualizamos si al menos uno de los nuevos totales es mayor que 0
+            if (
+              (ensaladasPedidasGr > 0 || ensaladasPedidasPeq > 0 || ensaladillasPedidasGr > 0 || ensaladillasPedidasPeq > 0) &&
+              (currentEnsGr !== ensaladasPedidasGr ||
+              currentEnsPeq !== ensaladasPedidasPeq ||
+              currentEnsadGr !== ensaladillasPedidasGr ||
+              currentEnsadPeq !== ensaladillasPedidasPeq)
+            ) {
+              updateDoc(saladsRef, {
+                "ensaladas.grandes.pedidas": ensaladasPedidasGr,
+                "ensaladas.pequenas.pedidas": ensaladasPedidasPeq,
+                "ensaladillas.grandes.pedidas": ensaladillasPedidasGr,
+                "ensaladillas.pequenas.pedidas": ensaladillasPedidasPeq,
+              }).catch(err => console.error("Error updating salad pedidas:", err));
+            }
+          }
+        })
+        .catch(err => console.error("Error reading current salad doc:", err));
     });
     return () => unsubscribe();
   }, [selectedDate, todayDocId, selectedDateStr, isToday]);
 
-  // Función para actualizar la cantidad de "preparadas" en Firebase
+  // Función para actualizar la cantidad de "preparadas"
   const updateSaladCount = async (type, size, amount) => {
     const saladsRef = doc(db, 'ensaladas', todayDocId);
     try {
@@ -288,7 +286,7 @@ const Cocina = () => {
     }
   };
 
-  // Lógica para alertas de nuevos pedidos y actualización de la propiedad "visto"
+  // Lógica para alertas y marcar pedidos como "visto"
   useEffect(() => {
     const pedidosRef = collection(db, 'pedidos');
     const unsubscribe = onSnapshot(pedidosRef, (querySnapshot) => {
@@ -298,9 +296,7 @@ const Cocina = () => {
       });
 
       currentPedidos.forEach((pedido) => {
-        // Detectar si el pedido es nuevo
         const isNewOrder = !prevPedidosRef.current.find((p) => p.id === pedido.id);
-        // Verificar si al menos uno de los productos no tiene la propiedad "visto"
         const hasUnseen = pedido.productos && pedido.productos.some(prod => !prod.visto);
         if (isNewOrder && hasUnseen) {
           const productosNombres = pedido.productos
@@ -308,14 +304,12 @@ const Cocina = () => {
             : 'Sin productos';
           console.log(`Nuevo pedido de ${pedido.cliente}. Productos: ${productosNombres}`);
 
-          // Programar alertas para productos específicos
           if (pedido.productos && Array.isArray(pedido.productos)) {
             pedido.productos.forEach((prod) => {
               const nombreProd = prod.nombre.toLowerCase();
               const now = new Date();
               const { endTime } = getTurnoActual();
 
-              // Alerta para "codillos" o "costillas": 30 minutos antes del fin del turno
               if ((nombreProd.includes('codillo') || nombreProd.includes('costilla')) && !alertScheduled.codillos) {
                 const alertTime = new Date(endTime.getTime() - 30 * 60000);
                 const delay = alertTime.getTime() - now.getTime();
@@ -326,7 +320,6 @@ const Cocina = () => {
                   setAlertScheduled(prev => ({ ...prev, codillos: true }));
                 }
               }
-              // Alerta para "chorizo" o "morcilla": 15 minutos antes del fin del turno
               if ((nombreProd.includes('chorizo') || nombreProd.includes('pimientos')) && !alertScheduled.chorizo) {
                 const alertTime = new Date(endTime.getTime() - 15 * 60000);
                 const delay = alertTime.getTime() - now.getTime();
@@ -339,8 +332,6 @@ const Cocina = () => {
               }
             });
           }
-
-          // Después de 30 segundos, actualizamos el pedido para marcarlo como "visto"
           setTimeout(() => {
             const updatedProductos = pedido.productos.map(prod => ({ ...prod, visto: true }));
             updateDoc(doc(db, 'pedidos', pedido.id), { productos: updatedProductos })
@@ -348,13 +339,12 @@ const Cocina = () => {
           }, 30000);
         }
       });
-      // Actualizamos la referencia de pedidos previos
       prevPedidosRef.current = currentPedidos;
     });
     return () => unsubscribe();
   }, [alertScheduled]);
 
-  // Configurar la grilla para ProductCard según los productos en "cocina"
+  // Configuración de la grilla para ProductCard
   const productCount = Math.min(cocinaProducts.length, 9);
   let gridClass = '';
   if (productCount === 4) {
@@ -370,7 +360,7 @@ const Cocina = () => {
   return (
     <div className="h-screen bg-gray-100 flex flex-col">
       <Header />
-      {/* Botón, calendario y texto de turno */}
+      {/* Botón, calendario y turno */}
       <div className="p-4 flex items-center space-x-4">
         <button 
           className="px-4 py-2 bg-[#f2ac02] text-white rounded"
