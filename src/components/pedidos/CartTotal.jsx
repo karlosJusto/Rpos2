@@ -331,22 +331,31 @@ const CartTotal = ({ datosCliente, setDatosCliente, orderToEdit }) => {
    const validateOrder = async (currentCart) => {
      console.log("Iniciando validación básica del pedido...");
      // 1. Validar datos del cliente
+     let mensajesError = ""; // Variable para almacenar todos los mensajes de error
+     let mensajesError1 = ""; // Variable para almacenar todos los mensajes de error
+
      const clienteData = sanitizeClientData(datosCliente);
      if (!clienteData.telefono) {
-       console.warn("Validación fallida: Teléfono del cliente es obligatorio.");
-       setMensajeModal("El teléfono del cliente es obligatorio.");
-       setShowModal2(true); return false;
-     }
-     console.log("Datos cliente OK (teléfono presente).");
+      mensajesError += " ❌ El teléfono del cliente es obligatorio." ; // Agrega el mensaje con salto de línea
 
+     }
+     if (!clienteData.fechahora) {
+      const horaRedondeada = obtenerHoraRedondeada().format('HH:mm'); // Obtener la hora redondeada
+      mensajesError1 += `❗️No has seleccionado hora para el pedido. La hora del pedido será: ${horaRedondeada} `; // Añadir al mensaje de error
+    }
+     console.log("Datos cliente OK (teléfono presente).");
+    
      // 2. Validar si incluye pollo (muestra advertencia/confirmación)
      const incluyePollo = currentCart.some(item => item && (item.id_product === 1 || item.id_product === 2));
      if (!incluyePollo) {
-       console.warn("Validación: Pedido no incluye pollo. Mostrando confirmación.");
-       setMensajeModal("Comprueba... tu pedido no incluye pollo.");
-       setShowModal(true); // Mostrar modal para que el usuario confirme
-       return false; // Esperar confirmación
+      mensajesError1 += "❗️Comprueba... tu pedido no incluye pollo."; // Añadir al mensaje de error
+
      }
+     if (mensajesError1) {
+      setMensajeModal(mensajesError1.trim()); // Establece los mensajes concatenados
+      setShowModal(true); // Mostrar el modal con los mensajes
+      return false; // Detener la ejecución
+    }
      console.log("Validación OK (incluye pollo).");
 
      // 3. Validación rápida (no transaccional) de stock para items clave (opcional pero útil)
@@ -396,31 +405,29 @@ const CartTotal = ({ datosCliente, setDatosCliente, orderToEdit }) => {
 
                     if (currentStock < cantidadNecesaria) {
                         // Si el stock preliminar no es suficiente, fallar validación
-                        console.warn(`Validación preliminar fallida: Stock insuficiente para ID ${idToCheck}. Necesario: ${cantidadNecesaria}, Disponible: ~${currentStock}`);
-                        setMensajeModal(`Stock preliminar insuficiente para ${productData.name || 'ID ' + idToCheck}. Necesitas ${cantidadNecesaria.toFixed(1)}, disponibles ~${currentStock}.`);
-                        setShowModal2(true);
+                        mensajesError += ` ❌ No hay suficiente stock para el producto ${item.name || 'sin nombre'}. Solo quedan ${currentStock} unidades.\n`;
                         return false;
                     } else {
                          console.log(`Validación preliminar stock OK para ID ${idToCheck}. Necesario: ${cantidadNecesaria.toFixed(1)}, Disponible: ~${currentStock}`);
                     }
                 } else {
                      // Si el producto no existe en la BD, fallar validación
-                     console.error(`Validación fallida: Producto con ID ${idToCheck} no encontrado.`);
-                     setMensajeModal(`Producto (ID: ${idToCheck}) no encontrado para validar stock.`);
-                     setShowModal2(true);
-                     return false;
+                     mensajesError += ` ❌ Validación fallida: Producto con ID ${idToCheck} no encontrado.\n`;
                 }
             }
         }
         console.log("Validación preliminar de stock OK.");
      } catch (error) {
          // Capturar errores durante la lectura de stock preliminar
-         console.error("Error durante validación preliminar de stock:", error);
-         setMensajeModal(`Error al verificar stock preliminar: ${error.message}`);
-         setShowModal2(true);
+         mensajesError += ` ❌ Error al verificar stock para el producto ${item.name || 'sin nombre'}. Solo quedan ${currentStock} unidades.\n`;
+
          return false;
      }
-
+     if (mensajesError.trim() !== "") {
+      setMensajeModal(mensajesError.trim());
+      setShowModal2(true); // Mostrar el modal con los errores
+      return false; // Detener la ejecución
+    }
      // Si todas las validaciones básicas (cliente, pollo, stock preliminar) pasan
      console.log("Validación básica del pedido completada con éxito.");
      return true;
