@@ -202,73 +202,93 @@ function ConfiguracionCalendario() {
       );
   };
 
-  // --- Función Principal de Guardado y Regeneración ---
-  const handleUpdateConfig = async () => {
-    // Guardar configuración base
-    try {
-      await Promise.all(
-        days.map((day) => {
-          const dayRef = doc(db, 'calendar', day.id);
-          const dataToSave = { ...day };
+// --- Función Principal de Guardado y Regeneración ---
+const handleUpdateConfig = async () => {
+  // Guardar configuración base
+  try {
+    await Promise.all(
+      days.map((day) => {
+        const dayRef = doc(db, 'calendar', day.id);
+        const dataToSave = { ...day };
 
-          // Normalizar y limpiar datos ANTES de guardar
-          ['morningSchedule', 'eveningSchedule', 'workSchedule'].forEach(key => {
-            if (dataToSave[key]) {
-               dataToSave[key] = {
-                 ...dataToSave[key],
-                 active: !!dataToSave[key].active, // Asegura booleano
-                 start: dataToSave[key].active ? normalizeTime(dataToSave[key].start) : '',
-                 end: dataToSave[key].active ? normalizeTime(dataToSave[key].end) : '',
-               };
-            } else {
-               dataToSave[key] = { active: false, start: '', end: '' }; // Asegura objeto si no existe
-            }
-          });
-           // Asegura cantidades numéricas y booleano negativeStock
-          dataToSave.chickenAmount = parseInt(dataToSave.chickenAmount) || 0;
-          dataToSave.costillaAmount = parseInt(dataToSave.costillaAmount) || 0;
-          dataToSave.codilloAmount = parseInt(dataToSave.codilloAmount) || 0;
-          dataToSave.webPreOrder = parseInt(dataToSave.webPreOrder) || 0;
-          dataToSave.negativeStock = !!dataToSave.negativeStock;
+        // Normalizar y limpiar datos ANTES de guardar
+        ['morningSchedule', 'eveningSchedule', 'workSchedule'].forEach(key => {
+          if (dataToSave[key]) {
+            dataToSave[key] = {
+              ...dataToSave[key],
+              active: !!dataToSave[key].active, // Asegura booleano
+              start: dataToSave[key].active ? normalizeTime(dataToSave[key].start) : '',
+              end: dataToSave[key].active ? normalizeTime(dataToSave[key].end) : '',
+            };
+          } else {
+            dataToSave[key] = { active: false, start: '', end: '' }; // Asegura objeto si no existe
+          }
+        });
+        // Asegura cantidades numéricas y booleano negativeStock
+        dataToSave.chickenAmount = parseInt(dataToSave.chickenAmount) || 0;
+        dataToSave.costillaAmount = parseInt(dataToSave.costillaAmount) || 0;
+        dataToSave.codilloAmount = parseInt(dataToSave.codilloAmount) || 0;
+        dataToSave.webPreOrder = parseInt(dataToSave.webPreOrder) || 0;
+        dataToSave.negativeStock = !!dataToSave.negativeStock;
 
-          delete dataToSave.id; // No guardar el id dentro del documento
-          console.log("Guardando en /calendar/", day.id, dataToSave);
-          return updateDoc(dayRef, dataToSave);
-        })
-      );
-      console.log("Configuración base 'calendar' actualizada.");
-      alert('Configuración general y de productos guardada.');
+        delete dataToSave.id; // No guardar el id dentro del documento
+        console.log("Guardando en /calendar/", day.id, dataToSave);
+        return updateDoc(dayRef, dataToSave);
+      })
+    );
+    console.log("Configuración base 'calendar' actualizada.");
+    alert('Configuración general y de productos guardada.');
 
-      // Regenerar intervalos diarios para la fecha actual visible
-      if (dailyCalendar?.date) {
-        console.log(`Regenerando intervalos diarios para la fecha: ${dailyCalendar.date}`);
-        const dateObj = new Date(dailyCalendar.date + "T00:00:00"); // Cuidado con zonas horarias si es relevante
-        const daysOfWeek = ["Domingo", "Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado"];
-        const dayName = daysOfWeek[dateObj.getDay()];
-        // Usa los datos recién actualizados en el estado 'days'
-        const relevantDayConfig = days.find(d => d.name === dayName);
-
-        if (relevantDayConfig) {
-          await Promise.all(
-            Object.keys(productTypesConfig).map(type =>
-              generateAndMergeIntervals(type, relevantDayConfig, dailyCalendar.date)
-            )
-          );
-          console.log(`Regeneración completada para ${dailyCalendar.date}`);
-          // Refresca el contexto para actualizar la vista diaria
-          refreshDailyCalendar();
-        } else {
-          console.warn(`No se encontró la configuración para el día ${dayName} para regenerar ${dailyCalendar.date}`);
+    // Regenerar intervalos diarios para la fecha actual visible
+    if (dailyCalendar?.date) {
+      console.log(`Regenerando intervalos diarios para la fecha: ${dailyCalendar.date}`);
+      
+      // Consulta si el día actual está marcado en holiday_calendar
+      const holidayDocRef = doc(db, 'holiday_calendar', dailyCalendar.date);
+      const holidayDocSnap = await getDoc(holidayDocRef);
+      let dayId;
+      if (holidayDocSnap.exists()) {
+        const holidayData = holidayDocSnap.data();
+        if (holidayData.type === 'holiday') {
+          dayId = "8";  // id para festivo
+        } else if (holidayData.type === 'preHoliday') {
+          dayId = "9";  // id para víspera de festivo
         }
-      } else {
-        console.warn("No hay fecha en dailyCalendar, no se pueden regenerar los intervalos diarios.");
       }
-
-    } catch (error) {
-      console.error('Error al actualizar configuración y/o regenerar intervalos:', error);
-      alert('Error al guardar cambios.');
+      // Si no hay marcado en holiday_calendar, usamos la configuración normal del día
+      if (!dayId) {
+        const dateObj = new Date(dailyCalendar.date + "T00:00:00"); // Cuidado con zonas horarias
+        const daysOfWeek = ["Domingo", "Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado"];
+        dayId = daysOfWeek[dateObj.getDay()];
+      }
+      
+      // Busca la configuración correspondiente en el estado 'days'
+      // Se asume que en la colección 'calendar' se tienen documentos cuyo id
+      // es el nombre del día normal ("Lunes", "Martes", etc.) o el id especial ("8" o "9")
+      const relevantDayConfig = days.find(d => d.id === dayId || d.name === dayId);
+      
+      if (relevantDayConfig) {
+        await Promise.all(
+          Object.keys(productTypesConfig).map(type =>
+            generateAndMergeIntervals(type, relevantDayConfig, dailyCalendar.date)
+          )
+        );
+        console.log(`Regeneración completada para ${dailyCalendar.date}`);
+        // Refresca el contexto para actualizar la vista diaria
+        refreshDailyCalendar();
+      } else {
+        console.warn(`No se encontró la configuración para el día ${dayId} para regenerar ${dailyCalendar.date}`);
+      }
+    } else {
+      console.warn("No hay fecha en dailyCalendar, no se pueden regenerar los intervalos diarios.");
     }
-  };
+
+  } catch (error) {
+    console.error('Error al actualizar configuración y/o regenerar intervalos:', error);
+    alert('Error al guardar cambios.');
+  }
+};
+
 
   // --- RENDERIZADO ---
   return (

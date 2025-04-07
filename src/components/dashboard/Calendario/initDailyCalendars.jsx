@@ -1,4 +1,3 @@
-// initDailyCalendars.js
 import { db } from '../../firebase/firebase';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 
@@ -17,35 +16,34 @@ const normalizeTime = (timeStr) => {
   return `${hour}:00`;
 };
 
-// Función que genera los intervalos según el horario, cantidad máxima y paso definido
+// Función que genera los intervalos según el horario, cantidad máxima y paso definido, asignando además el tipo de horario
 const generateIntervalsForSchedule = (start, end, maxAllowed, step, scheduleType) => {
-    if (!start || !end || !step) return [];
-    try {
-      const [startHour, startMinute] = start.split(':').map(Number);
-      const [endHour, endMinute] = end.split(':').map(Number);
-      let current = startHour * 60 + startMinute;
-      const endTime = endHour * 60 + endMinute;
-      const intervals = [];
-  
-      while (current + step <= endTime) {
-        const startStr = String(Math.floor(current / 60)).padStart(2, '0') + ':' + String(current % 60).padStart(2, '0');
-        const endStr = String(Math.floor((current + step) / 60)).padStart(2, '0') + ':' + String((current + step) % 60).padStart(2, '0');
-        intervals.push({
-          start: startStr,
-          end: endStr,
-          maxAllowed: maxAllowed || 0,
-          orderedCount: 0,
-          scheduleType, // Se asigna el tipo de horario
-        });
-        current += step;
-      }
-      return intervals;
-    } catch (error) {
-      console.error("Error generando intervalos:", error);
-      return [];
+  if (!start || !end || !step) return [];
+  try {
+    const [startHour, startMinute] = start.split(':').map(Number);
+    const [endHour, endMinute] = end.split(':').map(Number);
+    let current = startHour * 60 + startMinute;
+    const endTime = endHour * 60 + endMinute;
+    const intervals = [];
+
+    while (current + step <= endTime) {
+      const startStr = String(Math.floor(current / 60)).padStart(2, '0') + ':' + String(current % 60).padStart(2, '0');
+      const endStr = String(Math.floor((current + step) / 60)).padStart(2, '0') + ':' + String((current + step) % 60).padStart(2, '0');
+      intervals.push({
+        start: startStr,
+        end: endStr,
+        maxAllowed: maxAllowed || 0,
+        orderedCount: 0,
+        scheduleType, // Se asigna el tipo de horario (morning o evening)
+      });
+      current += step;
     }
-  };
-  
+    return intervals;
+  } catch (error) {
+    console.error("Error generando intervalos:", error);
+    return [];
+  }
+};
 
 // Función que genera y fusiona los intervalos para un producto según la configuración del día y la fecha dada
 export const generateAndMergeIntervals = async (productType, dayConfig, date) => {
@@ -67,28 +65,27 @@ export const generateAndMergeIntervals = async (productType, dayConfig, date) =>
     const maxAmount = parseInt(dayConfig[config.amountField]) || 0;
 
     if (dayConfig.morningSchedule?.active && dayConfig.morningSchedule.start && dayConfig.morningSchedule.end) {
-    newIntervals = newIntervals.concat(
+      newIntervals = newIntervals.concat(
         generateIntervalsForSchedule(
-        normalizeTime(dayConfig.morningSchedule.start),
-        normalizeTime(dayConfig.morningSchedule.end),
-        maxAmount,
-        config.intervalStep,
-        'morning'
+          normalizeTime(dayConfig.morningSchedule.start),
+          normalizeTime(dayConfig.morningSchedule.end),
+          maxAmount,
+          config.intervalStep,
+          'morning'
         )
-    );
+      );
     }
     if (dayConfig.eveningSchedule?.active && dayConfig.eveningSchedule.start && dayConfig.eveningSchedule.end) {
-    newIntervals = newIntervals.concat(
+      newIntervals = newIntervals.concat(
         generateIntervalsForSchedule(
-        normalizeTime(dayConfig.eveningSchedule.start),
-        normalizeTime(dayConfig.eveningSchedule.end),
-        maxAmount,
-        config.intervalStep,
-        'evening'
+          normalizeTime(dayConfig.eveningSchedule.start),
+          normalizeTime(dayConfig.eveningSchedule.end),
+          maxAmount,
+          config.intervalStep,
+          'evening'
         )
-    );
+      );
     }
-
 
     // Fusiona los intervalos nuevos con los anteriores, preservando orderedCount si hay pedidos
     const mergedIntervals = newIntervals.map(newInt => {
@@ -125,11 +122,26 @@ export const initDailyCalendars = async () => {
     const today = new Date();
     const dateString = today.toISOString().split('T')[0]; // Formato YYYY-MM-DD
 
-    // Determinamos el nombre del día (asumiendo que el id del documento en 'calendar' es el nombre del día)
-    const daysOfWeek = ["1", "2", "3", "4", "5", "6", "7","8","9"];
-    const dayName = daysOfWeek[today.getDay()];
+    // Consultamos la colección "holiday_calendar" para ver si el día actual está marcado
+    const holidayDocRef = doc(db, 'holiday_calendar', dateString);
+    const holidayDocSnap = await getDoc(holidayDocRef);
+    let dayName;
+    if (holidayDocSnap.exists()) {
+      const holidayData = holidayDocSnap.data();
+      if (holidayData.type === 'holiday') {
+        dayName = "8";  // id para festivo
+      } else if (holidayData.type === 'preHoliday') {
+        dayName = "9";  // id para víspera de festivo
+      }
+    }
+    // Si no es un día marcado, usamos el mapeo normal de la semana:
+    // (Lunes: "1", Martes: "2", Miércoles: "3", Jueves: "4", Viernes: "5", Sábado: "6", Domingo: "7")
+    if (!dayName) {
+      const daysMapping = { 0: "7", 1: "1", 2: "2", 3: "3", 4: "4", 5: "5", 6: "6" };
+      dayName = daysMapping[today.getDay()];
+    }
 
-    // Obtenemos la configuración del día desde la colección 'calendar'
+    // Obtenemos la configuración del día desde la colección "calendar" usando dayName
     const dayDocRef = doc(db, 'calendar', dayName);
     const dayDocSnap = await getDoc(dayDocRef);
     if (dayDocSnap.exists()) {

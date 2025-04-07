@@ -198,10 +198,17 @@ const CartTotal = ({ datosCliente, setDatosCliente, orderToEdit }) => {
 
   // --- Calcular Total del Carrito ---
   const total = cart.reduce(
-    // Suma segura, tratando valores nulos o inválidos como 0
-    (acc, item) => acc + ((item?.price || 0) * (item?.cantidad || 1)),
+    (acc, item) => {
+      // Se toma 'price' si existe; de lo contrario, se toma 'precio'
+      const unitPrice = item?.price === 0 
+      ? item?.precio ?? 0 
+      : item?.price ?? item?.precio ?? 0;
+          const quantity = item?.cantidad ?? 1;
+      return acc + (unitPrice * quantity);
+    },
     0
   );
+  
 
   // --- Obtener Hora Redondeada por Defecto ---
   const obtenerHoraRedondeada = () => {

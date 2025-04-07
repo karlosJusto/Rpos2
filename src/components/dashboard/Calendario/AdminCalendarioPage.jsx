@@ -1,6 +1,7 @@
 import React from 'react';
 import ConfiguracionCalendario from './ConfiguracionCalendario'; // Ajusta la ruta
 import VistaDiariaTabs from './VistaDiariaTabs'; // Ajusta la ruta
+import HolidayCalendar from './HolidayCalendar';
 // Si tu OrderProvider no está ya en un nivel superior, impórtalo
 // import { OrderProvider } from '../../Context/OrderProviderContext'; // Ajusta la ruta
 
@@ -12,8 +13,9 @@ function AdminCalendarioPage() {
         {/* Componente para configurar la semana */}
         <ConfiguracionCalendario />
 
-        {/* Componente para ver los intervalos diarios del día seleccionado */}
-        <VistaDiariaTabs />
+        {/* Componente para ver los intervalos diarios del día seleccionado 
+        <VistaDiariaTabs />*/}
+        <HolidayCalendar />
       </div>
     // </OrderProvider>
   );
