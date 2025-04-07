@@ -335,32 +335,28 @@ const CartTotal = ({ datosCliente, setDatosCliente, orderToEdit }) => {
      let mensajesError1 = ""; // Variable para almacenar todos los mensajes de error
 
      const clienteData = sanitizeClientData(datosCliente);
+     debugger
      if (!clienteData.telefono) {
-      mensajesError += " ❌ El teléfono del cliente es obligatorio." ; // Agrega el mensaje con salto de línea
+      mensajesError += " ❌ El teléfono del cliente es obligatorio.\n" ; // Agrega el mensaje con salto de línea
 
      }
      if (!clienteData.fechahora) {
       const horaRedondeada = obtenerHoraRedondeada().format('HH:mm'); // Obtener la hora redondeada
-      mensajesError1 += `❗️No has seleccionado hora para el pedido. La hora del pedido será: ${horaRedondeada} `; // Añadir al mensaje de error
+      mensajesError1 += `❗️No has seleccionado hora para el pedido. La hora del pedido será: ${horaRedondeada} \n`; // Añadir al mensaje de error
     }
      console.log("Datos cliente OK (teléfono presente).");
     
      // 2. Validar si incluye pollo (muestra advertencia/confirmación)
      const incluyePollo = currentCart.some(item => item && (item.id_product === 1 || item.id_product === 2));
      if (!incluyePollo) {
-      mensajesError1 += "❗️Comprueba... tu pedido no incluye pollo."; // Añadir al mensaje de error
+      mensajesError1 += "❗️Comprueba... tu pedido no incluye pollo.\n"; // Añadir al mensaje de error
 
      }
-     if (mensajesError1) {
-      setMensajeModal(mensajesError1.trim()); // Establece los mensajes concatenados
-      setShowModal(true); // Mostrar el modal con los mensajes
-      return false; // Detener la ejecución
-    }
+
      console.log("Validación OK (incluye pollo).");
 
      // 3. Validación rápida (no transaccional) de stock para items clave (opcional pero útil)
      console.log("Iniciando validación preliminar de stock...");
-     try {
         // Define los IDs de los productos cuyo stock quieres verificar aquí
         const idsConStockCritico = [1, 41, 50]; // Ejemplo: Pollo entero, Costilla entera, Codillo
 
@@ -405,9 +401,8 @@ const CartTotal = ({ datosCliente, setDatosCliente, orderToEdit }) => {
 
                     if (currentStock < cantidadNecesaria) {
                         // Si el stock preliminar no es suficiente, fallar validación
-                        mensajesError += ` ❌ No hay suficiente stock para el producto ${item.name || 'sin nombre'}. Solo quedan ${currentStock} unidades.\n`;
-                        return false;
-                    } else {
+                        mensajesError += ` ❌ No hay suficiente stock para el producto ${productData.name || 'sin nombre'}. Solo quedan ${currentStock} unidades.\n`;
+                      } else {
                          console.log(`Validación preliminar stock OK para ID ${idToCheck}. Necesario: ${cantidadNecesaria.toFixed(1)}, Disponible: ~${currentStock}`);
                     }
                 } else {
@@ -417,15 +412,15 @@ const CartTotal = ({ datosCliente, setDatosCliente, orderToEdit }) => {
             }
         }
         console.log("Validación preliminar de stock OK.");
-     } catch (error) {
-         // Capturar errores durante la lectura de stock preliminar
-         mensajesError += ` ❌ Error al verificar stock para el producto ${item.name || 'sin nombre'}. Solo quedan ${currentStock} unidades.\n`;
 
-         return false;
-     }
      if (mensajesError.trim() !== "") {
       setMensajeModal(mensajesError.trim());
       setShowModal2(true); // Mostrar el modal con los errores
+      return false; // Detener la ejecución
+    }
+    if (mensajesError1) {
+      setMensajeModal(mensajesError1.trim()); // Establece los mensajes concatenados
+      setShowModal(true); // Mostrar el modal con los mensajes
       return false; // Detener la ejecución
     }
      // Si todas las validaciones básicas (cliente, pollo, stock preliminar) pasan
@@ -795,44 +790,64 @@ const updateCodilloCalendar = (fechahora, cantidad, ignoreLimit = false) => upda
       // --- PASO 4: Actualizar Stock (POST-Guardado/Actualización de Pedido) ---
       console.log("Iniciando proceso de actualización de stock...");
       try {
-          const stockUpdatePromises = []; // Array para promesas de actualización
-
-          // Calcular cantidades totales a deducir por ID de stock
-          // Pollo (ID 1/2 afectan stock ID 1)
-          let stockPollos = currentCart.reduce((sum, item) => { if (item?.id_product === 1) return sum + (item.cantidad || 0); if (item?.id_product === 2) return sum + (item.cantidad || 0) / 2; return sum; }, 0);
-          if (stockPollos > 0) { stockUpdatePromises.push(updateStock(1, stockPollos)); }
-
-          // Costilla (ID 41/48 afectan stock ID 41)
-          let stockCostillas = currentCart.reduce((sum, item) => { if (item?.id_product === 41) return sum + (item.cantidad || 0); if (item?.id_product === 48) return sum + (item.cantidad || 0) / 2; return sum; }, 0);
-          if (stockCostillas > 0) { stockUpdatePromises.push(updateStock(41, stockCostillas)); }
-
-          // Otros items con stock individual (ej. ID 50 - Codillo)
-           const otrosItemsConStockIds = [50]; // Definir IDs aquí
-           currentCart.forEach(item => {
-                if (item && item.cantidad > 0 && otrosItemsConStockIds.includes(item.id_product)) {
-                     // Pasar id_product directamente (updateStock lo convierte a string si es necesario)
-                     stockUpdatePromises.push(updateStock(item.id_product, item.cantidad));
-                }
-           });
-
-          // Ejecutar todas las actualizaciones de stock en paralelo
-          if (stockUpdatePromises.length > 0) {
-              console.log(`Ejecutando ${stockUpdatePromises.length} actualizaciones de stock...`);
-              await Promise.all(stockUpdatePromises);
-              console.log("Actualización de stock completada con éxito.");
-          } else {
-              console.log("No se requirieron actualizaciones de stock para este pedido.");
+          const stockUpdatePromises = [];
+      
+          // --- Actualización para POLLO ---
+          // Los items de pollo (ID 1 y 2) afectan el stock del producto con ID 1.
+          let stockPollos = currentCart.reduce((sum, item) => {
+              if (item?.id_product === 1) return sum + (item.cantidad || 0);
+              if (item?.id_product === 2) return sum + (item.cantidad || 0) / 2; // medio pollo cuenta como 0.5
+              return sum;
+          }, 0);
+          if (stockPollos > 0) {
+               stockUpdatePromises.push(updateStock(1, stockPollos));
           }
-
+      
+          // --- Actualización para COSTILLAS ---
+          // Los items de costilla (ID 41 y 48) afectan el stock del producto con ID 41.
+          let stockCostillas = currentCart.reduce((sum, item) => {
+               if (item?.id_product === 41) return sum + (item.cantidad || 0);
+               if (item?.id_product === 48) return sum + (item.cantidad || 0) / 2;
+               return sum;
+          }, 0);
+          if (stockCostillas > 0) {
+               stockUpdatePromises.push(updateStock(41, stockCostillas));
+          }
+      
+          // --- Actualización para el resto de productos ---
+          // Definimos los IDs que ya tienen tratamiento especial:
+          const specialIds = [1, 2, 41, 48];
+          // Agrupamos por ID los productos que no están en specialIds.
+          const otherProductsQuantities = {};
+          currentCart.forEach(item => {
+               if (item && item.cantidad > 0 && !specialIds.includes(item.id_product)) {
+                   if (!otherProductsQuantities[item.id_product]) {
+                       otherProductsQuantities[item.id_product] = 0;
+                   }
+                   otherProductsQuantities[item.id_product] += item.cantidad;
+               }
+          });
+          // Para cada producto agrupado, llamar a updateStock con la cantidad total a restar.
+          for (const productId in otherProductsQuantities) {
+               stockUpdatePromises.push(updateStock(productId, otherProductsQuantities[productId]));
+          }
+      
+          // Ejecutar todas las actualizaciones en paralelo
+          if (stockUpdatePromises.length > 0) {
+               console.log(`Ejecutando ${stockUpdatePromises.length} actualizaciones de stock...`);
+               await Promise.all(stockUpdatePromises);
+               console.log("Actualización de stock completada con éxito.");
+          } else {
+               console.log("No se requirieron actualizaciones de stock para este pedido.");
+          }
       } catch (stockError) {
-          // Error CRÍTICO: Pedido guardado, pero stock falló.
           console.error(`¡ERROR CRÍTICO POST-GUARDADO! Pedido ${pedidoId} ${orderToEdit ? 'actualizado' : 'creado'}, PERO FALLÓ LA ACTUALIZACIÓN DE STOCK:`, stockError);
-          // Notificar al usuario de la inconsistencia grave
           setMensajeModal(`¡ATENCIÓN GRAVE! Pedido ${pedidoId} guardado, pero falló al actualizar stock (${stockError.message}). Es necesaria REVISIÓN MANUAL INMEDIATA del inventario.`);
-          setShowModal2(true); // Mostrar modal de error
-          setIsSubmitting(false); // Liberar estado, pero la situación requiere intervención
-          return; // Detener el proceso aquí
+          setShowModal2(true);
+          setIsSubmitting(false);
+          return;
       }
+      
 
 
       // --- PASO 5: Actualizar Contadores de Calendario (POST-Guardado y Stock OK) ---
@@ -894,6 +909,7 @@ const updateCodilloCalendar = (fechahora, cantidad, ignoreLimit = false) => upda
       // isSubmitting se liberará en el bloque finally
 
     } catch (error) {
+      debugger
       // --- Captura de Errores Generales / Inesperados ---
       console.error("Error general no capturado previamente en sendToFirestore:", error);
       // Mostrar modal de error genérico SOLO si no hay otro modal de confirmación activo
@@ -932,7 +948,7 @@ const updateCodilloCalendar = (fechahora, cantidad, ignoreLimit = false) => upda
         <a
           href="#"
           onClick={(e) => e.preventDefault()} // Mejor práctica para enlaces placeholder
-          className="inline-flex items-center text-2xl font-extrabold text-gray-600 hover:underline dark:text-gray-400"
+          className="inline-flex items-center text-2xl font-extrabold xtext-gray-600 hover:underline dark:text-gray-400"
         >
           <span className="text-end">{total.toFixed(2)} €</span>
         </a>

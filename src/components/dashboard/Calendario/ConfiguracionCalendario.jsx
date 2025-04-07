@@ -26,32 +26,34 @@ function ConfiguracionCalendario() {
     return `${hour}:00`;
   };
 
-  const generateIntervalsForSchedule = (start, end, maxAllowed, step) => {
-      if (!start || !end || !step) return []; // Evita errores si falta start/end/step
-      try {
-          const [startHour, startMinute] = start.split(':').map(Number);
-          const [endHour, endMinute] = end.split(':').map(Number);
-          let current = startHour * 60 + startMinute;
-          const endTime = endHour * 60 + endMinute;
-          const intervals = [];
+  const generateIntervalsForSchedule = (start, end, maxAllowed, step, scheduleType) => {
+    if (!start || !end || !step) return []; // Evita errores si falta start/end/step
+    try {
+        const [startHour, startMinute] = start.split(':').map(Number);
+        const [endHour, endMinute] = end.split(':').map(Number);
+        let current = startHour * 60 + startMinute;
+        const endTime = endHour * 60 + endMinute;
+        const intervals = [];
 
-          while (current + step <= endTime) {
-              const startStr = String(Math.floor(current / 60)).padStart(2, '0') + ':' + String(current % 60).padStart(2, '0');
-              const endStr = String(Math.floor((current + step) / 60)).padStart(2, '0') + ':' + String((current + step) % 60).padStart(2, '0');
-              intervals.push({
-                  start: startStr,
-                  end: endStr,
-                  maxAllowed: maxAllowed || 0, // Asegura que maxAllowed sea un número
-                  orderedCount: 0,
-              });
-              current += step;
-          }
-          return intervals;
-      } catch (error) {
-          console.error("Error generando intervalos para:", { start, end, maxAllowed, step }, error);
-          return []; // Devuelve array vacío en caso de error
-      }
+        while (current + step <= endTime) {
+            const startStr = String(Math.floor(current / 60)).padStart(2, '0') + ':' + String(current % 60).padStart(2, '0');
+            const endStr = String(Math.floor((current + step) / 60)).padStart(2, '0') + ':' + String((current + step) % 60).padStart(2, '0');
+            intervals.push({
+                start: startStr,
+                end: endStr,
+                maxAllowed: maxAllowed || 0,
+                orderedCount: 0,
+                scheduleType, // Asigna el tipo de horario (morning o evening)
+            });
+            current += step;
+        }
+        return intervals;
+    } catch (error) {
+        console.error("Error generando intervalos para:", { start, end, maxAllowed, step }, error);
+        return []; // Devuelve array vacío en caso de error
+    }
   };
+
 
   const generateAndMergeIntervals = async (productType, dayConfig, date) => {
     const config = productTypesConfig[productType];
@@ -60,24 +62,25 @@ function ConfiguracionCalendario() {
       return;
     }
     console.log(`Regenerando ${config.dailyCollection} para ${date}`);
-
+  
     const docRef = doc(db, config.dailyCollection, date);
-
+  
     try {
       const docSnap = await getDoc(docRef);
       const oldData = docSnap.exists() ? docSnap.data() : { intervals: [] };
       const oldIntervals = oldData.intervals || [];
-
+  
       let newIntervals = [];
       const maxAmount = parseInt(dayConfig[config.amountField]) || 0;
-
+  
       if (dayConfig.morningSchedule?.active && dayConfig.morningSchedule.start && dayConfig.morningSchedule.end) {
         newIntervals = newIntervals.concat(
           generateIntervalsForSchedule(
-            normalizeTime(dayConfig.morningSchedule.start), // Asegura formato HH:MM
+            normalizeTime(dayConfig.morningSchedule.start),
             normalizeTime(dayConfig.morningSchedule.end),
             maxAmount,
-            config.intervalStep
+            config.intervalStep,
+            'morning'  // Se indica que es horario de mañana
           )
         );
       }
@@ -87,37 +90,38 @@ function ConfiguracionCalendario() {
             normalizeTime(dayConfig.eveningSchedule.start),
             normalizeTime(dayConfig.eveningSchedule.end),
             maxAmount,
-            config.intervalStep
+            config.intervalStep,
+            'evening'  // Se indica que es horario de tarde
           )
         );
       }
-
+  
       const mergedIntervals = newIntervals.map(newInt => {
         const matchingOld = oldIntervals.find(oldInt => oldInt.start === newInt.start && oldInt.end === newInt.end);
         if (matchingOld && matchingOld.orderedCount > 0) {
            return { ...matchingOld, maxAllowed: newInt.maxAllowed };
         }
-        return newInt; // Retorna el nuevo si no hay match o el viejo no tenía pedidos
+        return newInt;
       });
-
+  
       oldIntervals.forEach(oldInt => {
         const existsInNew = newIntervals.some(newInt => newInt.start === oldInt.start && newInt.end === oldInt.end);
         if (!existsInNew && oldInt.orderedCount > 0) {
-          mergedIntervals.push({ ...oldInt, maxAllowed: maxAmount }); // Añade viejos con pedidos que desaparecen
+          mergedIntervals.push({ ...oldInt, maxAllowed: maxAmount });
         }
       });
-
+  
       mergedIntervals.sort((a, b) => (a.start > b.start ? 1 : -1));
       console.log(`Intervalos finales para ${config.dailyCollection}/${date}:`, mergedIntervals);
-
-      // Usa setDoc con merge: true para crear o actualizar el documento diario
+  
       await setDoc(docRef, { intervals: mergedIntervals, date: date, productType: productType }, { merge: true });
       console.log(`Firestore actualizado para ${config.dailyCollection}/${date}`);
-
+  
     } catch (error) {
       console.error(`Error regenerando ${config.dailyCollection} para ${date}:`, error);
     }
   };
+  
 
 
   // --- Carga Inicial de Datos ---

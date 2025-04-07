@@ -31,11 +31,15 @@ import { OrderProvider } from './components/Context/OrderProviderContext';
 import Cocina from "./components/cocina/Cocina"
 import AdminCalendarioPage from "./components/dashboard/Calendario/AdminCalendarioPage"
 
+import React, { useEffect } from 'react';
+import { initDailyCalendars } from './components/dashboard/Calendario/initDailyCalendars.jsx';
 
 
 
 function App() {
-  
+  useEffect(() => {
+    initDailyCalendars();
+  }, []);
 
   return (
    
