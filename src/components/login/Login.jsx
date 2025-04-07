@@ -12,6 +12,7 @@ import utc from 'dayjs/plugin/utc'; // Plugin para trabajar con fechas en UTC
 import customParseFormat from 'dayjs/plugin/customParseFormat';
 import SonidoOnChange from '../ordenes/SonidoOnChange';
 import Ordenes from '../ordenes/Ordenes';
+import { Layout } from 'lucide-react';
 
 
 const Login = () => {
@@ -28,6 +29,8 @@ dayjs.locale('es');
   const [errorMessage, setErrorMessage] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [role, setRole] = useState(0);
+
 
 
   const navigate = useNavigate(); // Inicializa el hook useNavigate
@@ -169,16 +172,28 @@ const generarEstadisticasDiarias = async () => {
 
           console.log(empleado.nombre); // Aquí puedes manejar el login, redirigir, etc.
 
+          // Guardar el nombre del empleado en sessionStorage
+        sessionStorage.setItem('empleadoNombre', empleado.nombre);
+
+         
+
           // Ejecutamos la función para generar las estadísticas diarias
           generarEstadisticasDiarias(); // Llamamos a la función para crear estadísticas
 
           // Ejemplo de cómo hacer algo con el dato
           if (empleado.rol === "jefe") {
             console.log("Jefe ingresó correctamente");
+
+           
+            
           
-            navigate('/layout/comida'); // Redirige a /dashboard
+            navigate('/layout/comida', { state: { role: empleado.rol } }); // Pasa el rol
+
           } else if (empleado.rol === "empleado") {
             console.log("Operario ingresó correctamente");
+
+            
+         
            
             
             navigate('/stock'); // Redirige a /layout
@@ -186,7 +201,7 @@ const generarEstadisticasDiarias = async () => {
         });
 
         setIsLoggedIn(true);
-        console.log(setIsLoggedIn);
+       // console.log(setIsLoggedIn);
 
       }
     } catch (error) {
@@ -205,90 +220,112 @@ const generarEstadisticasDiarias = async () => {
     }
   };
 
+
+
+
+
   return (
     <>
-      <section
-        className="min-h-screen flex items-center justify-center font-nunito bg-gray-200"
-      >
-        <div className="flex shadow-2xl" onClick={(e) => e.stopPropagation()}>
-          <div className="flex flex-col items-center justify-center text-center p-12 bg-white rounded-2xl xl:rounded-tr-none xl:rounded-br-none" onClick={handleBackgroundClick}>
-            <h4 className="text-4xl text-gray-500 font-extrabold font-nunito -mt-5">Bienvenido</h4>
-            <p className="font-medium text-lg text-gray-400 mt-2 font-nunito border-b-2">Introduce tu PIN!</p>
+<section className="min-h-screen flex items-center justify-center font-nunito bg-gray-200">
+  <div className="flex shadow-2xl" onClick={(e) => e.stopPropagation()}>
+    <div
+      className="flex flex-col items-center justify-center text-center p-12 bg-white rounded-2xl xl:rounded-tr-none xl:rounded-br-none"
+      onClick={handleBackgroundClick}
+    >
+      <h4 className="text-4xl text-gray-500 font-extrabold font-nunito -mt-5">Bienvenido</h4>
+      <p className="font-medium text-lg text-gray-400 mt-2 font-nunito border-b-2">Introduce tu PIN!</p>
 
-            <div className="flex flex-col text-2xl text-center p-4">
-              <input
-                type="password"
-                maxLength={5} // Limita el máximo de caracteres a 5
-                value={valorInput}
-                readOnly
-                className="w-24 pl-2 pr-6 text-yellow-500 bg-white text-center"
-              />
-            </div>
+      <div className="flex flex-col text-2xl text-center p-4">
+        <input
+          type="password"
+          maxLength={5} // Limita el máximo de caracteres a 5
+          value={valorInput}
+          readOnly
+          className="w-24 pl-2 pr-6 text-yellow-500 bg-white text-center"
+        />
+      </div>
 
-            <div className="grid grid-cols-3 text-center items-center justify-center gap-3 font-nunito text-gray-500 font-extrabold ">
-              {[...Array(9).keys()].map((i) => (
-                <div
-                  key={i + 1}
-                  onClick={() => handleClick((i + 1).toString())}
-                  className="p-7 border-2 rounded-2xl hover:bg-yellow-500 active:scale-[0.98] active:duration-75 transition-all ease-in-out hover:scale-[1.01]"
-                >
-                  {i + 1}
-                </div>
-              ))}
-
-              <div
-                onClick={handleBorrarTodo}
-                className="p-7 border-2 rounded-2xl hover:bg-yellow-500 active:scale-[0.98] active:duration-75 transition-all ease-in-out hover:scale-[1.01]"
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor" className="size-6">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="m9.75 9.75 4.5 4.5m0-4.5-4.5 4.5M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
-                </svg>
-              </div>
-              <div
-                onClick={() => handleClick('0')}
-                className="p-7 border-2 rounded-2xl hover:bg-yellow-500 active:scale-[0.98] active:duration-75 transition-all ease-in-out hover:scale-[1.01]"
-              >
-                0
-              </div>
-              <div
-                onClick={handleBorrar}
-                className="p-7 border-2 rounded-2xl hover:bg-yellow-500 active:scale-[0.98] active:duration-75 transition-all ease-in-out hover:scale-[1.01]"
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor" className="size-6">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="m11.25 9-3 3m0 0 3 3m-3-3h7.5M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
-                </svg>
-              </div>
-            </div>
-
-            {errorMessage && <p className="text-red-500 mt-4 font-extrabold font-nunito">{errorMessage}</p>}
-
-            <button
-              onClick={handleLogin}
-              className="mt-8 tracking-wide font-semibold bg-yellow-500 text-white w-full py-4 rounded-lg hover:bg-yellow-600 transition-all duration-300 ease-in-out flex items-center justify-center focus:shadow-outline focus:outline-none"
-              disabled={isLoading}
-            >
-              <svg className="w-6 h-6 -ml-2" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M16 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2" />
-                <circle cx="8.5" cy="7" r="4" />
-                <path d="M20 8v6M23 11h-6" />
-              </svg>
-              {isLoading ? (
-                <svg className="w-6 h-6 -ml-2 animate-spin" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                  <path d="M4 12a8 8 0 1 1 16 0 8 8 0 0 1 16 0Z" />
-                </svg>
-              ) : (
-                <span className="ml-2">Entrar</span>
-              )}
-            </button>
+      <div className="grid grid-cols-3 text-center items-center justify-center gap-3 font-nunito text-gray-500 font-extrabold ">
+        {[...Array(9).keys()].map((i) => (
+          <div
+            key={i + 1}
+            onClick={() => handleClick((i + 1).toString())}
+            className="p-7 border-2 rounded-2xl hover:bg-yellow-500 active:scale-[0.98] active:duration-75 transition-all ease-in-out hover:scale-[1.01]"
+          >
+            {i + 1}
           </div>
+        ))}
 
-          <img src={login} alt="imagen login" className="relative w-[400px] object-cover xl:rounded-tr-2xl xl:rounded-br-2xl xl:block hidden" />
+        <div
+          onClick={handleBorrarTodo}
+          className="p-7 border-2 rounded-2xl hover:bg-yellow-500 active:scale-[0.98] active:duration-75 transition-all ease-in-out hover:scale-[1.01]"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor" className="size-6">
+            <path strokeLinecap="round" strokeLinejoin="round" d="m9.75 9.75 4.5 4.5m0-4.5-4.5 4.5M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+          </svg>
         </div>
-      </section>
+        <div
+          onClick={() => handleClick('0')}
+          className="p-7 border-2 rounded-2xl hover:bg-yellow-500 active:scale-[0.98] active:duration-75 transition-all ease-in-out hover:scale-[1.01]"
+        >
+          0
+        </div>
+        <div
+          onClick={handleBorrar}
+          className="p-7 border-2 rounded-2xl hover:bg-yellow-500 active:scale-[0.98] active:duration-75 transition-all ease-in-out hover:scale-[1.01]"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor" className="size-6">
+            <path strokeLinecap="round" strokeLinejoin="round" d="m11.25 9-3 3m0 0 3 3m-3-3h7.5M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+          </svg>
+        </div>
+      </div>
+
+      {errorMessage && <p className="text-red-500 mt-4 font-extrabold font-nunito">{errorMessage}</p>}
+
+      <button
+        onClick={handleLogin}
+        className="mt-8 tracking-wide font-semibold bg-yellow-500 text-white w-full py-4 rounded-lg hover:bg-yellow-600 transition-all duration-300 ease-in-out flex items-center justify-center focus:shadow-outline focus:outline-none"
+        disabled={isLoading}
+      >
+        <svg className="w-6 h-6 -ml-2" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M16 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2" />
+          <circle cx="8.5" cy="7" r="4" />
+          <path d="M20 8v6M23 11h-6" />
+        </svg>
+        {isLoading ? (
+          <svg className="w-6 h-6 -ml-2 animate-spin" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+            <path d="M4 12a8 8 0 1 1 16 0 8 8 0 0 1 16 0Z" />
+          </svg>
+        ) : (
+          <span className="ml-2">Entrar</span>
+        )}
+      </button>
+    </div>
+
+    {/* Contenedor de la imagen con el botón "X" encima */}
+    <div className="relative flex justify-center items-center">
+      <img
+        src={login}
+        alt="imagen login"
+        className="w-[400px] h-full object-cover xl:rounded-tr-2xl xl:rounded-br-2xl xl:block hidden"
+      />
+      <button
+        onClick={() => navigate("/")} // Redirigir a home cuando se haga click en "X"
+        className="absolute top-4 right-4 text-4xl text-white hover:text-gray-400 z-10"
+      >
+        &times; {/* El "X" */}
+      </button>
+    </div>
+  </div>
+</section>
+
+
+
 
       <LoginJefe generarEstadisticas={generarEstadisticasDiarias} />
       <SonidoOnChange isLoggedIn={isLoggedIn} />
+   
 
      
 

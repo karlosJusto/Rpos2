@@ -104,6 +104,9 @@ const BuscadorPedidos = () => {
     setLoading(false);
   };
 
+  const empleadoNombre=sessionStorage.getItem('empleadoNombre');
+  //console.log(empleadoNombre);
+
   return (
     <div className="p-4 max-w-4xl mx-auto">
       <div className="flex flex-wrap items-center justify-around gap-4 mb-4 -mt-8">
@@ -290,7 +293,7 @@ const BuscadorPedidos = () => {
                       <td>{pedido.telefono}</td>
                       <td>{pedido.fechahora_realizado}</td>
                       <td>{pedido.fechahora}</td>
-                      <td>Alain</td>
+                      <td>{pedido.empleado}</td>
                       <td>{pedido.origen === 1 ? 'Online' : 'Tienda'}</td>
                       <td>12345ABCD</td>
                     </tr>

@@ -1,13 +1,23 @@
 import { useState, useEffect } from 'react';
 import { db } from '../firebase/firebase';
-import { collection, query, where, getDocs } from 'firebase/firestore'; // Importamos Firestore
+import { collection, query, where, getDocs, doc, setDoc, getDoc } from 'firebase/firestore'; // Importamos Firestore
 import loginboss from '../../assets/loginboss.png';
 import { useNavigate } from 'react-router-dom'; // Importa useNavigate
+import dayjs from 'dayjs';
+import 'dayjs/locale/es'; // Para trabajar con el locale en español
+import timezone from 'dayjs/plugin/timezone'; // Plugin para zona horaria
+import utc from 'dayjs/plugin/utc'; // Plugin para trabajar con fechas en UTC
+import customParseFormat from 'dayjs/plugin/customParseFormat';
 
 const Login = () => {
   const [valorInput, setValorInput] = useState('');
   const [errorMessage, setErrorMessage] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+
+    dayjs.extend(utc);
+    dayjs.extend(timezone);
+    dayjs.extend(customParseFormat);
+    dayjs.locale('es');
 
   const navigate = useNavigate(); // Inicializa el hook useNavigate
 
@@ -31,6 +41,86 @@ const Login = () => {
     if (e.target === e.currentTarget) {
       setErrorMessage('');
       setValorInput('');
+    }
+  };
+
+  const obtenerFechaEspana = () => {
+      const now = dayjs().tz('Europe/Madrid'); // Hora actual en la zona horaria de España 
+      const fecha = now.format('DD-MM-YYYY'); 
+  
+      console.log('carlos'+fecha);
+  
+        // Obtenemos el día de la semana completo en español
+        const diaSemana = now.format('dddd'); 
+        console.log(diaSemana)
+        return  {diaSemana , fecha} ;
+        };
+
+  const [stock, setStock] = useState(null);  
+ 
+  const obtenerStockProducto = async (productId) => {
+   try {
+     const docRef = doc(db, 'productos', `${productId}`);
+     const docSnap = await getDoc(docRef); // Esperamos a que se obtenga el documento
+ 
+     if (docSnap.exists()) {
+       const data = docSnap.data();
+       const stockValue = data.stock; // Extraemos el stock
+       setStock(stockValue); // Actualizamos el estado con el valor de stock
+     } else {
+       console.log('No se encontró el producto');
+       setStock(null); // Si no se encuentra el producto, asignamos null
+     }
+   } catch (error) {
+     console.error("Error al obtener el stock del producto:", error);
+     setStock(null); // En caso de error, podemos asignar null
+   }
+ };
+ 
+ 
+ 
+ // Usamos useEffect para obtener el stock cuando el componente se monta
+ useEffect(() => {
+   obtenerStockProducto(1); // Llamamos a la función para obtener el stock del producto con product_id = 1
+ }, []); // El array vacío hace que se ejecute solo una vez cuando el componente se monta
+
+  const generarEstadisticasDiarias = async () => {
+    if (stock === null) {
+      console.log('Esperando stock...');
+      return; // Salimos si el stock aún no está disponible
+    }
+  
+    try {
+      const { fecha, diaSemana } = obtenerFechaEspana(); // Obtenemos la fecha y el día de la semana
+      const docRef = doc(db, "estadisticas_diarias", fecha); // Usamos la fecha como ID para el documento
+  
+      // Verificamos si el documento ya existe
+      const docSnapshot = await getDoc(docRef);
+  
+      if (!docSnapshot.exists()) {
+        await setDoc(docRef, {
+          diasemana: diaSemana,
+          enbarra: 0,
+          libresManana: 0,
+          libresTarde: 0,
+          vm: 0,
+          vt: 0,
+          vd: 0,
+          stock: stock, // Usamos el valor de stock
+          stock_anterior: stock,
+          //stockactualizado:0,
+          //stockfinal:0,
+          entran: 0,
+          baja: 0,
+          devueltos: 0,
+        });
+        console.log("Datos guardados exitosamente para el día", fecha);
+      } else {
+        console.log("Ya existen datos para el día", fecha);
+      }
+  
+    } catch (e) {
+      console.error("Error al generar las estadísticas diarias: ", e);
     }
   };
 
@@ -67,6 +157,7 @@ const Login = () => {
           // Verificamos si el rol es "jefe"
           if (empleado.rol === "jefe") {
             console.log("Jefe ingresó correctamente");
+            generarEstadisticasDiarias(); // Llamamos a la función para crear estadísticas
             navigate('/dashboard'); // Redirige a /dashboard
             //generarEstadisticas();
           } else if (empleado.rol === "empleado") {
@@ -163,7 +254,20 @@ const Login = () => {
           </button>
         </div>
 
-        <img src={loginboss} alt="imagen login" className="relative w-[400px] object-cover xl:rounded-tr-2xl xl:rounded-br-2xl xl:block hidden" />
+         {/* Contenedor de la imagen con el botón "X" encima */}
+            <div className="relative flex justify-center items-center">
+              <img
+                src={loginboss}
+                alt="imagen login"
+                className="w-[400px] h-full object-cover xl:rounded-tr-2xl xl:rounded-br-2xl xl:block hidden"
+              />
+              <button
+                onClick={() => navigate("/")} // Redirigir a home cuando se haga click en "X"
+                className="absolute top-4 right-4 text-4xl text-white hover:text-gray-400 z-10"
+              >
+                &times; {/* El "X" */}
+              </button>
+            </div>
       </div>
     </section>
   );

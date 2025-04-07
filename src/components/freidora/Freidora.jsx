@@ -5,172 +5,171 @@ import patata from '../../assets/freidora/patata.png';
 import pimiento from '../../assets/freidora/pimiento.png';
 import croquetas from '../../assets/freidora/croquetas.png';
 import singluten from '../../assets/singluten.png'; // Imagen sin gluten
+import dayjs from 'dayjs';
+import timezone from 'dayjs/plugin/timezone'; // Plugin para zona horaria
+import utc from 'dayjs/plugin/utc'; // Plugin para trabajar con fechas en UTC
 
 const Freidora = () => {
   const [pedidos, setPedidos] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
 
-  // Definimos los IDs y sus imágenes asociadas
-  const productosAFiltrar = [
-    { id: '10', nombre: 'Patatas Fritas', imagen: patata },
-    { id: '3', nombre: 'Pimientos', imagen: pimiento },
-    { id: '45', nombre: 'Croquetas', imagen: croquetas }
-  ];
 
-  // Fetch orders with the filtered products
+
+
+
   useEffect(() => {
-    const fetchPedidos = async () => {
+    // Función para obtener los pedidos del día
+    const obtenerPedidosDelDia = async () => {
+      setLoading(true);
+      setError(null);
+
       try {
-        // Consulta a la colección de pedidos
         const pedidosRef = collection(db, 'pedidos');
         const querySnapshot = await getDocs(pedidosRef);
 
-        // Filtrar los pedidos que contienen productos de interés
-        const pedidosList = querySnapshot.docs.map(doc => {
+        const pedidosDelDia = [];
+        querySnapshot.forEach((doc) => {
           const pedido = doc.data();
+          // Verificamos si la fecha de recogida está hoy
+          if (pedido.productos) {
+            // Utilizamos la fecha desde el objeto pedido
+            const fechaRecogida = dayjs(pedido.fechahora, 'DD/MM/YYYY HH:mm'); // O ajusta el formato según sea necesario
+            const fechaHoy = dayjs().tz('Europe/Madrid').startOf('day'); // Hora inicio del día
+            const fechaFinal = dayjs().tz('Europe/Madrid').endOf('day'); // Hora final del día
+           
 
-          // Filtramos productos de interés
-          const productosFiltrados = productosAFiltrar.map(productoAFiltrar => {
-            let productosConFiltro;
-
-            // Si el id es 45 (Croquetas), filtramos por nombre
-            if (productoAFiltrar.id === '45') {
-              productosConFiltro = pedido.productos.filter(producto =>
-                producto.nombre.toLowerCase().includes('croquetas') // Filtrar por nombre
-              );
-            } else {
-              // Si no es "Croquetas", lo filtramos por ID
-              productosConFiltro = pedido.productos.filter(producto =>
-                producto.id === productoAFiltrar.id
-              );
+            // Validamos si la fecha de recogida es válida
+            if (!fechaRecogida.isValid()) {
+              return;
             }
 
-            return { ...productoAFiltrar, productos: productosConFiltro };
-          }).filter(item => item.productos.length > 0); // Filtramos solo los productos que hay en el pedido
+            // Comprobamos si la fecha de recogida está dentro del rango de hoy
+            if (fechaRecogida.isBetween(fechaHoy, fechaFinal, null, '[]')) {
+              // Agrupar los productos dentro del mismo pedido, solo si freidora === true
+              pedido.productos.forEach((producto) => {
+                // Solo procesar productos con freidora: true
+                if (producto.freidora === true) {
+                  const index = pedidosDelDia.findIndex((p) => p.id === producto.id && p.numeropedido === pedido.NumeroPedido);
 
-          if (productosFiltrados.length > 0) {
-            return { 
-              id: doc.id, 
-              productosFiltrados, 
-              celiaco: pedido.celiaco, 
-              NumeroPedido: pedido.NumeroPedido  // Añadimos el NumeroPedido
-            };
+                  if (index > -1) {
+                    // Si el producto ya existe en el mismo pedido, solo actualizamos la cantidad
+                    pedidosDelDia[index].cantidad += producto.cantidad;
+                  } else {
+                    // Si el producto no existe, lo agregamos como nuevo
+                    pedidosDelDia.push({
+                      id: producto.id,
+                      nombre: producto.nombre,
+                      alias: producto.alias,
+                      categoria: producto.categoria, // Añadimos la categoría
+                      cantidad: producto.cantidad,
+                      celiaco: producto.celiaco,
+                      numeropedido: pedido.NumeroPedido,
+                      cliente: pedido.cliente,
+                      fechahora: fechaRecogida.format('HH:mm'),
+                    });
+                  }
+                }
+              });
+            }
           }
+        });
 
-          //console.log("Pedidos filtrados:", productosFiltradoss);  // Verifica los pedidos filtrados
-
-          return null;
-        }).filter(pedido => pedido !== null);
-
-        setPedidos(pedidosList); // Guardamos los pedidos con productos filtrados en el estado
-      } catch (error) {
-        console.error("Error al obtener los pedidos: ", error);
+        setPedidos(pedidosDelDia); // Actualiza el estado con los pedidos del día
+      } catch (err) {
+        console.error("Error al obtener los pedidos del día: ", err);
+        setError("Ocurrió un error al obtener los pedidos.");
       }
+      setLoading(false); // Finaliza el estado de carga
     };
-    fetchPedidos();
+
+    obtenerPedidosDelDia();
+  
   }, []);
 
-  // Función para renderizar los productos de un pedido
-  const renderProductos = (productos, celiaco, numeroPedido) => {
-    return productos.map((producto, index) => (
-      <div key={index} className="bg-white rounded-lg shadow-lg p-2 w-[80%]">
-        <div className="flex flex-row items-center justify-between"> {/* Flex para alinear en fila y separar los elementos */}
-          
-          {/* Número de Pedido alineado a la izquierda */}
-          <h3 className="text-gray-500 font-extrabold bg-[#f2ac02] font-nunito rounded-md p-[0.25vw] text-xs ">{numeroPedido}</h3>
-          
-          {/* Contenedor para el nombre y cantidad del producto centrado */}
-          <div className="flex-1 text-center">
-            <h3 className="font-semibold text-md font-nunito">{producto.cantidad} x {producto.nombre}</h3>
-          </div>
-          
-          {/* Si el pedido es para celíaco, mostramos la imagen "Sin Gluten" */}
-          {celiaco && (
-            <img
-              src={singluten}
-              alt="Sin Gluten"
-              className="ml-4 w-[25px] h-[25px] rounded-full" // Añadir un pequeño margen a la izquierda
-            />
-          )}
-        </div>
-      </div>
-    ));
-  };
+ 
 
   return (
     <div>
-      <div className="flex text-center justify-between p-6 ">
-        {productosAFiltrar.map((productoAFiltrar) => {
-          // Filtramos los pedidos que contienen productos de este tipo
-          const pedidosConProducto = pedidos.filter(pedido => 
-            pedido.productosFiltrados.some(item => {
-              if (productoAFiltrar.id === '45') {
-                // Si es "Croquetas", filtrar por nombre
-                return item.nombre.toLowerCase().includes('croquetas');
-              } else {
-                // Para los demás productos, filtrar por id
-                return item.id === productoAFiltrar.id;
-              }
-            })
-          );
+      <div className="flex justify-between items-center mx-auto w-full px-4 font-nunito mt-4 ">
+        <div className="bg-[#F3F3F3] w-[30%] rounded-lg h-[50vh] ">
+          <div className="flex justify-center p-3">
+            <img
+              src={patata}
+              alt="patata"
+              className="w-[20%] h-[20%] p-3 bg-white border-4 border-gray-700 rounded-full"
+            />
+          </div>
+          <div className="text-center p-2">
+          {pedidos.filter((pedido) => pedido.id === 10 || pedido.id === '49').map((pedido, index) => (
+            <div key={index} className="mb-2 p-2 bg-white rounded-md shadow-md">
+              <div className="flex items-center justify-center"> {/* Flex container */}
+                <h2 className="mr-2">{`Cantidad: ${pedido.cantidad}`} - {pedido.alias} - {pedido.fechahora}</h2>
 
-          // Si hay pedidos con este producto, los renderizamos
-          return pedidosConProducto.length > 0 && (
-            <div key={productoAFiltrar.id} className="bg-[#F3F3F3] w-[30%] rounded-lg ">
-              <div className="pt-2 text-center">
-              <h1 className="bg-gray-700 p-2 text-white text-center rounded-md">{productoAFiltrar.nombre}</h1>
-                
-              </div>
-              <div className="flex justify-center pt-2">
-                <img
-                  src={productoAFiltrar.imagen}
-                  alt={productoAFiltrar.nombre}
-                  className="p-3 rounded-full bg-white w-24 shadow-md"
-                />
-              </div>
-              <div className="mt-[2.8vh] text-center">
-                {/* Contenedor con scroll cuando hay más de 8 productos */}
-                <div className="overflow-y-auto h-[420px] bg-[#F3F3F3]">
-                  {pedidosConProducto.map((pedido) => (
-                    <div key={pedido.id} className="p-1 m-1 ">
-                      {/* Filtramos los productos correspondientes para este tipo */}
-                      {pedido.productosFiltrados
-                        .filter(item => {
-                          if (productoAFiltrar.id === '45') {
-                            return item.nombre.toLowerCase().includes('croquetas'); // Filtrar por nombre
-                          } else {
-                            return item.id === productoAFiltrar.id; // Filtrar por id
-                          }
-                        })
-                        .map((item) => (
-                          <div key={item.id} className="flex flex-col gap-4 items-center ">
-                            {/* Pasamos NumeroPedido, celiaco y productos a la función de renderizado */}
-                            {renderProductos(item.productos, pedido.celiaco, pedido.NumeroPedido)}
-                          </div>
-                        ))}
-                    </div>
-                  ))}
-                </div>
+                {/* Verificar si celiaco es true y mostrar la imagen */}
+                {pedido.celiaco && (
+                  <img src={singluten} alt="Sin gluten" className="w-6 h-6" />
+                )}
               </div>
             </div>
-          );
-        })}
-      </div>
-      <div className="flex justify-between items-center mx-auto w-full px-4 font-nunito">
+          ))}
+        </div>
 
-            <div className="bg-[#F3F3F3] w-[30%] rounded-lg h-[30vh]">
-              <h1 className="bg-gray-700 p-2 text-white text-center rounded-md">Totales</h1>
-            </div>
+     
+        </div>
+
+        <div className="bg-[#F3F3F3] w-[30%] rounded-lg h-[50vh]">
+          <div className="flex justify-center p-3">
+            <img
+              src={pimiento}
+              alt="pimiento"
+              className="w-[20%] h-[20%] p-3 bg-white border-4 border-gray-700 rounded-full "
+            />
+          </div>
+          <div className="text-center p-2">
             
-            <div className="bg-[#F3F3F3] w-[30%] rounded-lg h-[30vh]">
-              <h1 className="bg-gray-700 p-2 text-white text-center rounded-md">Anteriores</h1>
-            </div>
-            
-            <div className="bg-[#F3F3F3] w-[30%] rounded-lg h-[30vh]">
-              <h1 className="bg-gray-700 p-2 text-white text-center rounded-md">Posteriores</h1>
-            </div>
+          {pedidos.filter((pedido) => pedido.id === 3 || pedido.id === 50).map((pedido, index) => (
+              <div key={index} className="mb-2 p-2 bg-white rounded-md shadow-md" >
+                <h2>{`Cantidad  ${pedido.cantidad}`}-{pedido.alias}-{pedido.fechahora}</h2>
+              
+              </div>
+            ))}
+          </div>
+        </div>
 
+        <div className="bg-[#F3F3F3] w-[30%] rounded-lg h-[50vh]">
+          <div className="flex justify-center p-3">
+            <img
+              src={croquetas}
+              alt="croquetas"
+              className="w-[20%] h-[20%] p-3 bg-white border-4 border-gray-700 rounded-full"
+            />
+          </div>
+          <div className="text-center p-2">
+           
+          {pedidos.filter((pedido) => pedido.id === 45 || pedido.id === 46 || pedido.id === 47).map((pedido, index) => (
+              <div key={index} className="mb-2 p-2 bg-white rounded-md shadow-md">
+                <h2>{`Cantidad  ${pedido.cantidad}`}-{pedido.alias}-{pedido.fechahora}</h2>
+              
+              </div>
+            ))}
+          </div>
+        </div>
       </div>
 
+      <div className="flex justify-between items-center mx-auto w-full px-4 font-nunito mt-10">
+        <div className="bg-[#F3F3F3] w-[30%] rounded-lg h-[30vh]">
+          <h1 className="bg-gray-700 p-2 text-white text-center rounded-md">Totales</h1>
+        </div>
+
+        <div className="bg-[#F3F3F3] w-[30%] rounded-lg h-[30vh]">
+          <h1 className="bg-gray-700 p-2 text-white text-center rounded-md">Anteriores: </h1>
+        </div>
+
+        <div className="bg-[#F3F3F3] w-[30%] rounded-lg h-[30vh]">
+          <h1 className="bg-gray-700 p-2 text-white text-center rounded-md">Posteriores</h1>
+        </div>
+      </div>
     </div>
   );
 };

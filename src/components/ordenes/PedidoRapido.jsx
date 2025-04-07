@@ -103,6 +103,9 @@ const fechahora = datosCliente.fechahora || obtenerHoraRedondeada().format('DD/M
 
       const productData = productSnap.data();
 
+
+      
+
       // Crear los datos del pedido rápido
       const productoRapidoData = {
         NumeroPedido: nextId,

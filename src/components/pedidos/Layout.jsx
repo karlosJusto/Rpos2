@@ -13,10 +13,17 @@ import "swiper/css/mousewheel";
 import { doc, getDoc } from "firebase/firestore";
 import { db } from "../firebase/firebase";
 
-const Layout = ({ bloquesPedidos }) => {
+const Layout = () => {
+
+ 
+
+
+
+
   const location = useLocation();
   // Se recibe el pedido a editar (si existe) desde Ordenes
   const orderToEdit = location.state?.orderToEdit || null;
+
 
   const [calendarData, setCalendarData] = useState(null);
   const [loading, setLoading] = useState(true);
