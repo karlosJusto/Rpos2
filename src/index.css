@@ -1,5 +1,26 @@
 @import url('https://fonts.googleapis.com/css2?family=Nunito:ital,wght@0,200..1000;1,200..1000&display=swap');
 
+/* src/styles.css o el archivo donde manejes tus estilos */
+@font-face {
+  font-family: 'Digital-7'; /* Nombre que utilizarás para referenciar la fuente */
+  src: url('./assets/fonts/DS-DIGIT.TTF') format('truetype'); /* Ruta a la fuente */
+  font-weight: normal;
+  font-style: normal;
+}
+
+/* Usar la fuente en cualquier parte del proyecto */
+.digital-clock {
+  font-family: 'Digital-7', sans-serif; /* Nombre que definimos en @font-face */
+  font-size: 48px;
+  letter-spacing: 2px;
+  color: #fff;
+  text-align: center;
+  
+  padding: 3px;
+  border-radius: 10px;
+}
+
+
 
 
 @tailwind base;
@@ -79,6 +100,7 @@ swiper-slide:nth-child(4) {
 swiper-slide:nth-child(5) {
     background-color: rgb(34 197 94);
 }
+
 
 
 

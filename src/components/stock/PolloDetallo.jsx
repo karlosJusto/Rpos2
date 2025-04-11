@@ -140,7 +140,7 @@ const PolloDetallo = () => {
                 isMonday && (
                   <tr key={`separator-${item.dia}`} className="separator-row">
                     <td colSpan="8" className="text-center py-2">
-                      <span className="text-yellow-500">Siguiente Semana  <span className='p-2'>📅</span></span>
+                      <span className="text-yellow-500">Siguiente Semana</span>
                     </td>
                   </tr>
                 ),

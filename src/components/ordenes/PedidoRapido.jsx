@@ -1,4 +1,4 @@
-import { useState, useContext, useImperativeHandle, forwardRef } from 'react';
+import { useState, useContext, useImperativeHandle, forwardRef, useEffect } from 'react';
 import { doc, setDoc, updateDoc, getDoc } from 'firebase/firestore';
 import { db } from '../firebase/firebase';
 import dayjs from 'dayjs';
@@ -7,27 +7,45 @@ const PedidoRapido = forwardRef(({ datosCliente }, ref) => {
 
 //obtener hora formateada
 
-
 const obtenerHoraRedondeada = () => {
   const now = dayjs(); // Hora actual
   
   // Obtener los minutos actuales
   const minutos = now.minute();
-
-  // Redondeamos los minutos al múltiplo más cercano de 15 (xx:00, xx:15, xx:30, xx:45)
-  const siguienteBloque = Math.floor(minutos / 15) * 15; // Redondea hacia abajo al múltiplo más cercano de 15 minutos
   
-  // Ajustar la hora a 00, 15, 30, 45 minutos
-  const nuevaHora = now
-    .minute(siguienteBloque) // Ajustamos a los minutos correspondientes (xx:00, xx:15, etc.)
-    .second(0)
-    .millisecond(0);
+  let nuevoBloque;
 
-  // Si la hora ajustada es antes de la hora actual, avanzamos al siguiente bloque (añadimos 15 minutos)
-  return nuevaHora.isBefore(now) ? nuevaHora.add(15, 'minute') : nuevaHora;
+  // Bloques de minutos: 00, 15, 30, 45
+  if (minutos >= 0 && minutos <= 15) {
+    nuevoBloque = now.startOf('hour').add(15, 'minute'); // Bloque a las xx:15
+  } else if (minutos >= 16 && minutos <= 30) {
+    nuevoBloque = now.startOf('hour').add(30, 'minute'); // Bloque a las xx:30
+  } else if (minutos >= 31 && minutos <= 45) {
+    nuevoBloque = now.startOf('hour').add(45, 'minute'); // Bloque a las xx:45
+  } else if (minutos >= 46 && minutos <= 59) {
+    nuevoBloque = now.add(1, 'hour').startOf('hour'); // Bloque a la siguiente hora (xx+1:00)
+  }
+
+  // Si el bloque calculado es antes de la hora actual, avanzamos al siguiente bloque
+  return nuevoBloque.isBefore(now) ? nuevoBloque.add(15, 'minute') : nuevoBloque;
 };
 
+
+
 const fechahora = datosCliente.fechahora || obtenerHoraRedondeada().format('DD/MM/YYYY HH:mm');
+
+const [empleadoNombre, setEmpleadoNombre] = useState(null);
+
+  useEffect(() => {
+    // Recuperamos el nombre del empleado desde sessionStorage
+    const nombre = sessionStorage.getItem('empleadoNombre');
+    
+    if (nombre) {
+      setEmpleadoNombre(nombre);  // Si encontramos el nombre, lo guardamos en el estado
+    } else {
+      console.log('No se encontró el nombre del empleado en sessionStorage');
+    }
+  }, []); // El array vacío asegura que esto solo se ejecute una vez cuando el componente se monta
 
 
 
@@ -110,6 +128,7 @@ const fechahora = datosCliente.fechahora || obtenerHoraRedondeada().format('DD/M
       const productoRapidoData = {
         NumeroPedido: nextId,
         cliente: clienteData.cliente,
+        empleado:empleadoNombre,
         telefono: clienteData.telefono,
         fechahora: datosCliente.fechahora || fechahora,
         observaciones: clienteData.observaciones,
@@ -120,7 +139,7 @@ const fechahora = datosCliente.fechahora || obtenerHoraRedondeada().format('DD/M
           nombre: productData.name || 'Producto desconocido', // Nombre del producto desde Firestore
           cantidad: 1, // Cantidad del producto, si es necesario
           //cantidad: idProduct === 1 ? 1 : (idProduct === 2 ? 0.5 : 1),
-          alias: productData.alias, // Alias (si aplica)
+          alias: productData.alias, // Alias (si aplica)   
           observaciones: clienteData.observaciones || '', // Observaciones adicionales
           celiaco: clienteData.celiaco || false, // Si el cliente tiene restricciones para celiacos
           tostado: false, // Si el producto está tostado, si aplica

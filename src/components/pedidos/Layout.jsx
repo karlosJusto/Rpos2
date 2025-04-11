@@ -61,7 +61,7 @@ const Layout = () => {
   return (
     <>
       <div
-        className="flex max-w-[2500px] mx-auto h-[calc(100vh-5px)] bg-no-repeat bg-cover"
+        className="flex max-w-[2500px] mx-auto h-[calc(100vh-0px)] bg-no-repeat bg-cover"
         style={{ backgroundImage: `url(${fondo})` }}
       >
         <div className="w-[7%]">
@@ -69,59 +69,59 @@ const Layout = () => {
         </div>
 
         <div className="w-[70%]">
-          <div className="h-[9%]">
-            <Navbar />
-          </div>
-          <div className="h-[9%]">
-            <Tabs />
-          </div>
-          <div className="p-[2.5vw] pl-[3vw] h-[64%] max-h-[75%] grid grid-cols-5 overflow-y-auto gap-4">
-            <Card />
-          </div>
-          {/* Slider con los intervalos */}
-          <div className="w-full pt-[1vh] border-2 border-white rounded p-4 bg-white">
-            {loading ? (
-              <p>Cargando horarios...</p>
-            ) : (
-              <Swiper
-                slidesPerView={1}
-                spaceBetween={20}
-                scrollbar={{ draggable: true }}
-                mousewheel={true}
-                className="w-full"
-              >
-                <SwiperSlide>
-                  <h2 className="text-xl font-bold mb-2">
-                    {isMorning
-                      ? "Turno Mañana"
-                      : "Turno Tarde "}
-                  </h2>
-                  <div className="flex flex-wrap gap-2">
-                    {(isMorning ? morningIntervals : afternoonIntervals).map(
-                      (interval, index) => (
-                        <button
-                          key={index}
-                          className="px-4 py-2 border rounded whitespace-nowrap"
-                        >
-                          {interval.start} (
-                          <span
-                            className={
-                              interval.orderedCount > interval.maxAllowed
-                                ? "text-red-500"
-                                : ""
-                            }
-                          >
-                            {interval.orderedCount}
-                          </span>
+              <div className="h-[9%]">
+                <Navbar />
+              </div>
+              <div className="h-[9%]">
+                <Tabs />
+              </div>
+              <div className="p-[2.5vw] pl-[3vw] h-[64%] max-h-[75%] grid grid-cols-5 overflow-y-auto gap-4">
+                <Card />
+              </div>
+              {/* Slider con los intervalos */}
+              <div className="w-[90%] pt-[1vh] ms-[3.1vw] mt-[1vh] border-white rounded p-4 bg-white ">
+                {loading ? (
+                  <p>Cargando horarios...</p>
+                ) : (
+                  <Swiper
+                    slidesPerView={1}
+                    spaceBetween={20}
+                    //scrollbar={{ draggable: true }}
+                    mousewheel={true}
+                    className="w-full"
+                  >
+                    <SwiperSlide>
+                      <h2 className="text-xl font-bold mb-2">
+                        {isMorning
+                          ? ""
+                          : ""}
+                      </h2>
+                      <div className="flex flex-wrap gap-2">
+                        {(isMorning ? morningIntervals : afternoonIntervals).map(
+                          (interval, index) => (
+                            <button
+                              key={index}
+                              className="px-3 py-2 ms-4 border rounded whitespace-nowrap"
+                            >
+                              {interval.start} (
+                              <span
+                                className={
+                                  interval.orderedCount > interval.maxAllowed
+                                    ? "text-red-500"
+                                    : ""
+                                }
+                              >
+                                {interval.orderedCount}
+                              </span>
+                              )
+                            </button>
                           )
-                        </button>
-                      )
-                    )}
-                  </div>
-                </SwiperSlide>
-              </Swiper>
-            )}
-          </div>
+                        )}
+                      </div>
+                    </SwiperSlide>
+                  </Swiper>
+                )}
+              </div>
         </div>
 
         <div className="bg-[#F3F3F3] w-[23%]">

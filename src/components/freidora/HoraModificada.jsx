@@ -1,5 +1,7 @@
 import { useState, useEffect } from 'react';
 
+
+
 function HoraModificada() {
   const [hora, setHora] = useState('');
 
@@ -24,9 +26,19 @@ function HoraModificada() {
     return () => clearInterval(intervalo);
   }, []);
 
+  console.log("Hora actual en render:", hora);
+
+
+
   return (
    <>
+      <div>
+
       <h1 className='font-nunito text-gray-400 text-[1.2vw] text-right font-bold'>{hora}</h1>
+      </div>
+
+   
+      
    </>
   );
 }

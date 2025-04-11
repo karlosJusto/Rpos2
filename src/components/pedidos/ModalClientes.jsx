@@ -103,9 +103,9 @@ const ModalClientes = ({ show, handleClose, onSave }) => {
   return (
     <>
       <Modal show={show} onHide={handleClose} size="xl" backdrop="static" keyboard={false} centered>
-        <Modal.Header closeButton>
-          <Modal.Title>Buscar Cliente</Modal.Title>
-        </Modal.Header>
+        
+          <Modal.Title className='text-center p-3 mt-2 font-nunito text-gray-600'>Datos Pedido</Modal.Title>
+       
 
         <Modal.Body>
           <div className="bg-white rounded-lg flex justify-around gap-3 appearance-none px-[3vw]">

@@ -1200,8 +1200,8 @@ const handlePedidoRapido = (idProduct) => {
         
         {/* Mostrar los alias de los productos en la franja horaria */}
         {Object.keys(bloquesFiltrados[bloque].productos).length > 0 && (
-  <div className="">
-    {bloquesFiltrados[bloque].productos
+      <div className="">
+        {bloquesFiltrados[bloque].productos
       // Ordenamos los productos según la categoría
       .sort((a, b) => {
         // Definimos las prioridades de las categorías
@@ -1269,7 +1269,7 @@ const handlePedidoRapido = (idProduct) => {
                   pedido.origen === 0 ? 'text-gray-600' : 'text-gray-700'}`}
               >
                 {pedido.NumeroPedido}
-                <p className="pt-1 w-16 text-[0.75vw] font-extrabold">{pedido.cliente ? pedido.cliente : 'Generico'}</p>
+                <p className="pt-1 w-24 text-[0.65vw] font-extrabold">{pedido.cliente ? pedido.cliente : 'Generico'}</p>
               </h3>
 
               {/* Botón para mostrar detalles */}
@@ -1285,28 +1285,45 @@ const handlePedidoRapido = (idProduct) => {
               </div>
             </div>
 
-            {/* Mostrar los productos de este pedido */}
-            <div className="ml-2 gap-2 flex flex-wrap items-center ">
-              {pedido.productos.map((producto) => {
-                let borderColor = 'border-gray-500';
-                let backgroundColor = 'bg-white';
+           {/* Mostrar los productos de este pedido */}
+<div className="ml-2 gap-2 flex flex-wrap items-center">
+  {pedido.productos
+    .sort((a, b) => {
+      // Definir las prioridades de las categorías
+      const categoriaPrioridad = {
+        comida: 1,
+        complementos: 2,
+        bebidas: 3,
+        postres: 4,
+        extras: 5,
+      };
 
-                // Obtener el valor de entregado del producto
-                const entregadoActual = producto.entregado || 0;
-                const cantidadTotal = producto.cantidad;
+      // Obtener las prioridades para cada producto y devolver la comparación
+      const categoriaA = categoriaPrioridad[a.categoria] || 6; // Si no se encuentra la categoría, asignamos una prioridad baja
+      const categoriaB = categoriaPrioridad[b.categoria] || 6;
 
-                // Definir el borde según la categoría
-                if (producto.categoria === 'comida') {
-                  borderColor = 'border-3 border-yellow-500';
-                } else if (producto.categoria === 'complementos') {
-                  borderColor = 'border-3 border-green-700';
-                } else if (producto.categoria === 'bebidas') {
-                  borderColor = 'border-3 border-red-700';
-                } else if (producto.categoria === 'postres') {
-                  borderColor = 'border-3 border-purple-700';
-                } else if (producto.categoria === 'extras') {
-                  borderColor = 'border-3 border-gray-500';
-                }
+      return categoriaA - categoriaB; // Ordenamos por prioridad de la categoría
+    })
+    .map((producto, index) => {
+      let borderColor = 'border-gray-500';
+      let backgroundColor = 'bg-white';
+
+      // Obtener el valor de entregado del producto
+      const entregadoActual = producto.entregado || 0;
+      const cantidadTotal = producto.cantidad;
+
+      // Definir el borde según la categoría
+      if (producto.categoria === 'comida') {
+        borderColor = 'border-3 border-yellow-500';
+      } else if (producto.categoria === 'complementos') {
+        borderColor = 'border-3 border-green-700';
+      } else if (producto.categoria === 'bebidas') {
+        borderColor = 'border-3 border-red-700';
+      } else if (producto.categoria === 'postres') {
+        borderColor = 'border-3 border-purple-700';
+      } else if (producto.categoria === 'extras') {
+        borderColor = 'border-3 border-gray-500';
+      }
 
                 // Si entregado es igual a cantidad, cambia el color de fondo
                 if (entregadoActual === cantidadTotal) {

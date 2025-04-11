@@ -1,17 +1,72 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Offcanvas, Button, Navbar, Nav } from 'react-bootstrap';
 import { Link } from 'react-router-dom';
 import Reloj from '../pedidos/Reloj';
 import Freidora from './Freidora';
+import dayjs from 'dayjs';
+import timezone from 'dayjs/plugin/timezone'; // Plugin para zona horaria
+import utc from 'dayjs/plugin/utc'; // Plugin para trabajar con fechas en UTC
 
 
-const texto= 'Freidora:';
+const texto= 'Freidora';
 
-const LGFreidora = () => {
+const LGFreidora = ( ) => {
   const [show, setShow] = useState(false);
+
+
+  //bloque horario navbar
+  const [bloqueHorario, setBloqueHorario] = useState('');
+  const [hora, setHora] = useState('');
+  useEffect(() => {
+    // Función para actualizar la hora y los bloques
+    const actualizarHora = () => {
+      const currentTime = dayjs().locale('es').tz('Europe/Madrid'); // Obtener la hora actual en España
+      setHora(currentTime.format('HH:mm:ss')); // Establecer la hora actual en formato 'HH:mm:ss'
+
+      // Obtener los minutos de la hora actual
+      const minutos = currentTime.minute();
+
+      let nuevoBloque = '';
+
+      // Determinamos el bloque horario según los minutos de la hora actual
+      if (minutos >= 0 && minutos <= 15) {
+        nuevoBloque = currentTime.startOf('hour').add(15, 'minute').format('HH:mm'); // Bloque a las xx:15
+      } else if (minutos >= 16 && minutos <= 30) {
+        nuevoBloque = currentTime.startOf('hour').add(30, 'minute').format('HH:mm'); // Bloque a las xx:30
+      } else if (minutos >= 31 && minutos <= 45) {
+        nuevoBloque = currentTime.startOf('hour').add(45, 'minute').format('HH:mm'); // Bloque a las xx:45
+      } else if (minutos >= 46 && minutos <= 59) {
+        nuevoBloque = currentTime.add(1, 'hour').startOf('hour').format('HH:mm'); // Bloque a la siguiente hora (xx+1:00)
+      }
+
+      setBloqueHorario(nuevoBloque); // Actualizamos el estado con el nuevo bloque horario
+
+      // Calcular anteriores y posteriores basados en el bloqueHorario
+      const bloqueTime = dayjs(nuevoBloque, 'HH:mm'); // Convertimos bloqueHorario a dayjs
+
+     
+
+     
+    };
+
+    // Llamamos a la función por primera vez para inicializar los valores
+    actualizarHora();
+
+    // Configuramos un intervalo para comprobar la hora cada minuto
+    const interval = setInterval(() => {
+      actualizarHora();
+    }, 60000); // Comprobamos cada minuto
+
+    // Limpiamos el intervalo cuando el componente se desmonte
+    return () => clearInterval(interval);
+  }, []); // El array vacío asegura que se ejecute solo una vez al montar el componente
+
+
 
   // Función para alternar el estado del offcanvas
   const toggleOffcanvas = () => setShow(!show);
+
+  
 
   return (
     <>
@@ -35,8 +90,11 @@ const LGFreidora = () => {
           <Navbar.Collapse id="basic-navbar-nav">
             <Nav className="ms-auto pr-3 pt-1 d-flex justify-content-between w-100">
               {/* Contenedor que centra el texto 'hola' */}
+              <h1 className="text-2xl font-nunito font-extrabold text-gray-400 ms-12 ">{texto}</h1>
               <div className="d-flex justify-content-center flex-grow-1">
-                <h1 className="text-xl font-nunito font-extrabold text-gray-600">{texto}</h1>
+               
+                <h1 className="text-xl font-nunito font-extrabold text-gray-600 ms-5 mt-2">En preparación: </h1>
+                <h1 className="text-3xl digital-clock font-extrabold text-gray-600 ms-4 px-4  border-2 border-yellow-500 rounded-md ">{bloqueHorario}</h1>
               </div>
 
               {/* Componente Reloj, que se coloca a la derecha */}
@@ -160,7 +218,7 @@ const LGFreidora = () => {
 
     <div>
 
-     <Freidora/>
+    <Freidora  />
      </div>
 
 

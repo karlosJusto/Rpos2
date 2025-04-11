@@ -53,23 +53,48 @@ export default function Calendario({ onDateChange }) {
     // Si se pasa una nueva fecha, o si no, utilizamos la hora actual
     const dateToRound = newDate ? dayjs(newDate) : dayjs();
   
-    // Redondear los minutos a los bloques de 15 minutos (00, 15, 30, 45)
+    // Obtener los minutos actuales
     const minutes = dateToRound.minute();
-    const roundedMinutes = [0, 15, 30, 45].reduce((prev, curr) =>
-      Math.abs(curr - minutes) < Math.abs(prev - minutes) ? curr : prev
-    );
+    
+    // Lógica de redondeo de los minutos
+    let nuevoBloque;
+    
+    // Bloques de minutos: 00, 15, 30, 45
+    if (minutes >= 0 && minutes <= 15) {
+      nuevoBloque = dateToRound.startOf('hour').add(15, 'minute'); // Bloque a las xx:15
+    } else if (minutes >= 16 && minutes <= 30) {
+      nuevoBloque = dateToRound.startOf('hour').add(30, 'minute'); // Bloque a las xx:30
+    } else if (minutes >= 31 && minutes <= 45) {
+      nuevoBloque = dateToRound.startOf('hour').add(45, 'minute'); // Bloque a las xx:45
+    } else if (minutes >= 46 && minutes <= 59) {
+      nuevoBloque = dateToRound.add(1, 'hour').startOf('hour'); // Bloque a la siguiente hora (xx+1:00)
+    }
   
-    // Crear la nueva fecha redondeada a los 15 minutos más cercanos
-    const roundedDate = dateToRound
-      .minute(roundedMinutes)
-      .second(0)
-      .millisecond(0); // Aseguramos que los milisegundos sean 0
+    // Establecer la nueva fecha con el minuto redondeado
+    const roundedDate = nuevoBloque.second(0).millisecond(0); // Aseguramos que los segundos y milisegundos sean 0
   
     // Establecer la fecha redondeada en el estado
     setSelectedDate(roundedDate);
   
     // Pasamos la fecha seleccionada al ModalCliente
     onDateChange(roundedDate ? roundedDate.format("DD/MM/YYYY HH:mm") : "");
+  };
+  
+
+  // Función para deshabilitar ciertas horas y minutos
+  const shouldDisableTime = (time, clockType) => {
+    const hour = time.hour();  // Obtener la hora usando el método .hour() de Dayjs
+
+    // Deshabilitar entre las 00:00 y las 12:00, y entre las 16:00 y las 18:00
+    if (clockType === "hours") {
+      if (
+        (hour >= 0 && hour < 12) || // Deshabilitar entre las 00:00 y las 12:00
+        (hour >= 15 && hour < 18)   // Deshabilitar entre las 16:00 y las 18:00
+      ) {
+        return true;
+      }
+    }
+    return false;
   };
 
   return (
@@ -80,11 +105,12 @@ export default function Calendario({ onDateChange }) {
             label="Selecciona fecha y hora del pedido"
             value={selectedDate} // Establecer el valor del DateTimePicker
             onChange={handleDateChange} // Llamar a la función cuando se cambia la fecha
-            minTime={dayjs().set('hour', 11).set('minute', 10)} // Hora mínima (11:00)
-            maxTime={dayjs().set('hour', 23).set('minute', 0)} // Hora máxima (23:00)
+            minTime={dayjs().set('hour', 12).set('minute', 0)} // Hora mínima (11:00)
+            maxTime={dayjs().set('hour', 22).set('minute', 0)} // Hora máxima (23:00)
             ampm={false} // Usar formato de 24 horas (sin AM/PM)
             textField={(params) => <TextField {...params} />}
             format="DD/MM/YYYY HH:mm" // Formato de fecha y hora (día/mes/año hora:minutos)
+            shouldDisableTime={shouldDisableTime} // Deshabilitar horas fuera de los rangos
           />
         </DemoContainer>
       </LocalizationProvider>

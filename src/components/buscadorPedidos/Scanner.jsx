@@ -21,6 +21,21 @@ const Scanner = () => {
   const [loading, setLoading] = useState(false); // Estado de carga
   const [error, setError] = useState(null); // Estado de error
 
+   const [empleadoNombre, setEmpleadoNombre] = useState(null);
+  
+    useEffect(() => {
+      // Recuperamos el nombre del empleado desde sessionStorage
+      const nombre = sessionStorage.getItem('empleadoNombre');
+      
+      if (nombre) {
+        setEmpleadoNombre(nombre);  // Si encontramos el nombre, lo guardamos en el estado
+      } else {
+        console.log('No se encontró el nombre del empleado en sessionStorage');
+      }
+    }, []); // El array vacío asegura que esto solo se ejecute una vez cuando el componente se monta
+
+
+
   // Success callback function
   const onScanSuccess = (result) => {
     console.log("QR scan result:", result);
@@ -172,7 +187,7 @@ const Scanner = () => {
                     <td>{pedidoData.telefono}</td>
                     <td>{pedidoData.fechahora_realizado}</td>
                     <td>{pedidoData.fechahora}</td>
-                    <td>Alain</td>
+                    <td>{empleadoNombre}</td>
                     <td>{pedidoData.origen === 1 ? 'Online' : 'Tienda'}</td>
                     <td>12345ABCD</td>
                   </tr>

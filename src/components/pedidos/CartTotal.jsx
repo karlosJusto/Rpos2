@@ -1,4 +1,4 @@
-import React, { useState, useContext } from "react"; // Import React
+import React, { useState, useContext, useEffect } from "react"; // Import React
 import { dataContext } from "../Context/DataContext"; // Asegúrate que la ruta sea correcta
 import { doc, getDoc, updateDoc, setDoc, runTransaction, FieldValue, increment } from "firebase/firestore"; // *** IMPORTAR increment ***
 import { db } from "../firebase/firebase"; // Asegúrate que la ruta sea correcta
@@ -53,6 +53,8 @@ const convertTimeToMinutes = (timeStr) => {
       return -1;
   }
 };
+
+
 
 
 // --- Función para Actualizar Contadores de Ensaladas/Ensaladillas ---
@@ -195,6 +197,19 @@ const CartTotal = ({ datosCliente, setDatosCliente, orderToEdit }) => {
   const handleCloseModal = () => setShowModal(false);
   const handleCloseModal2 = () => setShowModal2(false);
   const handleCloseLimitModal = () => setShowLimitModal(false);
+
+  const [empleadoNombre, setEmpleadoNombre] = useState(null);
+
+  useEffect(() => {
+    // Recuperamos el nombre del empleado desde sessionStorage
+    const nombre = sessionStorage.getItem('empleadoNombre');
+    
+    if (nombre) {
+      setEmpleadoNombre(nombre);  // Si encontramos el nombre, lo guardamos en el estado
+    } else {
+      console.log('No se encontró el nombre del empleado en sessionStorage');
+    }
+  }, []); // El array vacío asegura que esto solo se ejecute una vez cuando el componente se monta
 
   // --- Calcular Total del Carrito ---
   const total = cart.reduce(
@@ -342,9 +357,9 @@ const CartTotal = ({ datosCliente, setDatosCliente, orderToEdit }) => {
      let mensajesError1 = ""; // Variable para almacenar todos los mensajes de error
 
      const clienteData = sanitizeClientData(datosCliente);
-     debugger
+    
      if (!clienteData.telefono) {
-      mensajesError += " ❌ El teléfono del cliente es obligatorio.\n" ; // Agrega el mensaje con salto de línea
+      mensajesError += "  El teléfono del cliente es obligatorio.\n" ; // Agrega el mensaje con salto de línea
 
      }
      if (!clienteData.fechahora) {
@@ -752,6 +767,7 @@ const updateCodilloCalendar = (fechahora, cantidad, ignoreLimit = false) => upda
                 entregado: item.entregado || 0,
                 troceado: item.troceado || false,
                 categoria: item.categoria || "No especificada",
+                freidora: item.freidora || false,
                 // Guardar precios como strings formateados a 2 decimales
                 precio: item.price.toFixed(2),
                 total: (item.price * item.cantidad).toFixed(2),
@@ -783,7 +799,7 @@ const updateCodilloCalendar = (fechahora, cantidad, ignoreLimit = false) => upda
         const pedidoData = {
            NumeroPedido: pedidoId, cliente: clienteData.cliente, telefono: clienteData.telefono,
            fechahora: horaPedido, observaciones: clienteData.observaciones, pagado: clienteData.pagado,
-           celiaco: clienteData.celiaco, localidad: clienteData.localidad, empleado: "", origen: 0, // Valores por defecto
+           celiaco: clienteData.celiaco, localidad: clienteData.localidad, empleado: empleadoNombre, origen: 0, // Valores por defecto
            productos: mappedProducts, total_pedido: totalPedido, fechahora_realizado: nowString,
            // No incluir fechahora_modificado al crear
         };
@@ -916,7 +932,7 @@ const updateCodilloCalendar = (fechahora, cantidad, ignoreLimit = false) => upda
       // isSubmitting se liberará en el bloque finally
 
     } catch (error) {
-      debugger
+      
       // --- Captura de Errores Generales / Inesperados ---
       console.error("Error general no capturado previamente en sendToFirestore:", error);
       // Mostrar modal de error genérico SOLO si no hay otro modal de confirmación activo
@@ -964,6 +980,8 @@ const updateCodilloCalendar = (fechahora, cantidad, ignoreLimit = false) => upda
       {/* Botón Principal de Acción */}
       <div className="flex text-center justify-center items-center mt-6 mb-4">
         <button
+
+        
           // Llama a sendToFirestore con estado inicial
           onClick={() => { console.log("Click en Botón Generar/Actualizar"); sendToFirestore({ confirmado: false, ignoreCalendarLimits: false }); }}
           // Deshabilitar si está procesando
@@ -971,6 +989,14 @@ const updateCodilloCalendar = (fechahora, cantidad, ignoreLimit = false) => upda
           // Clases CSS (ajusta según tu framework o estilos)
           className={`w-full sm:w-auto min-w-[150px] px-6 py-3 tracking-wide bg-[#f2ac02] text-white font-bold rounded-lg shadow-md hover:bg-yellow-600 focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:ring-opacity-50 transition-all duration-300 ease-in-out flex items-center justify-center ${isSubmitting ? 'opacity-50 cursor-not-allowed' : 'hover:scale-105'}`}
         >
+          <svg width="28px" height="28px" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M4 18V6" stroke="#ffffff" strokeWidth="1.5" strokeLinecap="round"></path>
+            <path d="M20 12L20 18" stroke="#ffffff" strokeWidth="1.5" strokeLinecap="round"></path>
+            <path d="M12 10C16.4183 10 20 8.20914 20 6C20 3.79086 16.4183 2 12 2C7.58172 2 4 3.79086 4 6C4 8.20914 7.58172 10 12 10Z"
+              stroke="#ffffff" strokeWidth="1.5"></path>
+            <path d="M20 12C20 14.2091 16.4183 16 12 16C7.58172 16 4 14.2091 4 12" stroke="#ffffff" strokeWidth="1.5" strokeLinecap="round"></path>
+            <path d="M20 18C20 20.2091 16.4183 22 12 22C7.58172 22 4 20.2091 4 18" stroke="#ffffff" strokeWidth="1.5"></path>
+          </svg>
           {/* Icono opcional - Descomentar si quieres un spinner */}
           {/* isSubmitting && <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg> */}
           <span className="ml-1 font-nunito text-lg">
@@ -984,21 +1010,32 @@ const updateCodilloCalendar = (fechahora, cantidad, ignoreLimit = false) => upda
 
       {/* Modal 2: Errores o Información General */}
       <Modal show={showModal2} onHide={() => { handleCloseModal2(); setIsSubmitting(false); }} size="md" backdrop="static" keyboard={false} centered>
-         <Modal.Header closeButton>
-             <Modal.Title className="font-nunito text-xl text-center text-[#e74c3c]">Error / Aviso</Modal.Title>
-         </Modal.Header>
+        
         <Modal.Body className="flex flex-col items-center p-4">
           {/* Puedes añadir un icono de error aquí */}
-          <div className="text-red-500 mb-3">
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-10 w-10" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-          </div>
+          <div className='p-1'>
+         <svg fill="#c81d0c" width="100px" height="100px" viewBox="0 0 22 22" version="1.1" xmlns="http://www.w3.org/2000/svg">
+
+              <g id="SVGRepo_bgCarrier" strokeWidth="0"/>
+
+              <g id="SVGRepo_tracerCarrier" strokeLinecap="round" strokeLinejoin="round"/>
+
+              <g id="SVGRepo_iconCarrier">
+
+              <path d="M12.1458333,9.85416667 L12.1458333,6.74047388 C12.1458333,6.4826434 11.9382041,6.28571429 11.6820804,6.28571429 L10.3179196,6.28571429 C10.0656535,6.28571429 9.85416667,6.48931709 9.85416667,6.74047388 L9.85416667,9.85416667 L6.74047388,9.85416667 C6.4826434,9.85416667 6.28571429,10.0617959 6.28571429,10.3179196 L6.28571429,11.6820804 C6.28571429,11.9343465 6.48931709,12.1458333 6.74047388,12.1458333 L9.85416667,12.1458333 L9.85416667,15.2595261 C9.85416667,15.5173566 10.0617959,15.7142857 10.3179196,15.7142857 L11.6820804,15.7142857 C11.9343465,15.7142857 12.1458333,15.5106829 12.1458333,15.2595261 L12.1458333,12.1458333 L15.2595261,12.1458333 C15.5173566,12.1458333 15.7142857,11.9382041 15.7142857,11.6820804 L15.7142857,10.3179196 C15.7142857,10.0656535 15.5106829,9.85416667 15.2595261,9.85416667 L12.1458333,9.85416667 Z" id="Combined-Shape" transform="translate(11.000000, 11.000000) rotate(-45.000000) translate(-11.000000, -11.000000) "/>
+
+              </g>
+
+          </svg>
+
+
+
+         </div>
           <p className="font-nunito text-lg p-2 text-center text-gray-700">{mensajeModal}</p>
         </Modal.Body>
-        <Modal.Footer className="border-t-0 justify-center">
+        <Modal.Footer className='no-border'>
           {/* Botón Aceptar: Cierra el modal y asegura que isSubmitting es false */}
-          <Button variant="primary" className="bg-yellow-500 border-yellow-500 hover:bg-yellow-600 hover:border-yellow-600 py-2 px-4 font-nunito text-white rounded-md shadow-sm" onClick={() => { handleCloseModal2(); setIsSubmitting(false); }}>
+          <Button variant="primary" className="mt-1 bg-yellow-500 border-yellow-500 hover:bg-yellow-600 hover:border-yellow-600 py-2 px-5 font-nunito text-white rounded-md shadow-sm" onClick={() => { handleCloseModal2(); setIsSubmitting(false); }}>
             Aceptar
           </Button>
         </Modal.Footer>
@@ -1006,22 +1043,29 @@ const updateCodilloCalendar = (fechahora, cantidad, ignoreLimit = false) => upda
 
       {/* Modal 1: Confirmación (ej. continuar sin pollo) */}
       <Modal show={showModal} onHide={() => { handleCloseModal(); setIsSubmitting(false); }} size="md" backdrop="static" keyboard={false} centered>
-         <Modal.Header closeButton>
-             <Modal.Title className="font-nunito text-xl text-center text-orange-600">Confirmación Requerida</Modal.Title>
-         </Modal.Header>
+        
         <Modal.Body className="flex flex-col items-center p-4">
           {/* Icono de pregunta/aviso */}
-          <div className="text-orange-500 mb-3">
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-10 w-10" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-          </div>
+          <div className='p-2'>
+         <svg fill="#c81d0c  " width="75px" height="75px" viewBox="-5.5 0 32 32" version="1.1" xmlns="http://www.w3.org/2000/svg">
+
+              <g id="SVGRepo_bgCarrier" strokeWidth="0"/>
+
+              <g id="SVGRepo_tracerCarrier" strokeLinecap="round" strokeLinejoin="round"/>
+
+              <g id="SVGRepo_iconCarrier"> <path d="M10.16 25.92c-2.6 0-8.72-0.24-9.88-2.24-1.28-2.28 2.040-8.24 3.080-10.040 1.040-1.76 4.64-7.56 7.12-7.56 2.8 0 7.24 7.48 8.56 10.12 1.92 3.84 2.48 6.4 1.56 7.6-1.52 2.040-8.96 2.12-10.44 2.12zM10.48 7.72c-0.72 0-3.080 2.36-5.64 6.76-2.76 4.68-3.48 7.72-3.080 8.4 0.32 0.56 3.2 1.4 8.4 1.4 5.44 0 8.64-0.88 9.080-1.48 0.28-0.36 0.040-2.28-1.72-5.84-2.64-5.28-6.12-9.24-7.040-9.24zM10.52 19.2c-0.48 0-0.84-0.36-0.84-0.84v-6.36c0-0.48 0.36-0.84 0.84-0.84s0.84 0.36 0.84 0.84v6.32c0 0.48-0.4 0.88-0.84 0.88zM11.36 21.36c0 0.464-0.376 0.84-0.84 0.84s-0.84-0.376-0.84-0.84c0-0.464 0.376-0.84 0.84-0.84s0.84 0.376 0.84 0.84z"/> </g>
+
+              </svg>
+
+
+
+         </div>
           <p className="font-nunito text-lg p-2 text-center text-gray-700">{mensajeModal}</p>
-          <p className="font-nunito text-md text-center text-gray-500 mt-2">¿Deseas continuar igualmente?</p>
+         
         </Modal.Body>
         <Modal.Footer className="border-t-0 flex justify-around p-4">
           {/* Botón Cancelar: Cierra modal y libera isSubmitting */}
-          <Button variant="secondary" className="py-2 px-5 bg-white font-nunito text-red-600 border border-red-500 hover:bg-red-50 rounded-md shadow-sm" onClick={() => { handleCloseModal(); setIsSubmitting(false); }} disabled={isSubmitting}>
+          <Button variant="secondary" className="py-2 px-5 bg-white font-nunito text-red-500 border-red-500 hover:text-red-600 hover:border-red-600 shadow-sm" onClick={() => { handleCloseModal(); setIsSubmitting(false); }} disabled={isSubmitting}>
             Cancelar
           </Button>
           {/* Botón Continuar: Cierra modal y llama a sendToFirestore con confirmado=true */}
@@ -1033,9 +1077,7 @@ const updateCodilloCalendar = (fechahora, cantidad, ignoreLimit = false) => upda
 
       {/* Modal 3: Confirmación de Límite Excedido */}
       <Modal show={showLimitModal} onHide={() => { handleCloseLimitModal(); setIsSubmitting(false); }} size="lg" backdrop="static" keyboard={false} centered>
-         <Modal.Header closeButton>
-             <Modal.Title className="font-nunito text-xl text-center text-red-600">¡Límite Excedido!</Modal.Title>
-         </Modal.Header>
+         
         <Modal.Body className="flex flex-col items-center p-4">
            {/* Icono de Advertencia */}
            <div className="p-2 text-red-500">

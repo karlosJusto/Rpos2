@@ -323,8 +323,8 @@ const generarEstadisticasDiarias = async () => {
 
 
 
-      <LoginJefe generarEstadisticas={generarEstadisticasDiarias} />
-      <SonidoOnChange isLoggedIn={isLoggedIn} />
+      
+   
    
 
      
