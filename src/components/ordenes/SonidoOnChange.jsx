@@ -1,19 +1,19 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef } from 'react';
 
-const SonidoOnChange = ({ contadorValor, isLoggedIn }) => {
+const SonidoOnChange = ({ pedidosConOrigenUno }) => {
   const sonidoRef = useRef(null); // Referencia para controlar el sonido
-  const prevContadorValorRef = useRef(contadorValor); // Referencia para guardar el valor previo de contadorValor
+  const prevPedidosConOrigenUnoRef = useRef(pedidosConOrigenUno); // Referencia para guardar el valor previo
+  
 
   // Crear el sonido cuando el componente se monta
   useEffect(() => {
-    sonidoRef.current = new Audio('https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3');
+   // sonidoRef.current = new Audio('https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3');
+    sonidoRef.current = new Audio('/musica/audio.mp3');
   }, []);
 
-  
-
-  // Reproducir el sonido cuando el contadorValor aumenta
+  // Reproducir el sonido cuando pedidosConOrigenUno cambia
   useEffect(() => {
-    if (contadorValor > prevContadorValorRef.current) { // Verificar si el contador ha aumentado
+    if (pedidosConOrigenUno > prevPedidosConOrigenUnoRef.current) { // Verificar si el valor ha cambiado
       if (sonidoRef.current) {
         sonidoRef.current.pause(); // Pausar el audio si ya está sonando
         sonidoRef.current.currentTime = 0; // Reiniciar el audio
@@ -23,15 +23,13 @@ const SonidoOnChange = ({ contadorValor, isLoggedIn }) => {
       }
     }
 
-    // Actualizar el valor previo del contador
-    prevContadorValorRef.current = contadorValor;
-
-  }, [contadorValor]); // Solo se ejecuta cuando el valor de contadorValor cambia
+    // Actualizar el valor previo
+    prevPedidosConOrigenUnoRef.current = pedidosConOrigenUno;
+  }, [pedidosConOrigenUno]); // Se ejecuta cuando pedidosConOrigenUno cambia
 
   return (
-    <div>
-      <h2>Contador: {contadorValor}</h2>
-    </div>
+    <>
+    </>
   );
 };
 

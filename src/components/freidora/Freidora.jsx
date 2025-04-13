@@ -5,6 +5,7 @@ import { Timestamp } from 'firebase/firestore';
 import patata from '../../assets/freidora/patata.png';
 import pimiento from '../../assets/freidora/pimiento.png';
 import croquetas from '../../assets/freidora/croquetas.png';
+import doble from '../../assets/freidora/doble.png';
 import singluten from '../../assets/singluten.png'; // Imagen sin gluten
 import dayjs from 'dayjs';
 import timezone from 'dayjs/plugin/timezone'; // Plugin para zona horaria
@@ -23,6 +24,8 @@ const Freidora = () => {
   const [bloqueHorario, setBloqueHorario] = useState('');
   const [anteriores, setAnteriores] = useState('');
   const [posteriores, setPosteriores] = useState('');
+  const [pedidosTotales, setPedidosTotales] = useState('');
+
 
   useEffect(() => {
     // Función para actualizar la hora y los bloques
@@ -85,39 +88,58 @@ useEffect(() => {
 
     try {
   
+      const hoy = new Date();
+      const dia = String(hoy.getDate()).padStart(2, '0');
+      const mes = String(hoy.getMonth() + 1).padStart(2, '0');
+      const anio = hoy.getFullYear();
+      const horaActual = hoy.getHours();
+
+      let fechaInicio, fechaFin;
+
+      if (horaActual < 18) {
+        fechaInicio = `${dia}/${mes}/${anio} 00:00`;
+        fechaFin = `${dia}/${mes}/${anio} 17:59`;
+      } else {
+        fechaInicio = `${dia}/${mes}/${anio} 18:00`;
+        fechaFin = `${dia}/${mes}/${anio} 23:59`;
+      }
+
 
       const pedidosRef = collection(db, 'pedidos');
-     // const q = query(pedidosRef, where('fechahora', '>=', tsInicio), where('fechahora', '<', tsFin));
+      const q = query(pedidosRef, where('fechahora', '>=', fechaInicio), where('fechahora', '<=', fechaFin));
 
 
-
-      //const querySnapshot = await getDocs(q);
-      const querySnapshot = await getDocs(pedidosRef);
+      const querySnapshot = await getDocs(q);
+      //const querySnapshot = await getDocs(pedidosRef);
       const pedidosDelDia = {}; // Objeto para agrupar productos por bloque horario
 
+      // Convertimos bloqueHorario a día y hora y sumamos 15 minutos
+      const fechaBloqueActual = dayjs(bloqueHorario, 'HH:mm').tz('Europe/Madrid'); // Utilizamos bloqueHorario como inicio
+      const fechaBloqueAnterior = fechaBloqueActual.subtract(15, 'minutes'); // Sumamos 15 minutos al bloque horario
+      const fechaBloquePosterior = fechaBloqueActual.add(15, 'minutes'); // Sumamos 15 minutos al bloque horario
+      setBloqueHorario(bloqueHorario);
+
+      let productosTotales = {};
+
       querySnapshot.forEach((doc) => {
-        //console.log('tttttttttttttttttttttttttttt');
         const pedido = doc.data();
-        //console.log('->' + JSON.stringify(pedido));
+       // console.log('->' + JSON.stringify(pedido));
 
         // Verificamos si la fecha de recogida está hoy
         if (pedido.productos) {
           // Utilizamos la fecha desde el objeto pedido
           const fechaRecogida = dayjs(pedido.fechahora, 'DD/MM/YYYY HH:mm').tz('Europe/Madrid'); // Aseguramos que esté en la zona horaria de España
-          const fechaHoy = dayjs().tz('Europe/Madrid').startOf('day'); // Hora inicio del día en España
-          const fechaFinal = dayjs().tz('Europe/Madrid').endOf('day'); // Hora final del día en España
+         // const fechaHoy = dayjs().tz('Europe/Madrid').startOf('day'); // Hora inicio del día en España
+         // const fechaFinal = dayjs().tz('Europe/Madrid').endOf('day'); // Hora final del día en España
         // console.log('fechaRecogida: '+fechaRecogida)
           // Validamos si la fecha de recogida es válida
-          if (!fechaRecogida.isValid()) {
-            return;
-          }
+          //if (!fechaRecogida.isValid()) {
+          //  return;
+          //}
 
-          // Convertimos bloqueHorario a día y hora y sumamos 15 minutos
-          const fechaBloqueInicio = dayjs(bloqueHorario, 'HH:mm').tz('Europe/Madrid'); // Utilizamos bloqueHorario como inicio
-          const fechaBloqueFin = fechaBloqueInicio.subtract(15, 'minutes'); // Sumamos 15 minutos al bloque horario
-
+        
           // Comprobamos si la fecha de recogida está dentro del rango entre bloqueInicio y bloqueFin
-          if (fechaRecogida.isBetween(fechaBloqueInicio, fechaBloqueFin, null, '[]')) {
+        //  if (fechaRecogida.isBetween(fechaBloqueActual, fechaBloqueAnterior, null, '[]')) {
             // Agrupar los productos dentro del mismo pedido, solo si freidora === true
             pedido.productos.forEach((producto) => {
               // Solo procesar productos con freidora: true
@@ -133,33 +155,133 @@ useEffect(() => {
                   entregado: producto.entregado, // Agregar el campo entregado
                   cliente: pedido.cliente,
                   fechahora: fechaRecogida.format('HH:mm'),
+                  doble: false,
                 };
 
-                const clave = `${productoConFecha.id}-${productoConFecha.fechahora}`; // Generar clave única basada en id y hora
-
+                //Cantidad de productos para rango horario
+                let clave = `${productoConFecha.id}-${productoConFecha.fechahora}`; // Generar clave única basada en id y hora
+                let producto_doble = false;
+                if ( (producto.id == 10) || (producto.id == 3) )
+                {
+                  if (producto.cantidad>1)
+                  {
+                    clave=clave+"_doble";
+                    producto_doble=true;
+                  }
+                }
+                if (producto.celiaco)
+                {
+                  clave=clave+"_celiaco";
+                }
                 if (pedidosDelDia[clave]) {
                   // Si ya existe, sumamos la cantidad y también actualizamos la cantidad entregada
-                  pedidosDelDia[clave].cantidad += productoConFecha.cantidad;
-                  pedidosDelDia[clave].entregado += productoConFecha.entregado; // Sumar el entregado también
+                  if (producto_doble)
+                  {
+                      pedidosDelDia[clave].cantidad += Math.floor(productoConFecha.cantidad/2);
+                      pedidosDelDia[clave].entregado += Math.floor(productoConFecha.entregado/2); // Sumar el entregado también
+
+                      if ( (productoConFecha.cantidad % 2)>0 )
+                      {
+                         pedidosDelDia[clave.replace('_doble', '')].cantidad += productoConFecha.cantidad % 2;
+                         pedidosDelDia[clave.replace('_doble', '')].entregado += productoConFecha.entregado %2 ; 
+                      }
+
+
+                  }else{
+                       pedidosDelDia[clave].cantidad += productoConFecha.cantidad;
+                       pedidosDelDia[clave].entregado += productoConFecha.entregado; // Sumar el entregado también
+                  }
+                 
                 } else {
                   // Si no existe, añadimos el producto
                   pedidosDelDia[clave] = productoConFecha;
+                  if (producto_doble)
+                    {
+                      let productoDoble = { ...productoConFecha, alias: pedidosDelDia[clave].alias+" Dobles", cantidad: Math.floor(productoConFecha.cantidad/2), entregado: Math.floor(productoConFecha.entregado/2), doble: true };
+                      pedidosDelDia[clave] = productoDoble;
+
+  
+                        if ( (productoConFecha.cantidad % 2)>0 )
+                        {
+                          let clave_simple=clave.replace('_doble', '');
+                          if (pedidosDelDia[clave_simple]) {
+                            pedidosDelDia[clave_simple].cantidad += productoConFecha.cantidad % 2;
+                            pedidosDelDia[clave_simple].entregado += productoConFecha.entregado %2 ;
+                          } 
+                          else{
+                            let productoSimple = { ...productoConFecha, cantidad:productoConFecha.cantidad%2, entregado: productoConFecha.entregado%2 };
+                            pedidosDelDia[clave_simple] = productoSimple;
+                          }
+
+                        }
+                     
+  
+  
+                    }
                 }
+
+
               }
             });
-          }
+        //  }
+
+
+
+
+
         }
       });
 
+      const pedidosDelDiaArray = Object.entries(pedidosDelDia);
+      pedidosDelDiaArray.sort(([, pedidoA], [, pedidoB]) => pedidoA.id - pedidoB.id);
+
+
+
       // Calculamos la cantidad total que aún está pendiente de entrega
-      Object.keys(pedidosDelDia).forEach((clave) => {
-        const bloque = pedidosDelDia[clave];
+     // Object.keys(pedidosDelDia).forEach((clave) => {
+      pedidosDelDiaArray.forEach(([clave, bloque]) => {
+
+
+        //const bloque = pedidosDelDia[clave];
         // Restamos la cantidad entregada de la cantidad total del bloque
         bloque.cantidad -= bloque.entregado;
+        //console.log("->"+clave+": "+JSON.stringify(bloque));
+
+        let clave_totales = clave.split("-")[0]; // Obtener la parte antes del primer guión
+        if (clave_totales.length+6 < clave.length)
+        {
+          clave_totales=clave_totales+clave.substring(clave_totales.length+6);
+        }
+        clave_totales = clave_totales.replace('_celiaco', ''); 
+
+
+        if (productosTotales[clave_totales]) {
+          productosTotales[clave_totales].cantidad += bloque.cantidad;
+          productosTotales[clave_totales].entregado += bloque.entregado;
+          productosTotales[clave_totales].celiaco += bloque.celiaco ? bloque.cantidad : 0;
+        } else {
+          productosTotales[clave_totales] = {
+            id: bloque.id,
+            nombre: bloque.nombre,
+            alias: bloque.alias,
+            cantidad: bloque.cantidad,
+            entregado: bloque.entregado,
+            celiaco: bloque.celiaco ? bloque.cantidad : 0,
+            doble: clave_totales.includes('_doble') ? true : false,
+          };
+          
+
+          //console.log("***** New producto:"+JSON.stringify(productosTotales[clave_totales]));
+        }
+
+
       });
 
+
+      //console.log("->Productos_totales:"+JSON.stringify(productosTotales));
       // Convertimos el objeto a array para que se pueda mostrar en la interfaz
       setPedidos(Object.values(pedidosDelDia));
+      setPedidosTotales(productosTotales);
     } catch (err) {
       console.error("Error al obtener los pedidos del día: ", err);
       setError("Ocurrió un error al obtener los pedidos.");
@@ -181,7 +303,7 @@ useEffect(() => {
   return (
 
     <>
-      <div>
+      
       
         <div className="flex justify-between items-center mx-auto w-full px-4 font-nunito mt-3 ">
          
@@ -196,18 +318,22 @@ useEffect(() => {
             </div>
             <div className="text-center p-2 ">
               {pedidos
-                .filter((pedido) => pedido.nombre.toLowerCase().includes('patatas') && pedido.cantidad > 0) // Filtramos por 'patatas' y cantidad > 0
+                .filter((pedido) => pedido.fechahora===bloqueHorario &&  pedido.nombre.toLowerCase().includes('patatas')) // Filtramos por 'patatas' y cantidad > 0
                 .map((pedido, index) => {
                   const borderColor = pedido.cantidad === 0 ? 'border-yellow-500' : 'border-red-500';
                   return (
                     <div
                       key={index}
-                      className={`mb-2 p-2 bg-white rounded-md shadow-md border-2 ${borderColor}`}
+                      className={`mb-2 p-2 bg-white rounded-md shadow-md border-3 ${borderColor}`}
                     >
                       <div className="flex items-center justify-center">
-                      <h2 className="mr-2">{`${pedido.cantidad+pedido.entregado}`}  <span className='font-bold'>[ {`${pedido.entregado}`} ]</span> x {pedido.alias} - {pedido.fechahora}</h2>
+                        
+                      <h2 className="mr-2 text-md">{`${pedido.cantidad+pedido.entregado}`}  <span className='font-bold'>[ {`${pedido.entregado}`} ]</span> x {pedido.alias}   </h2>
                         {pedido.celiaco && (
-                          <img src={singluten} alt="Sin gluten" className="w-6 h-6" />
+                          <img src={singluten} alt="Sin gluten" className="w-6 h-6 me-2" />
+                        )}
+                         {pedido.doble && (
+                          <img src={doble} alt="doble" className="w-7 h-7 " />
                         )}
                       </div>
                     </div>
@@ -227,18 +353,21 @@ useEffect(() => {
             </div>
             <div className="text-center p-2">
               {pedidos
-                .filter((pedido) => pedido.nombre.toLowerCase().includes('pimientos') && pedido.cantidad > 0) // Filtramos por 'pimientos' y cantidad > 0
+                .filter((pedido) => pedido.fechahora===bloqueHorario &&   pedido.nombre.toLowerCase().includes('pimientos')) // Filtramos por 'pimientos' y cantidad > 0
                 .map((pedido, index) => {
                   const borderColor = pedido.cantidad === 0 ? 'border-yellow-500' : 'border-red-500';
                   return (
                     <div
                       key={index}
-                      className={`mb-2 p-2 bg-white rounded-md shadow-md border-2 ${borderColor}`}
+                      className={`mb-2 p-2 bg-white rounded-md shadow-md border-3 ${borderColor}`}
                     >
                       <div className="flex items-center justify-center">
-                      <h2 className="mr-2">{`${pedido.cantidad+pedido.entregado}`}  <span className='font-bold'>[ {`${pedido.entregado}`} ]</span> x {pedido.alias} - {pedido.fechahora}</h2>
+                      <h2 className="mr-2 text-md">{`${pedido.cantidad+pedido.entregado}`}  <span className='font-bold'>[ {`${pedido.entregado}`} ]</span> x {pedido.alias}</h2>
                         {pedido.celiaco && (
-                          <img src={singluten} alt="Sin gluten" className="w-6 h-6" />
+                          <img src={singluten} alt="Sin gluten" className="w-6 h-6 me-2" />
+                        )}
+                         {pedido.doble && (
+                          <img src={doble} alt="doble" className="w-7 h-7 " />
                         )}
                       </div>
                     </div>
@@ -258,16 +387,16 @@ useEffect(() => {
             </div>
             <div className="text-center p-2">
               {pedidos
-                .filter((pedido) => pedido.nombre.toLowerCase().includes('croquetas') && pedido.cantidad > 0) // Filtramos por 'croquetas' y cantidad > 0
+                .filter((pedido) => pedido.fechahora===bloqueHorario &&   pedido.nombre.toLowerCase().includes('croquetas') ) // Filtramos por 'croquetas' y cantidad > 0
                 .map((pedido, index) => {
                   const borderColor = pedido.cantidad === 0 ? 'border-yellow-500' : 'border-red-500';
                   return (
                     <div
                       key={index}
-                      className={`mb-2 p-2 bg-white rounded-md shadow-md border-2 ${borderColor}`}
+                      className={`mb-2 p-2 bg-white rounded-md shadow-md border-3 ${borderColor}`}
                     >
                       <div className="flex items-center justify-center">
-                      <h2 className="mr-2">{`${pedido.cantidad+pedido.entregado}`}  <span className='font-bold'>[ {`${pedido.entregado}`} ]</span> x {pedido.alias} - {pedido.fechahora}</h2>
+                      <h2 className="mr-2 text-md">{`${pedido.cantidad+pedido.entregado}`}  <span className='font-bold'>[ {`${pedido.entregado}`} ]</span> x {pedido.alias}</h2>
                         {pedido.celiaco && (
                           <img src={singluten} alt="Sin gluten" className="w-6 h-6" />
                         )}
@@ -285,50 +414,96 @@ useEffect(() => {
         <div className="flex justify-between items-center mx-auto w-full px-4 font-nunito mt-4">
                 {/* Totales */}
                 <div className="bg-[#F3F3F3] w-[30%] rounded-lg h-[43vh]">
-                  <h1 className="bg-gray-700 p-2 text-white text-xl text-center rounded-md">Totales</h1>
-                  <div className="text-center p-2">
-                    {/*{pedidos
-                      .filter((pedido) => pedido.cantidad === 0) // Aquí filtramos todos los pedidos con cantidad 0
-                      .map((pedido, index) => (
-                        <div key={index} className="mb-2 p-2 bg-white rounded-md shadow-md">
-                          <div className="flex items-center justify-center">
-                          <h2 className="mr-2">{`${pedido.cantidad+pedido.entregado}`}  <span className='font-bold'>[ {`${pedido.entregado}`} ]</span> x {pedido.alias} - {pedido.fechahora}</h2>
-                            {pedido.celiaco && (
-                              <img src={singluten} alt="Sin gluten" className="w-6 h-6" />
-                            )}
-                          </div>
-                        </div>
-                      ))}*/}
-                  </div>
-                </div>
+                    <h1 className="bg-gray-700 p-2 text-white text-xl text-center rounded-md">Totales</h1>
+                    <div className="text-center p-2 overflow-y-auto h-[37vh]">
+                      {Object.values(pedidosTotales).map((pedido, index) => {
+                  
+                       const borderColor =
+                        pedido.cantidad >0
+                          ? 'border-red-500'
+                          : 'border-yellow-500';
 
-                {/* Anteriores */}
-                <div className="bg-[#F3F3F3] w-[30%] rounded-lg h-[43vh]">
-                  <h1 className="bg-gray-700 p-2 text-white text-xl text-center rounded-md">Anteriores: {anteriores} </h1>
-                  <div className="text-center p-2">
-                    {/*{pedidos
-                      .filter((pedido) => pedido.cantidad === 0) // Filtramos solo los pedidos con cantidad 0
-                      .map((pedido, index) => (
-                        <div key={index} className="mb-2 p-2 bg-white rounded-md shadow-md">
-                          <div className="flex items-center justify-center">
-                          <h2 className="mr-2">{`${pedido.cantidad+pedido.entregado}`}  <span className='font-bold'>[ {`${pedido.entregado}`} ]</span> x {pedido.alias} - {pedido.fechahora}</h2>
-                            {pedido.celiaco && (
-                              <img src={singluten} alt="Sin gluten" className="w-6 h-6" />
-                            )}
+                        return (
+                          <div
+                            key={index}
+                            className={`mb-2 p-2 bg-white rounded-md shadow-md border-3 ${borderColor}`}
+                          >
+                            <div className="flex items-center justify-center">
+                              <h2 className="mr-2 text-md flex items-center">
+                                {`${pedido.cantidad + pedido.entregado}`}
+                                <span className="font-bold px-1">[ {pedido.entregado} ] </span>  x  {pedido.alias} 
+                                {pedido.celiaco > 0 && (
+                                  <span className="flex items-center ms-2">
+                                   [ {pedido.celiaco} x
+                                    <img src={singluten} alt="Sin gluten" className="w-6 h-6 me-2" /> ]
+                                  </span>
+                                )}
+                              </h2>
+                            </div>
                           </div>
-                        </div>
-                      ))}*/}
-                  </div>
+                        );
+                      })}
+                    </div>
                 </div>
                 
+                {/* Anteriores */}
+
+                <div className="bg-[#F3F3F3] w-[30%] rounded-lg h-[43vh] ">
+                      <h1 className="bg-gray-700 p-2 text-white text-xl text-center rounded-md">Anteriores: {anteriores}</h1>
+                      <div className="text-center p-2 ">
+                        {pedidos
+                          .filter((pedido) => pedido.fechahora === anteriores) // Filtramos solo los pedidos con fecha igual a 'anteriores'
+                          .map((pedido, index) => {
+                            const borderColor = pedido.cantidad === 0 ? 'border-yellow-500' : 'border-red-500'; // Definimos el color del borde
+                            return (
+                              <div key={index} className={`mb-2 p-2 bg-white rounded-md shadow-md border-3 ${borderColor}`}>
+                                <div className="flex items-center justify-center">
+                                  <h2 className="mr-2 text-md">
+                                    {`${pedido.cantidad + pedido.entregado}`}{" "}
+                                    <span className="font-bold">[ {pedido.entregado} ]</span> x {pedido.alias} </h2>
+                                  {pedido.celiaco && (
+                                    <img src={singluten} alt="Sin gluten" className="w-6 h-6 me-2" />
+                                  )}
+                                   {pedido.doble && (
+                                      <img src={doble} alt="doble" className="w-7 h-7 " />
+                                    )}
+                                </div>
+                              </div>
+                            );
+                          })}
+                      </div>
+                </div>
+
 
                 {/* Posteriores */}
                 <div className="bg-[#F3F3F3] w-[30%] rounded-lg h-[43vh]">
-                  <h1 className="bg-gray-700 p-2 text-white text-xl text-center rounded-md ">Posteriores: {posteriores} </h1>
-                  {/* Aquí puedes agregar los pedidos que se deben mostrar en Posteriores */}
+                      <h1 className="bg-gray-700 p-2 text-white text-xl text-center rounded-md">Posteriores: {posteriores}</h1>
+                      <div className="text-center p-2">
+                        {pedidos
+                          .filter((pedido) => pedido.fechahora === posteriores) // Filtramos solo los pedidos con fecha igual a 'anteriores'
+                          .map((pedido, index) => {
+                            const borderColor = pedido.cantidad === 0 ? 'border-yellow-500' : 'border-red-500'; // Definimos el color del borde
+                            return (
+                              <div key={index} className={`mb-2 p-2 bg-white rounded-md shadow-md border-3 ${borderColor}`}>
+                                <div className="flex items-center justify-center">
+                                  <h2 className="mr-2 text-md">
+                                    {`${pedido.cantidad + pedido.entregado}`}{" "}
+                                    <span className="font-bold">[ {pedido.entregado} ]</span> x {pedido.alias}  {/* - {pedido.fechahora} */}
+                                  </h2>
+                                  {pedido.celiaco && (
+                                    <img src={singluten} alt="Sin gluten" className="w-6 h-6 me-2" />
+                                  )}
+                                   {pedido.doble && (
+                                    <img src={doble} alt="doble" className="w-7 h-7 " />
+                                  )}
+                                </div>
+                              </div>
+                            );
+                          })}
+                      </div>
                 </div>
-              </div>
-      </div>
+        </div>
+     
 
 
 

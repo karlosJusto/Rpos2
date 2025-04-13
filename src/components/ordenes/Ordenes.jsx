@@ -179,7 +179,9 @@ const handlePedidoRapido = (idProduct) => {
 
   //origen pedidos, 0 tienda 1 online
 
-  const [pedidosConOrigenUno, setPedidosConOrigenUno] = useState(0);
+  const [pedidosConOrigenUno, setPedidosConOrigenUno] = useState(null);
+
+  console.log('ibai:'+pedidosConOrigenUno);
 
 
 
@@ -1702,7 +1704,7 @@ const handlePedidoRapido = (idProduct) => {
      <PedidoRapido ref={pedidoRapidoRef} datosCliente={datosCliente} />
     
    
-    
+     <SonidoOnChange pedidosConOrigenUno={pedidosConOrigenUno} initialValue={pedidosConOrigenUno} />
    
                         
    </>

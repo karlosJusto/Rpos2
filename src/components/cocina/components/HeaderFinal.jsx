@@ -8,12 +8,11 @@ import RelojDistinto from './RelojDistinto';
 import { Offcanvas, Button, Navbar, Nav } from 'react-bootstrap';
 import { Link } from 'react-router-dom';
 
-import { ProductCard } from './components/ProductCard';
-import { SaladTypeCard } from './components/SaladTypeCard';
 
 
 
-const Header = () => {
+
+const HeaderFinal = () => {
 
   
   const [show, setShow] = useState(false);
@@ -115,7 +114,7 @@ const Header = () => {
             </svg>
             
             {/* Texto debajo del ícono */}
-            <p className="text-white text-[0.90vw] text-center bg-green-700 rounded-md py-1 px-3 mt-2">9</p>
+            <p className="text-white text-[0.90vw] text-center bg-green-700 rounded-md py-1 px-3 mt-2">P</p>
         </div>
 
         </div>
@@ -218,54 +217,38 @@ const Header = () => {
 
 
 
-     <div className='w-[8vw] h-[10vh] bg-[#f2ac02]  flex flex-col justify-center items-center rounded-xl shadow-md'>
-          <h1 className="text-white text-center text-[2vw] font-nunito">61.0</h1>
-          <h1 className="text-white text-center text-[2w] font-nunito">VM</h1>
+     <div className='w-[8vw] h-[10vh] bg-[#bfc9ca]  flex flex-col justify-center items-center rounded-xl shadow-md'>
+            <h1 className="text-white text-center text-[2vw] font-nunito"></h1>
+            <h1 className="text-white text-center text-[2w] font-nunito"></h1>
+        
      </div>
 
-     <div className='w-[8vw] h-[10vh] bg-[#f2ac02] flex flex-col justify-center items-center rounded-xl shadow-md'>
-          <h1 className="text-white text-center text-[2vw] font-nunito">0.0</h1>
-          <h1 className="text-white text-center text-[2w] font-nunito">VT</h1>
+     <div className='w-[8vw] h-[10vh] bg-[#bfc9ca] flex flex-col justify-center items-center rounded-xl shadow-md'>
+            <h1 className="text-white text-center text-[2vw] font-nunito"></h1>
+            <h1 className="text-white text-center text-[2w] font-nunito"></h1>
+               
      </div>
 
-     <div className='w-[8vw] h-[10vh] bg-[#f2ac02]  flex flex-col justify-center items-center rounded-xl shadow-md'>
-          <h1 className="text-white text-center text-[2vw] font-nunito">61.0</h1>
-          <h1 className="text-white text-center text-[2w] font-nunito">VD</h1>
+     <div className='w-[8vw] h-[10vh] bg-[#bfc9ca]  flex flex-col justify-center items-center rounded-xl shadow-md'>
+          <h1 className="text-white text-center text-[2vw] font-nunito"></h1>
+          <h1 className="text-white text-center text-[2w] font-nunito"></h1>
      </div>
+
+     
 
 
       
-     <div className='w-[8vw] h-[10vh] bg-[#f2ac02] flex flex-col justify-center items-center rounded-xl shadow-md'>
+     <div className='w-[8vw] h-[10vh] bg-[#f2ac02] flex flex-col justify-center items-center rounded-xl shadow-md' >
         <RelojDistinto/>
       </div>
       </div>
     </div>
 
     
-    <div className="w-full  bg-gray-700 flex justify-center items-center mt-5">
-      <p className="text-white text-[2vh]">Prox 45mins: 0 + 0/2</p>
-    </div>
+   
 
      
-    <div className="w-full bg-gray-100 flex flex-col justify-center items-center mt-2">
-  {pedidos.map((pedido) => (
-    <div key={pedido.id} className="w-full bg-gray-200 p-2 rounded-md mb-1">
-      <div className="flex items-center">
-        {/* Mostrar el número de pedido en la misma línea que los productos */}
-        <h3 className="text-[0.70vw] text-gray-700 font-semibold mr-4">{pedido.NumeroPedido}</h3>
-        
-        {/* Mostrar los productos del pedido */}
-        <div className="gap-2 h-[3vh] flex items-center">
-          {pedido.productos.map((producto, index) => (
-            <div key={index} className="border-2 border-yellow-500 p-1 rounded-md">
-              {producto.nombre} [ {producto.cantidad} ]
-            </div>
-          ))}
-        </div>
-      </div>
-    </div>
-  ))}
-</div>
+    
 
 
     {/* Offcanvas */}
@@ -400,5 +383,5 @@ const Header = () => {
   );
 };
 
-export default Header;
+export default HeaderFinal;
 

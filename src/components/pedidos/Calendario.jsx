@@ -60,16 +60,17 @@ export default function Calendario({ onDateChange }) {
     let nuevoBloque;
     
     // Bloques de minutos: 00, 15, 30, 45
-    if (minutes >= 0 && minutes <= 15) {
-      nuevoBloque = dateToRound.startOf('hour').add(15, 'minute'); // Bloque a las xx:15
+    if (minutes === 0) {
+      nuevoBloque = dateToRound.startOf('hour'); // Bloque exacto a la hora (xx:00)
+    } else if (minutes >= 5 && minutes <= 15) {
+      nuevoBloque = dateToRound.startOf('hour').add(15, 'minute'); // xx:15
     } else if (minutes >= 16 && minutes <= 30) {
-      nuevoBloque = dateToRound.startOf('hour').add(30, 'minute'); // Bloque a las xx:30
+      nuevoBloque = dateToRound.startOf('hour').add(30, 'minute'); // xx:30
     } else if (minutes >= 31 && minutes <= 45) {
-      nuevoBloque = dateToRound.startOf('hour').add(45, 'minute'); // Bloque a las xx:45
+      nuevoBloque = dateToRound.startOf('hour').add(45, 'minute'); // xx:45
     } else if (minutes >= 46 && minutes <= 59) {
-      nuevoBloque = dateToRound.add(1, 'hour').startOf('hour'); // Bloque a la siguiente hora (xx+1:00)
+      nuevoBloque = dateToRound.add(1, 'hour').startOf('hour'); // siguiente hora en punto
     }
-  
     // Establecer la nueva fecha con el minuto redondeado
     const roundedDate = nuevoBloque.second(0).millisecond(0); // Aseguramos que los segundos y milisegundos sean 0
   

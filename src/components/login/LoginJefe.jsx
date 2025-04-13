@@ -153,6 +153,9 @@ const Login = () => {
           const empleado = doc.data();
 
           console.log(empleado); // Aquí puedes manejar el login, redirigir, etc.
+
+             // Guardar el nombre del empleado en sessionStorage
+             sessionStorage.setItem('empleadoNombre', empleado.nombre);
          
           // Verificamos si el rol es "jefe"
           if (empleado.rol === "jefe") {

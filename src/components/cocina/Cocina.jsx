@@ -1,7 +1,10 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { Header } from './components/Header';
-import { ProductCard } from './components/ProductCard';
-import { SaladTypeCard } from './components/SaladTypeCard';
+//import Header from '../Header';
+//import { ProductCard } from './ProductCard';
+//import { SaladTypeCard } from '../SaladTypeCard';
+import HeaderFinal from './components/HeaderFinal';
+import ProductCard from  './components/ProductCard';
+import SaladTypeCard from './components/SaladTypeCard';
 import { db } from '../firebase/firebase';
 import { 
   collection, 
@@ -12,6 +15,8 @@ import {
   getDoc 
   //, query, where  // Si decides usar un campo timestamp
 } from 'firebase/firestore';
+
+
 
 // Función para formatear la fecha en "dd/mm/yyyy" (con ceros a la izquierda)
 const formatDate = (date) => {
@@ -358,28 +363,15 @@ const Cocina = () => {
   }
 
   return (
-    <div className="h-screen bg-gray-100 flex flex-col">
-      <Header />
-      {/* Botón, calendario y turno */}
-      <div className="p-4 flex items-center space-x-4">
-        <button 
-          className="px-4 py-2 bg-[#f2ac02] text-white rounded"
-          onClick={() => setShowCalendar(!showCalendar)}
-        >
-          Seleccionar Fecha
-        </button>
-        <span className="text-gray-700 font-medium">{turnoText}</span>
-        {showCalendar && (
-          <input 
-            type="date" 
-            className="ml-4 p-2 border rounded"
-            value={selectedDate.toISOString().split('T')[0]}
-            onChange={handleDateChange}
-          />
-        )}
-      </div>
+    <div className="h-screen flex flex-col">
+     
+     <HeaderFinal/>
+
+   
+
+
       {/* Sección de ProductCards */}
-      <div className="p-6 flex-grow overflow-hidden">
+      <div className="p-6 flex-grow overflow-hidden mt-[2.5vh] ">
         <div className={`grid gap-6 ${gridClass} h-full`}>
           {productsData.slice(0, 9).map((product, index) => (
             <ProductCard key={index} product={product} />
@@ -387,7 +379,7 @@ const Cocina = () => {
         </div>
       </div>
       {/* Sección inferior: ensaladas y ensaladillas */}
-      <div className="p-6 bg-gray-100">
+      <div className="p-6 bg-white -mt-5">
         <div className="flex">
           <div className="w-1/2 p-2">
             {saladsData.length > 0 && (
