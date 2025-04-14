@@ -380,60 +380,6 @@ const CartTotal = ({ datosCliente, setDatosCliente, orderToEdit }) => {
      // 3. Validación rápida (no transaccional) de stock para items clave (opcional pero útil)
      console.log("Iniciando validación preliminar de stock...");
         // Define los IDs de los productos cuyo stock quieres verificar aquí
-        const idsConStockCritico = [1, 41, 50]; // Ejemplo: Pollo entero, Costilla entera, Codillo
-
-        for (const idToCheck of idsConStockCritico) {
-             // Obtener referencia del producto (convertir ID a string)
-             const productRef = doc(db, "productos", idToCheck.toString());
-
-             // Calcular la cantidad total necesaria para este ID de stock, considerando items relacionados
-             let cantidadNecesaria = 0;
-             if (idToCheck === 1) { // Stock de pollos (ID 1) afectado por ID 1 y ID 2
-                 cantidadNecesaria = currentCart.reduce((sum, i) => {
-                    if (i?.id_product === 1) return sum + (i.cantidad || 0);
-                    if (i?.id_product === 2) return sum + (i.cantidad || 0) / 2; // Medio pollo = 0.5 stock
-                    return sum;
-                 }, 0);
-             } else if (idToCheck === 41) { // Stock de costillas (ID 41) afectado por ID 41 y ID 48
-                 cantidadNecesaria = currentCart.reduce((sum, i) => {
-                    if (i?.id_product === 41) return sum + (i.cantidad || 0);
-                    if (i?.id_product === 48) return sum + (i.cantidad || 0) / 2; // Media costilla = 0.5 stock
-                    return sum;
-                 }, 0);
-             } else { // Otros IDs con stock propio (ej. ID 50)
-                 cantidadNecesaria = currentCart.reduce((sum, i) => {
-                    if (i?.id_product === idToCheck) return sum + (i.cantidad || 0);
-                    return sum;
-                 }, 0);
-             }
-
-            // Si se necesita este item, verificar su stock
-            if (cantidadNecesaria > 0) {
-                const productSnap = await getDoc(productRef); // Lectura no transaccional
-
-                if (productSnap.exists()) {
-                    const productData = productSnap.data();
-                    const currentStock = productData.stock;
-                    // Validar stock leído
-                    if (typeof currentStock !== 'number' || isNaN(currentStock)){
-                         console.warn(`Stock inválido encontrado para ID ${idToCheck} en validación preliminar.`);
-                         // Podrías lanzar error o continuar, dependiendo de la criticidad
-                         continue; // Saltar a la siguiente verificación
-                    }
-
-                    if (currentStock < cantidadNecesaria) {
-                        // Si el stock preliminar no es suficiente, fallar validación
-                        mensajesError += ` ❌ No hay suficiente stock para el producto ${productData.name || 'sin nombre'}. Solo quedan ${currentStock} unidades.\n`;
-                      } else {
-                         console.log(`Validación preliminar stock OK para ID ${idToCheck}. Necesario: ${cantidadNecesaria.toFixed(1)}, Disponible: ~${currentStock}`);
-                    }
-                } else {
-                     // Si el producto no existe en la BD, fallar validación
-                     mensajesError += ` ❌ Validación fallida: Producto con ID ${idToCheck} no encontrado.\n`;
-                }
-            }
-        }
-        console.log("Validación preliminar de stock OK.");
 
      if (mensajesError.trim() !== "") {
       setMensajeModal(mensajesError.trim());
@@ -450,87 +396,7 @@ const CartTotal = ({ datosCliente, setDatosCliente, orderToEdit }) => {
      return true;
    };
 
-  // --- Función Auxiliar para Validar Disponibilidad de Calendario ---
-  const validateCalendarAvailability = async (productType, fechahora, cantidad) => {
-    // Log inicial y validación de cantidad
-    console.log(`Validando calendario para ${productType} a las ${fechahora} (Cantidad: ${cantidad})`);
-    if (cantidad <= 0) { console.log("Cantidad 0, validación de calendario omitida."); return; }
 
-    // Validar y parsear fecha/hora
-    const orderDate = dayjs(fechahora, "DD/MM/YYYY HH:mm", true); // Parseo estricto
-    if (!orderDate.isValid()) {
-      console.error("Formato de fecha/hora inválido en validación calendario:", fechahora);
-      throw new Error("Formato de fecha/hora inválido para validación de calendario: " + fechahora);
-    }
-
-    // Determinar colección y nombre del producto
-    const dailyDocId = orderDate.format("YYYY-MM-DD"); // Cambiado a formato estándar ISO para ID
-    let collectionName = "", productName = "";
-    switch (productType) {
-        case 'pollo': collectionName = "chicken_calendar_daily"; productName = "Pollos"; break;
-        case 'costilla': collectionName = "costilla_calendar_daily"; productName = "Costillas"; break;
-        case 'codillo': collectionName = "codillo_calendar_daily"; productName = "Codillos"; break;
-        default: throw new Error(`Tipo de producto desconocido para validar calendario: ${productType}`);
-    }
-    const docRef = doc(db, collectionName, dailyDocId); // Referencia al documento diario
-
-    try {
-        // Leer el documento (lectura no transaccional para validación)
-        console.log(`Leyendo documento: ${collectionName}/${dailyDocId}`);
-        const docSnap = await getDoc(docRef);
-
-        // Validar existencia del documento y estructura de intervalos
-        if (!docSnap.exists()) { throw new Error(`Calendario diario (${dailyDocId}) para ${productName} no existe.`); }
-        const data = docSnap.data();
-        const intervals = data.intervals;
-        if (!Array.isArray(intervals) || intervals.length === 0) { throw new Error(`No hay intervalos definidos para ${productName} el ${dailyDocId}.`); }
-
-        // Encontrar el intervalo correspondiente a la hora del pedido
-        const requestedMinutes = orderDate.hour() * 60 + orderDate.minute();
-        let foundIntervalIndex = -1;
-         for (let i = 0; i < intervals.length; i++) {
-              const interval = intervals[i];
-              if (!interval?.start || !interval?.end) continue; // Saltar si el intervalo no tiene start/end
-              const startMin = convertTimeToMinutes(interval.start);
-              const endMin = convertTimeToMinutes(interval.end);
-              // Incluye startMin, excluye endMin
-              if (startMin !== -1 && endMin !== -1 && requestedMinutes >= startMin && requestedMinutes < endMin) {
-                  foundIntervalIndex = i;
-                  break;
-               }
-         }
-        if (foundIntervalIndex === -1) { throw new Error(`Hora ${orderDate.format("HH:mm")} fuera de horario para ${productName}.`); }
-
-        // --- Validación de Límite ---
-        const intervalIndex = foundIntervalIndex;
-        const current = intervals[intervalIndex].orderedCount || 0;
-        const max = intervals[intervalIndex].maxAllowed;
-        const intervalLabel = `${intervals[intervalIndex].start}-${intervals[intervalIndex].end}`;
-
-        // Validar que 'max' sea un número
-        if (typeof max !== 'number' || isNaN(max)) { throw new Error(`Límite (maxAllowed) mal configurado para ${productName} en ${intervalLabel}.`); }
-
-        // Comprobar si se excede el límite y lanzar error específico si es así
-        if (current + cantidad > max) {
-            console.warn(`Límite excedido para ${productName} en ${intervalLabel}: ${current} + ${cantidad} > ${max}`);
-            throw new LimitExceededError(
-                `El límite de ${productName} (${max}) en ${intervalLabel} se excedería (Actual: ${current}, Pedido: ${cantidad.toFixed(1)}).`,
-                { productType, interval: intervalLabel, current, pedido: cantidad, max }
-            );
-        }
-
-        // Si pasa todas las validaciones
-        console.log(`Validación de calendario OK para ${productType} en ${intervalLabel}.`);
-
-    } catch (error) {
-        // Loguear errores que no sean de límite excedido
-        if (!(error instanceof LimitExceededError)) {
-            console.error(`Error inesperado durante validación de calendario ${productName} (${fechahora}):`, error);
-        }
-        // Re-lanzar siempre el error
-        throw error;
-    }
-  }
 
 // --- Función Base para ACTUALIZAR Calendario (MODIFICADA para override UNIVERSAL) ---
   const updateCalendarBase = async (collectionName, productName, fechahora, cantidad, ignoreLimit = false) => {
@@ -635,10 +501,6 @@ const CartTotal = ({ datosCliente, setDatosCliente, orderToEdit }) => {
     }
 };
 
-// Las funciones específicas no cambian, siguen usando la base:
-const updateChickenCalendarPollo = (fechahora, cantidad, ignoreLimit = false) => updateCalendarBase("chicken_calendar_daily", "Pollo", fechahora, cantidad, ignoreLimit);
-const updateCostillaCalendar = (fechahora, cantidad, ignoreLimit = false) => updateCalendarBase("costilla_calendar_daily", "Costilla", fechahora, cantidad, ignoreLimit);
-const updateCodilloCalendar = (fechahora, cantidad, ignoreLimit = false) => updateCalendarBase("codillo_calendar_daily", "Codillo", fechahora, cantidad, ignoreLimit);
 
 
   // --- Función Principal para Enviar/Actualizar Pedido ---
@@ -696,50 +558,6 @@ const updateCodilloCalendar = (fechahora, cantidad, ignoreLimit = false) => upda
            throw new Error(`El formato de la fecha/hora final del pedido es inválido: ${horaPedido}`);
       }
        console.log("Hora final del pedido:", horaPedido);
-
-
-      // --- PASO 2: Validación de Límites de Calendario ---
-      // Solo si no se ha indicado ignorar los límites explícitamente
-      if (!ignoreCalendarLimits) {
-          console.log("Iniciando validación de límites de calendario...");
-          try {
-             // Calcular cantidades totales para cada tipo de calendario
-             // Pollo (ID 1 y 2 = 1 unidad c/u)
-             let cantidadPolloTotalCal = currentCart.reduce((sum, item) => { if (item && (item.id_product === 1 || item.id_product === 2)) return sum + (item.cantidad || 0); return sum; }, 0);
-             // Costilla (ID 41=1, ID 48=0.5)
-             let cantidadCostillaTotalCal = currentCart.reduce((sum, item) => { if (item && (item.id_product === 41 || item.id_product === 48)) return sum + (item.id_product === 41 ? (item.cantidad || 0) : (item.cantidad || 0) / 2); return sum; }, 0);
-             // Codillo (Nombre o ID 50 = 1 unidad)
-             let cantidadCodilloCal = currentCart.reduce((sum, item) => { if (item && (item.name?.toLowerCase().includes("codillo") || item.id_product === 50)) return sum + (item.cantidad || 0); return sum; }, 0);
-
-             // Ejecutar validaciones solo si la cantidad es > 0
-             if (cantidadPolloTotalCal > 0) await validateCalendarAvailability('pollo', horaPedido, cantidadPolloTotalCal);
-             if (cantidadCostillaTotalCal > 0) await validateCalendarAvailability('costilla', horaPedido, cantidadCostillaTotalCal);
-             if (cantidadCodilloCal > 0) await validateCalendarAvailability('codillo', horaPedido, cantidadCodilloCal);
-
-            console.log("Validación de calendarios completada (sin exceder límites o errores).");
-
-          } catch (validationError) {
-            // --- Manejo Específico de Errores de Validación ---
-            if (validationError instanceof LimitExceededError) {
-              // Mostrar modal de confirmación para ignorar límite
-              console.warn("Límite de calendario excedido detectado:", validationError.message);
-              setLimitWarning(validationError.message + " ¿Deseas continuar igualmente?");
-              setShowLimitModal(true); // Mostrar modal específico
-              setIsSubmitting(false); // Liberar para interacción del usuario
-              return; // Esperar decisión
-            } else {
-              // Otro error durante la validación (doc no existe, hora fuera rango, etc.)
-              console.error("Error durante validación de calendario (no de límite):", validationError);
-              setMensajeModal(validationError.message || "Error durante la validación del calendario.");
-              setShowModal2(true); // Mostrar modal de error genérico
-              setIsSubmitting(false); // Liberar
-              return; // Detener
-            }
-          }
-      } else {
-          // Si se indicó ignorar límites, loguear y continuar
-          console.log("Saltando validación de límites de calendario (ignoreCalendarLimits = true).");
-      }
 
       // --- PASO 3: Preparar y Guardar/Actualizar Pedido en Firestore ---
       // Si se llega aquí, las validaciones pasaron o se ignoraron los límites.
@@ -869,41 +687,6 @@ const updateCodilloCalendar = (fechahora, cantidad, ignoreLimit = false) => upda
           setShowModal2(true);
           setIsSubmitting(false);
           return;
-      }
-      
-
-
-      // --- PASO 5: Actualizar Contadores de Calendario (POST-Guardado y Stock OK) ---
-      console.log(`Iniciando actualización de calendarios (ignorar límite: ${ignoreCalendarLimits})...`);
-      try {
-          // Calcular cantidades para CADA tipo de calendario
-          let cantPolloCal = currentCart.reduce((sum, item) => { if (item && (item.id_product === 1 || item.id_product === 2)) return sum + (item.cantidad || 0); return sum; }, 0);
-          let cantCostillaCal = currentCart.reduce((sum, item) => { if (item && (item.id_product === 41 || item.id_product === 48)) return sum + (item.id_product === 41 ? (item.cantidad || 0) : (item.cantidad || 0) / 2); return sum; }, 0);
-          let cantCodilloCal = currentCart.reduce((sum, item) => { if (item && (item.name?.toLowerCase().includes("codillo") || item.id_product === 50)) return sum + (item.cantidad || 0); return sum; }, 0);
-
-          // Crear array de promesas para actualizaciones de calendario
-          const calendarUpdatePromises = [];
-          if (cantPolloCal > 0) { calendarUpdatePromises.push(updateChickenCalendarPollo(horaPedido, cantPolloCal, ignoreCalendarLimits)); }
-          if (cantCostillaCal > 0) { calendarUpdatePromises.push(updateCostillaCalendar(horaPedido, cantCostillaCal, ignoreCalendarLimits)); }
-          if (cantCodilloCal > 0) { calendarUpdatePromises.push(updateCodilloCalendar(horaPedido, cantCodilloCal, ignoreCalendarLimits)); }
-
-          // Ejecutar actualizaciones de calendario en paralelo
-          if (calendarUpdatePromises.length > 0) {
-               console.log(`Ejecutando ${calendarUpdatePromises.length} actualizaciones de calendario...`);
-               await Promise.all(calendarUpdatePromises);
-               console.log("Actualización de calendarios completada (ver logs individuales para detalles).");
-          } else {
-               console.log("No se requirieron actualizaciones de calendario para este pedido.");
-          }
-
-      } catch(calendarError) {
-           // Error CRÍTICO: Pedido y stock OK, pero fallo al actualizar contadores.
-           console.error(`¡ERROR CRÍTICO POST-STOCK! Pedido ${pedidoId} guardado, stock OK, PERO FALLÓ ACTUALIZACIÓN CALENDARIO:`, calendarError);
-           // Notificar de la inconsistencia grave
-           setMensajeModal(`¡ATENCIÓN GRAVE! Pedido ${pedidoId} procesado, pero falló la actualización del calendario (${calendarError.message}). Es necesaria REVISIÓN MANUAL del calendario.`);
-           setShowModal2(true); // Mostrar modal de error
-           setIsSubmitting(false); // Liberar estado, requiere intervención
-           return; // Detener
       }
 
       // --- PASO 5.5: Actualizar Contadores de Ensaladas/Ensaladillas (NUEVO) ---

@@ -20,7 +20,17 @@
   border-radius: 10px;
 }
 
+@keyframes blink {
+  50% {
+    /* Hace que el elemento (incluyendo su borde) se vuelva semi-transparente */
+    opacity: 0.3;
+  }
+}
 
+/* Clase que aplica la animación */
+.animate-blink {
+  animation: blink 10s linear infinite; /* Duración 1.2s, se repite infinitamente */
+}
 
 
 @tailwind base;

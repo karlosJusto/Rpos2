@@ -1,139 +1,58 @@
 import React, { useState, useEffect } from 'react';
 import { Save } from 'lucide-react';
 // Asegúrate que la ruta a tu configuración de Firebase y contexto sea correcta
+// AÑADE setDoc a los imports de firestore
 import { db } from '../../firebase/firebase';
-import { collection, onSnapshot, doc, updateDoc, getDoc, setDoc } from 'firebase/firestore';
+import { collection, onSnapshot, doc, setDoc } from 'firebase/firestore'; // Cambiado updateDoc por setDoc
+// Importamos useOrder solo si necesitamos refreshDailyCalendar para refrescar OTRAS vistas
 import { useOrder } from '../../Context/OrderProviderContext';
 
-// --- Configuración Específica por Producto ---
+// --- Configuración Específica por Producto (para la UI) ---
+// Mantenemos esto aquí para construir la tabla correctamente
 const productTypesConfig = {
-  chicken: { name: 'Pollos', amountField: 'chickenAmount', intervalStep: 15, dailyCollection: 'chicken_calendar_daily', intervalLabel: '(15min)' },
-  costilla: { name: 'Costillas', amountField: 'costillaAmount', intervalStep: 30, dailyCollection: 'costilla_calendar_daily', intervalLabel: '(30min)' }, // Ajusta label si es necesario
-  codillo: { name: 'Codillos', amountField: 'codilloAmount', intervalStep: 60, dailyCollection: 'codillo_calendar_daily', intervalLabel: '(60min)' }, // Ajusta label si es necesario
+  chicken: { name: 'Pollos', amountField: 'chickenAmount', intervalLabel: '(15min)' },
+  costilla: { name: 'Costillas', amountField: 'costillaAmount', intervalLabel: '(15min)' }, // Ajustado label
+  codillo: { name: 'Codillos', amountField: 'codilloAmount', intervalLabel: '(15min)' }, // Ajustado label
 };
 
 function ConfiguracionCalendario() {
   const [days, setDays] = useState([]);
-  // Obtiene el calendario diario y la función para refrescar del contexto
-  const { dailyCalendar, refreshDailyCalendar } = useOrder();
+  // Mantenemos refreshDailyCalendar si queremos que al guardar aquí,
+  // se refresque la vista del calendario diario (aunque los intervalos
+  // no se regeneren desde este componente). Si no es necesario, puedes quitarlo.
+  const { refreshDailyCalendar } = useOrder();
 
   // --- Funciones Auxiliares ---
+  // Normaliza la hora a HH:MM
   const normalizeTime = (timeStr) => {
     if (!timeStr) return '';
-    // Asegura que siempre devuelva HH:MM, incluso si la entrada es solo H o HH
-    if (timeStr.includes(':')) return timeStr;
+    // Si ya tiene dos puntos, asumimos que es HH:MM
+    if (timeStr.includes(':')) {
+        // Opcional: Validar/rellenar ceros si es necesario, ej: "9:5" -> "09:05"
+        const parts = timeStr.split(':');
+        const hour = parts[0].padStart(2,'0');
+        const minute = parts[1] ? parts[1].padStart(2,'0') : '00';
+        return `${hour}:${minute}`;
+    }
+    // Si no tiene dos puntos, asumimos que es solo la hora y añadimos :00
     const hour = timeStr.padStart(2, '0');
     return `${hour}:00`;
   };
 
-  const generateIntervalsForSchedule = (start, end, maxAllowed, step, scheduleType) => {
-    if (!start || !end || !step) return []; // Evita errores si falta start/end/step
-    try {
-        const [startHour, startMinute] = start.split(':').map(Number);
-        const [endHour, endMinute] = end.split(':').map(Number);
-        let current = startHour * 60 + startMinute;
-        const endTime = endHour * 60 + endMinute;
-        const intervals = [];
-
-        while (current + step <= endTime) {
-            const startStr = String(Math.floor(current / 60)).padStart(2, '0') + ':' + String(current % 60).padStart(2, '0');
-            const endStr = String(Math.floor((current + step) / 60)).padStart(2, '0') + ':' + String((current + step) % 60).padStart(2, '0');
-            intervals.push({
-                start: startStr,
-                end: endStr,
-                maxAllowed: maxAllowed || 0,
-                orderedCount: 0,
-                scheduleType, // Asigna el tipo de horario (morning o evening)
-            });
-            current += step;
-        }
-        return intervals;
-    } catch (error) {
-        console.error("Error generando intervalos para:", { start, end, maxAllowed, step }, error);
-        return []; // Devuelve array vacío en caso de error
-    }
-  };
-
-
-  const generateAndMergeIntervals = async (productType, dayConfig, date) => {
-    const config = productTypesConfig[productType];
-    if (!config || !dayConfig || !date) {
-      console.error("Faltan datos para generateAndMergeIntervals", { productType, dayConfig, date });
-      return;
-    }
-    console.log(`Regenerando ${config.dailyCollection} para ${date}`);
-  
-    const docRef = doc(db, config.dailyCollection, date);
-  
-    try {
-      const docSnap = await getDoc(docRef);
-      const oldData = docSnap.exists() ? docSnap.data() : { intervals: [] };
-      const oldIntervals = oldData.intervals || [];
-  
-      let newIntervals = [];
-      const maxAmount = parseInt(dayConfig[config.amountField]) || 0;
-  
-      if (dayConfig.morningSchedule?.active && dayConfig.morningSchedule.start && dayConfig.morningSchedule.end) {
-        newIntervals = newIntervals.concat(
-          generateIntervalsForSchedule(
-            normalizeTime(dayConfig.morningSchedule.start),
-            normalizeTime(dayConfig.morningSchedule.end),
-            maxAmount,
-            config.intervalStep,
-            'morning'  // Se indica que es horario de mañana
-          )
-        );
-      }
-      if (dayConfig.eveningSchedule?.active && dayConfig.eveningSchedule.start && dayConfig.eveningSchedule.end) {
-        newIntervals = newIntervals.concat(
-          generateIntervalsForSchedule(
-            normalizeTime(dayConfig.eveningSchedule.start),
-            normalizeTime(dayConfig.eveningSchedule.end),
-            maxAmount,
-            config.intervalStep,
-            'evening'  // Se indica que es horario de tarde
-          )
-        );
-      }
-  
-      const mergedIntervals = newIntervals.map(newInt => {
-        const matchingOld = oldIntervals.find(oldInt => oldInt.start === newInt.start && oldInt.end === newInt.end);
-        if (matchingOld && matchingOld.orderedCount > 0) {
-           return { ...matchingOld, maxAllowed: newInt.maxAllowed };
-        }
-        return newInt;
-      });
-  
-      oldIntervals.forEach(oldInt => {
-        const existsInNew = newIntervals.some(newInt => newInt.start === oldInt.start && newInt.end === oldInt.end);
-        if (!existsInNew && oldInt.orderedCount > 0) {
-          mergedIntervals.push({ ...oldInt, maxAllowed: maxAmount });
-        }
-      });
-  
-      mergedIntervals.sort((a, b) => (a.start > b.start ? 1 : -1));
-      console.log(`Intervalos finales para ${config.dailyCollection}/${date}:`, mergedIntervals);
-  
-      await setDoc(docRef, { intervals: mergedIntervals, date: date, productType: productType }, { merge: true });
-      console.log(`Firestore actualizado para ${config.dailyCollection}/${date}`);
-  
-    } catch (error) {
-      console.error(`Error regenerando ${config.dailyCollection} para ${date}:`, error);
-    }
-  };
-  
-
-
   // --- Carga Inicial de Datos ---
+  // (Sigue escuchando 'calendar')
   useEffect(() => {
     const unsubscribe = onSnapshot(collection(db, 'calendar'), (snapshot) => {
       const daysData = snapshot.docs.map((doc) => {
         const data = doc.data();
-        // Normalización inicial (aunque se hará de nuevo al guardar)
+        // Normalización y asegurar estructura al cargar
         ['morningSchedule', 'eveningSchedule', 'workSchedule'].forEach(key => {
             if (data[key]) {
-                data[key].start = normalizeTime(data[key].start);
-                data[key].end = normalizeTime(data[key].end);
+                data[key] = {
+                    active: !!data[key].active, // Asegura booleano
+                    start: normalizeTime(data[key].start),
+                    end: normalizeTime(data[key].end),
+                };
             } else {
                  // Asegura que el objeto exista aunque esté vacío o inactivo
                  data[key] = { active: false, start: '', end: '' };
@@ -147,11 +66,14 @@ function ConfiguracionCalendario() {
          data.negativeStock = !!data.negativeStock; // Asegura booleano
 
         return { id: doc.id, ...data };
-      }).sort((a, b) => { // Ordena los días de Lunes a Domingo (o como prefieras)
-           const order = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"];
-           return order.indexOf(a.name) - order.indexOf(b.name);
+      }).sort((a, b) => { // Ordena los días
+           const order = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo", "Festivo", "Vispera"]; // Ajusta si tus IDs son distintos (8 y 9?)
+           // Mapea IDs 8 y 9 a nombres para ordenar si es necesario
+           const nameA = a.id === "8" ? "Festivo" : a.id === "9" ? "Vispera" : a.name;
+           const nameB = b.id === "8" ? "Festivo" : b.id === "9" ? "Vispera" : b.name;
+           return order.indexOf(nameA) - order.indexOf(nameB);
       });
-      console.log('Calendario base (days) actualizado:', daysData);
+      console.log('Calendario base (days) actualizado desde Firestore:', daysData);
       setDays(daysData);
     });
     return unsubscribe; // Limpia el listener al desmontar
@@ -164,7 +86,8 @@ function ConfiguracionCalendario() {
         if (day.id === dayId) {
           const dayCopy = { ...day };
           if (scheduleField) { // Actualizando hora de inicio/fin de un horario
-            dayCopy[field] = { ...dayCopy[field], [scheduleField]: value };
+            // Asegura que el objeto de horario exista antes de actualizar
+            dayCopy[field] = { ...(dayCopy[field] || { active: false, start: '', end: '' }), [scheduleField]: value };
           } else { // Actualizando un campo directo (amount, webPreOrder)
              // Convertir a número si es un campo numérico
              const numericFields = ['chickenAmount', 'costillaAmount', 'codilloAmount', 'webPreOrder'];
@@ -189,7 +112,7 @@ function ConfiguracionCalendario() {
                           ...(dayCopy[field] || { start: '', end: '' }), // Asegura objeto base
                           active: checked,
                       };
-                       // Opcional: Limpiar horas si se desactiva?
+                       // Opcional: Limpiar horas si se desactiva? (Actualmente no lo hace)
                        // if (!checked) {
                        //     dayCopy[field].start = '';
                        //     dayCopy[field].end = '';
@@ -202,92 +125,63 @@ function ConfiguracionCalendario() {
       );
   };
 
-// --- Función Principal de Guardado y Regeneración ---
-const handleUpdateConfig = async () => {
-  // Guardar configuración base
-  try {
-    await Promise.all(
-      days.map((day) => {
-        const dayRef = doc(db, 'calendar', day.id);
-        const dataToSave = { ...day };
+  // --- Función de Guardado (MODIFICADA para usar setDoc) ---
+  // Guarda/Sobrescribe la configuración base en la colección 'calendar'
+  const handleUpdateBaseConfig = async () => {
+    console.log("Iniciando guardado (con setDoc) de configuración semanal base...");
+    try {
+      await Promise.all(
+        days.map((day) => {
+          const dayRef = doc(db, 'calendar', day.id);
+          // Prepara los datos asegurando la estructura y normalización ANTES de guardar
+          // Es crucial que dataToSave contenga TODOS los campos que quieres en el documento final
+          const dataToSave = {
+              name: day.name || '', // Asegura que siempre haya un nombre
+              chickenAmount: parseInt(day.chickenAmount) || 0,
+              costillaAmount: parseInt(day.costillaAmount) || 0,
+              codilloAmount: parseInt(day.codilloAmount) || 0,
+              webPreOrder: parseInt(day.webPreOrder) || 0,
+              negativeStock: !!day.negativeStock,
+              morningSchedule: {
+                  active: !!day.morningSchedule?.active,
+                  // Solo guarda horas si está activo
+                  start: (!!day.morningSchedule?.active && day.morningSchedule?.start) ? normalizeTime(day.morningSchedule.start) : '',
+                  end: (!!day.morningSchedule?.active && day.morningSchedule?.end) ? normalizeTime(day.morningSchedule.end) : '',
+              },
+              eveningSchedule: {
+                  active: !!day.eveningSchedule?.active,
+                  // Solo guarda horas si está activo
+                  start: (!!day.eveningSchedule?.active && day.eveningSchedule?.start) ? normalizeTime(day.eveningSchedule.start) : '',
+                  end: (!!day.eveningSchedule?.active && day.eveningSchedule?.end) ? normalizeTime(day.eveningSchedule.end) : '',
+              },
+              workSchedule: {
+                 // Asumiendo que workSchedule siempre guarda horas si existen, sin 'active' flag propio.
+                 // Si necesitas que workSchedule también pueda estar inactivo, añade un checkbox y un flag 'active'
+                 start: day.workSchedule?.start ? normalizeTime(day.workSchedule.start) : '',
+                 end: day.workSchedule?.end ? normalizeTime(day.workSchedule.end) : '',
+              }
+              // ¡Importante! No incluimos el 'id' de React dentro del documento Firestore
+          };
 
-        // Normalizar y limpiar datos ANTES de guardar
-        ['morningSchedule', 'eveningSchedule', 'workSchedule'].forEach(key => {
-          if (dataToSave[key]) {
-            dataToSave[key] = {
-              ...dataToSave[key],
-              active: !!dataToSave[key].active, // Asegura booleano
-              start: dataToSave[key].active ? normalizeTime(dataToSave[key].start) : '',
-              end: dataToSave[key].active ? normalizeTime(dataToSave[key].end) : '',
-            };
-          } else {
-            dataToSave[key] = { active: false, start: '', end: '' }; // Asegura objeto si no existe
-          }
-        });
-        // Asegura cantidades numéricas y booleano negativeStock
-        dataToSave.chickenAmount = parseInt(dataToSave.chickenAmount) || 0;
-        dataToSave.costillaAmount = parseInt(dataToSave.costillaAmount) || 0;
-        dataToSave.codilloAmount = parseInt(dataToSave.codilloAmount) || 0;
-        dataToSave.webPreOrder = parseInt(dataToSave.webPreOrder) || 0;
-        dataToSave.negativeStock = !!dataToSave.negativeStock;
+          console.log(`Guardando (setDoc) en /calendar/${day.id}`, dataToSave);
+          // Usamos setDoc para sobrescribir completamente el documento
+          return setDoc(dayRef, dataToSave); // <--- USA SETDOC PARA SOBRESCRIBIR
+        })
+      );
+      console.log("Configuración base 'calendar' actualizada (sobrescrita) correctamente.");
+      alert('Configuración semanal base guardada (sobrescrita).');
 
-        delete dataToSave.id; // No guardar el id dentro del documento
-        console.log("Guardando en /calendar/", day.id, dataToSave);
-        return updateDoc(dayRef, dataToSave);
-      })
-    );
-    console.log("Configuración base 'calendar' actualizada.");
-    alert('Configuración general y de productos guardada.');
+      // Opcional: Refrescar otras vistas si es necesario
+      if (refreshDailyCalendar) {
+          console.log("Llamando a refreshDailyCalendar para posible actualización de vistas...");
+          refreshDailyCalendar();
+      }
 
-    // Regenerar intervalos diarios para la fecha actual visible
-    if (dailyCalendar?.date) {
-      console.log(`Regenerando intervalos diarios para la fecha: ${dailyCalendar.date}`);
-      
-      // Consulta si el día actual está marcado en holiday_calendar
-      const holidayDocRef = doc(db, 'holiday_calendar', dailyCalendar.date);
-      const holidayDocSnap = await getDoc(holidayDocRef);
-      let dayId;
-      if (holidayDocSnap.exists()) {
-        const holidayData = holidayDocSnap.data();
-        if (holidayData.type === 'holiday') {
-          dayId = "8";  // id para festivo
-        } else if (holidayData.type === 'preHoliday') {
-          dayId = "9";  // id para víspera de festivo
-        }
-      }
-      // Si no hay marcado en holiday_calendar, usamos la configuración normal del día
-      if (!dayId) {
-        const dateObj = new Date(dailyCalendar.date + "T00:00:00"); // Cuidado con zonas horarias
-        const daysOfWeek = ["Domingo", "Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado"];
-        dayId = daysOfWeek[dateObj.getDay()];
-      }
-      
-      // Busca la configuración correspondiente en el estado 'days'
-      // Se asume que en la colección 'calendar' se tienen documentos cuyo id
-      // es el nombre del día normal ("Lunes", "Martes", etc.) o el id especial ("8" o "9")
-      const relevantDayConfig = days.find(d => d.id === dayId || d.name === dayId);
-      
-      if (relevantDayConfig) {
-        await Promise.all(
-          Object.keys(productTypesConfig).map(type =>
-            generateAndMergeIntervals(type, relevantDayConfig, dailyCalendar.date)
-          )
-        );
-        console.log(`Regeneración completada para ${dailyCalendar.date}`);
-        // Refresca el contexto para actualizar la vista diaria
-        refreshDailyCalendar();
-      } else {
-        console.warn(`No se encontró la configuración para el día ${dayId} para regenerar ${dailyCalendar.date}`);
-      }
-    } else {
-      console.warn("No hay fecha en dailyCalendar, no se pueden regenerar los intervalos diarios.");
+    } catch (error) {
+      console.error('Error al actualizar (setDoc) la configuración base en Firestore:', error);
+      alert('Error al guardar la configuración semanal.');
     }
-
-  } catch (error) {
-    console.error('Error al actualizar configuración y/o regenerar intervalos:', error);
-    alert('Error al guardar cambios.');
-  }
-};
+  };
 
 
   // --- RENDERIZADO ---
@@ -296,7 +190,7 @@ const handleUpdateConfig = async () => {
       {/* Header */}
       <div className="text-center py-6 border-b border-gray-100">
         <h1 className="text-3xl font-bold text-gray-800">Configuración Semanal General</h1>
-        <p className="text-gray-600 mt-1">Define horarios, cantidades y reglas para cada día.</p>
+        <p className="text-gray-600 mt-1">Define horarios, cantidades y reglas base para cada tipo de día.</p>
       </div>
 
       {/* Contenido principal */}
@@ -324,7 +218,7 @@ const handleUpdateConfig = async () => {
               {days.map((day) => (
                 <tr key={day.id} className="border-b border-gray-200 hover:bg-gray-50">
                   {/* Día (Sticky) */}
-                  <td className="py-3 px-2 text-gray-700 font-medium sticky left-0 bg-white hover:bg-gray-50 z-10">{day.name}</td>
+                  <td className="py-3 px-2 text-gray-700 font-medium sticky left-0 bg-white hover:bg-gray-50 z-10">{day.name || `Día ID: ${day.id}`}</td>
 
                   {/* Inputs de Cantidad */}
                   {Object.entries(productTypesConfig).map(([key, config]) => (
@@ -421,16 +315,15 @@ const handleUpdateConfig = async () => {
                    </td>
 
                   {/* Input Horario Trabajo (Traba) */}
-                  {/* Asumiendo que 'Traba' es el workSchedule y se activa/desactiva junto con sus horas */}
+                  {/* Asumiendo que 'Traba' es el workSchedule */}
                   <td className="py-3 px-2">
                       <div className="flex items-center justify-center space-x-1">
-                        {/* Podrías añadir un checkbox si workSchedule tuviera su propio 'active' */}
-                        {/* <input type="checkbox" checked={day.workSchedule?.active || false} ... /> */}
+                        {/* Si workSchedule necesita activarse/desactivarse, añade un checkbox aquí y deshabilita inputs */}
                          <input
                            type="time"
                            title="Inicio Horario Trabajo (Traba)"
                            value={day.workSchedule?.start || ''}
-                           // Podrías deshabilitarlo si no hay horas o si añades un 'active' flag
+                           // Podrías deshabilitarlo si añades un 'active' flag y está inactivo
                            onChange={(e) => handleInputChange(day.id, 'workSchedule', e.target.value, 'start')}
                            className="w-24 px-2 py-1 border border-gray-300 rounded text-center text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
                          />
@@ -439,6 +332,7 @@ const handleUpdateConfig = async () => {
                            type="time"
                            title="Fin Horario Trabajo (Traba)"
                            value={day.workSchedule?.end || ''}
+                           // Podrías deshabilitarlo si añades un 'active' flag y está inactivo
                            onChange={(e) => handleInputChange(day.id, 'workSchedule', e.target.value, 'end')}
                            className="w-24 px-2 py-1 border border-gray-300 rounded text-center text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
                          />
@@ -450,18 +344,18 @@ const handleUpdateConfig = async () => {
           </table>
         </div>
 
-        {/* Botón para actualizar la configuración */}
+        {/* Botón para actualizar la configuración base */}
         <div className="mt-6 flex justify-end">
           <button
             className="flex items-center bg-blue-600 hover:bg-blue-700 text-white px-5 py-2 rounded-lg shadow hover:shadow-md transition-colors duration-200"
-            onClick={handleUpdateConfig} // Llama a la función principal de guardado
+            onClick={handleUpdateBaseConfig} // Llama a la función que ahora usa setDoc
           >
             <Save className="w-5 h-5 mr-2" />
-            Guardar Configuración y Regenerar Día Actual
+            Guardar Configuración Semanal
           </button>
         </div>
-      </div>
-    </div>
+      </div> {/* Cierre de div p-4 md:p-6 */}
+    </div> /* Cierre de div principal w-full */
   );
 }
 
