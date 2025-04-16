@@ -41,6 +41,7 @@ import customParseFormat from 'dayjs/plugin/customParseFormat';
 import { useNavigate } from "react-router-dom";
 
 import SonidoOnChange from './SonidoOnChange'; // Asegúrate de importar correctamente el componente
+import HeaderFinal from '../cocina/components/HeaderFinal';
 
 
 
@@ -82,6 +83,8 @@ dayjs.extend(customParseFormat);
 
 //usamos la refencia del otro componente
 const pedidoRapidoRef = useRef();
+
+
 
 
 
@@ -181,7 +184,7 @@ const handlePedidoRapido = (idProduct) => {
 
   const [pedidosConOrigenUno, setPedidosConOrigenUno] = useState(null);
 
-  console.log('ibai:'+pedidosConOrigenUno);
+  //console.log('ibai:'+pedidosConOrigenUno);
 
 
 
@@ -696,10 +699,8 @@ const handlePedidoRapido = (idProduct) => {
           }
 
         }, [numeroBarra, totalProductosDespuesDeLas18, totalbloquesAntesdelas18]);
-          
 
-
-      
+                
           //search clientes 
           const [clientes, setClientes] = useState([]);
           // Estado para el término de búsqueda
@@ -1702,12 +1703,14 @@ const handlePedidoRapido = (idProduct) => {
 
          
      <PedidoRapido ref={pedidoRapidoRef} datosCliente={datosCliente} />
-    
+
    
      <SonidoOnChange pedidosConOrigenUno={pedidosConOrigenUno} initialValue={pedidosConOrigenUno} />
    
                         
    </>
+
+
    
    
   );

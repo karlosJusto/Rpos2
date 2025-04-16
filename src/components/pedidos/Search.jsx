@@ -7,6 +7,8 @@ const Search = () => {
 
   const { buscar, handleSearch, setBuscar } = useContext(dataContext);
 
+  const { libres, setLibres, enbarra, setEnbarra } = useContext(dataContext);
+
    // Función para resetear el valor de búsqueda
    const handleBlur = () => {
     setBuscar(""); // Limpiar el valor de búsqueda cuando el input pierde el foco

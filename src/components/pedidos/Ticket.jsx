@@ -86,7 +86,16 @@ const Ticket = (props) => {
     <>
   <div className="flex justify-end gap-[1vw] p-[0.5vw] mt-[0.7vw]">
 
-<Link className='border-2 p-[0.55vh] rounded-lg bg-white shadow-md'>
+          <div>
+          <h1 className="flex items-center justify-start ">hola</h1>
+          <h1>q etal</h1>
+
+          </div>
+          
+
+      <Link className='border-2 p-[0.55vh] rounded-lg bg-white shadow-md'>
+
+      
 
         <svg width="1.5vw" height="1.5vw" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg">
 
@@ -104,8 +113,8 @@ const Ticket = (props) => {
 
         </svg>
 
-</Link>
-<Link className='border-2  p-[0.55vh] rounded-lg bg-white shadow-md'>
+        </Link>
+            <Link className='border-2  p-[0.55vh] rounded-lg bg-white shadow-md'>
 
 
                 <svg width="1.5vw" height="1.5vw" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -140,10 +149,10 @@ const Ticket = (props) => {
 
             </Link>
 
-<Link className=' p-[0.30vw] rounded-lg   bg-green-700 '>
-<h1 className='p-[0.40vw]  font-nunito text-white'>10</h1>
-</Link>
-</div>
+              <Link className=' p-[0.30vw] rounded-lg   bg-green-700 '>
+                <h1 className='p-[0.40vw]  font-nunito text-white'>10</h1>
+            </Link>
+          </div>
 
       <div className="p-[1.3vh] mt-[1vh]">
         <h1 className="font-nunito border-b-2 text-gray-600 font-bold border-gray-600 text-[1vw]">

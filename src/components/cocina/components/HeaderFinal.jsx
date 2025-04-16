@@ -1,12 +1,31 @@
 import React from 'react';
 
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useContext} from 'react';
 import { db } from '../../firebase/firebase';
 import { collection, getDocs } from 'firebase/firestore';
 import RelojDistinto from './RelojDistinto';
-import { Offcanvas, Button, Navbar, Nav } from 'react-bootstrap';
+import PedidoRapido from '../../ordenes/PedidoRapido';
+import { Offcanvas, Button, Navbar, Nav,Modal } from 'react-bootstrap';
 import { Link } from 'react-router-dom';
+import { useRef } from 'react';
+
+import { DemoContainer, DemoItem } from '@mui/x-date-pickers/internals/demo';
+import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
+import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
+import { DatePicker } from '@mui/x-date-pickers/DatePicker';
+import { MobileDatePicker } from '@mui/x-date-pickers/MobileDatePicker';
+import { DesktopDatePicker } from '@mui/x-date-pickers/DesktopDatePicker';
+import { StaticDatePicker } from '@mui/x-date-pickers/StaticDatePicker';
+import { createTheme, ThemeProvider } from '@mui/material/styles';
+
+import dayjs from 'dayjs';
+import 'dayjs/locale/es'; // Para trabajar con el locale en español
+import timezone from 'dayjs/plugin/timezone'; // Plugin para zona horaria
+import utc from 'dayjs/plugin/utc'; // Plugin para trabajar con fechas en UTC
+import customParseFormat from 'dayjs/plugin/customParseFormat';
+
+import { dataContext } from '../../Context/DataContext';
 
 
 
@@ -14,9 +33,94 @@ import { Link } from 'react-router-dom';
 
 const HeaderFinal = () => {
 
-  
+
+    const { numeroBarra, libres, mostrarBarra } = useContext(dataContext);
+
+    console.log({mostrarBarra});
+
+
   const [show, setShow] = useState(false);
   const [numero, setNumero] = useState(0);
+   const [selectedDate, setSelectedDate] = useState(dayjs('DD/MM/YYYY'));
+
+  const [showModal, setShowModal] = useState(false);
+  const handleShowModal= () => setShowModal(true);
+  const handleCloseModal = () => setShowModal(false);
+  const [isColorChanged, setIsColorChanged] = useState(false); // Estado para controlar si el color del div cambió
+
+      // Función para manejar el cambio de la fecha en el StaticDatePicker
+      const handleDateChange = (newDate) => {
+        setSelectedDate(newDate);
+        console.log(newDate);
+      };
+
+      
+
+      const handleAccept = () => {
+        setDateToPass(selectedDate);  // Pasa la fecha seleccionada a otro componente
+        setIsColorChanged(true);
+        handleCloseModal();  // Cierra el modal
+      };
+
+    // Estilo del div que cambiará dependiendo de si el color ha cambiado
+    const divStyle = isColorChanged
+    ? 'w-[8vw] h-[10vh] bg-[#75adab]'  // Color de fondo si se ha hecho clic
+    : 'w-[8vw] h-[10vh] bg-[#f2ac02]'; // Color de fondo inicial
+
+    const theme = createTheme({
+        palette: {
+          primary: {
+            main: '#f2ac02', // Cambiar a cualquier color que desees.
+          },
+        },
+      });
+
+
+      //ajustamos la hora
+        const obtenerHoraRedondeada = () => {
+          const now = dayjs(); // Hora actual
+          
+          // Obtener los minutos actuales
+          const minutos = now.minute();
+        
+          // Redondeamos los minutos al múltiplo más cercano de 15 (xx:00, xx:15, xx:30, xx:45)
+          const siguienteBloque = Math.floor(minutos / 15) * 15; // Redondea hacia abajo al múltiplo más cercano de 15 minutos
+          
+          // Ajustar la hora a 00, 15, 30, 45 minutos
+          const nuevaHora = now
+            .minute(siguienteBloque) // Ajustamos a los minutos correspondientes (xx:00, xx:15, etc.)
+            .second(0)
+            .millisecond(0);
+        
+          // Si la hora ajustada es antes de la hora actual, avanzamos al siguiente bloque (añadimos 15 minutos)
+          return nuevaHora.isBefore(now) ? nuevaHora.add(15, 'minute') : nuevaHora;
+        };
+        
+        const fechahora = obtenerHoraRedondeada().format('DD/MM/YYYY HH:mm');
+
+        //usamos la refencia del otro componente
+        const pedidoRapidoRef = useRef();
+        
+        
+        
+        //pedidos rapidos pasandole el id producto 1 o 2
+        const handlePedidoRapido = (idProduct) => {
+          // Llamamos a la función hacerPedidoRapido sin la comprobación del carrito
+          pedidoRapidoRef.current.hacerPedidoRapido(idProduct);
+        };
+      
+
+        // Datos del cliente para pasar a PedidoRapido
+  const [datosCliente, setDatosCliente] = useState({
+    cliente: 'AAgenerico',
+    telefono: '000000000',
+    fechahora: fechahora,
+    observaciones: 'Pedido Rapido',
+    pagado: false,
+    celiaco: false,
+    localidad: 'Mungia',
+  });
+  
 
 
   // Función para alternar el estado del offcanvas
@@ -123,14 +227,15 @@ const HeaderFinal = () => {
 
          <div className='w-[8vw] h-[10vh] bg-[#f2ac02]  rounded-xl shadow-md'>
 
-            <div className="flex justify-center items-center h-1/2">
-              <p className="text-white text-center text-[1.8vw] font-nunito border-b-4">1P</p>
+            <div className="flex justify-center items-center h-1/2" onClick={() => handlePedidoRapido(1)}>
+            <button type='button' className="text-white text-center text-[1.8vw] font-nunito border-b-4">1P</button>
             </div>
             
             
-            <div className="flex justify-center items-center h-1/2">
-              <p className="text-white text-center text-[1.8vw] font-nunito">1/2P</p>
+            <div className="flex justify-center items-center h-1/2" onClick={() => handlePedidoRapido(2)}>
+            <button type='button' className="text-white text-center text-[1.8vw] font-nunito ">1/2P</button>
             </div>
+           
         
          </div>
 
@@ -169,7 +274,7 @@ const HeaderFinal = () => {
 
 
      <div className='w-[8vw] h-[10vh]  bg-gray-500 flex flex-col justify-center items-center rounded-xl shadow-md'>
-          <h1 className="text-white text-center text-[3.5vw] font-nunito">{numero}</h1>
+          <h1 className="text-white text-center text-[3vw] font-nunito">{mostrarBarra}</h1>
           <h1 className="text-white text-center text-[2w] font-nunito">En barra</h1>
      </div>   
 
@@ -209,7 +314,7 @@ const HeaderFinal = () => {
 
 
       <div className='w-[8vw] h-[10vh] bg-[#f2ac02]  flex flex-col justify-center items-center rounded-xl shadow-md'>
-          <h1 className="text-white text-center text-[3.5vw] font-nunito">{numero}</h1>
+          <h1 className="text-white text-center text-[2.5vw] font-nunito">{libres}</h1>
           <h1 className="text-white text-center text-[2w] font-nunito">Libres</h1>
      </div>
 
@@ -217,19 +322,19 @@ const HeaderFinal = () => {
 
 
 
-     <div className='w-[8vw] h-[10vh] bg-[#bfc9ca]  flex flex-col justify-center items-center rounded-xl shadow-md'>
+     <div className='w-[8vw] h-[10vh] bg-gray-400  flex flex-col justify-center items-center rounded-xl shadow-md'>
             <h1 className="text-white text-center text-[2vw] font-nunito"></h1>
             <h1 className="text-white text-center text-[2w] font-nunito"></h1>
         
      </div>
 
-     <div className='w-[8vw] h-[10vh] bg-[#bfc9ca] flex flex-col justify-center items-center rounded-xl shadow-md'>
+     <div className='w-[8vw] h-[10vh] bg-gray-400  flex flex-col justify-center items-center rounded-xl shadow-md'>
             <h1 className="text-white text-center text-[2vw] font-nunito"></h1>
             <h1 className="text-white text-center text-[2w] font-nunito"></h1>
                
      </div>
 
-     <div className='w-[8vw] h-[10vh] bg-[#bfc9ca]  flex flex-col justify-center items-center rounded-xl shadow-md'>
+     <div className='w-[8vw] h-[10vh] bg-gray-400   flex flex-col justify-center items-center rounded-xl shadow-md'>
           <h1 className="text-white text-center text-[2vw] font-nunito"></h1>
           <h1 className="text-white text-center text-[2w] font-nunito"></h1>
      </div>
@@ -238,9 +343,9 @@ const HeaderFinal = () => {
 
 
       
-     <div className='w-[8vw] h-[10vh] bg-[#f2ac02] flex flex-col justify-center items-center rounded-xl shadow-md' >
-        <RelojDistinto/>
-      </div>
+     <div className={`${divStyle} flex flex-col justify-center items-center rounded-xl shadow-md`} onClick={handleShowModal}>
+            <RelojDistinto />
+          </div>
       </div>
     </div>
 
@@ -343,22 +448,6 @@ const HeaderFinal = () => {
       </svg>
       </Link>
 
-      <Link className='p-3  hover:bg-gray-100 hover:rounded-2xl ' to={"/scanner"}>
-
-      <svg width="40px" height="40px" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" stroke="#000000" strokeWidth="1.2">
-
-      <g id="SVGRepo_bgCarrier" strokeWidth="0"/>
-
-      <g id="SVGRepo_tracerCarrier" strokeLinecap="round" strokeLinejoin="round"/>
-
-      <g id="SVGRepo_iconCarrier"> <path d="M7.55556 4H5C4.44771 4 4 4.44772 4 5V7.55556M16.4444 4H19C19.5523 4 20 4.44772 20 5V7.55556M20 16.4444V19C20 19.5523 19.5523 20 19 20H16.4444M7.55556 20H5C4.44771 20 4 19.5523 4 19V16.4444M5.77778 12.8889H6.66667M8.44444 12.8889H9.33333M5.77778 11H10.1111C10.6634 11 11.1111 10.5523 11.1111 10V5.77778M12.8889 5.77778V11.1111M16.4444 11H18.2222M14.6667 11H15.1111M13.7778 12.8889H15.1111M17 12.8889H18.2222M18.2222 15H15.5556M15.5556 16.8889V18.2222M13.7778 15V18.2222M12 18.2222V12.8889H11.1111M10.2222 14.6667V18.2222M18.2222 17.7778V17.7778C18.2222 17.5323 18.0232 17.3333 17.7778 17.3333V17.3333C17.5323 17.3333 17.3333 17.5323 17.3333 17.7778V17.7778C17.3333 18.0232 17.5323 18.2222 17.7778 18.2222V18.2222C18.0232 18.2222 18.2222 18.0232 18.2222 17.7778ZM18.2222 6.77778V8.33333C18.2222 8.88562 17.7745 9.33333 17.2222 9.33333H15.6667C15.1144 9.33333 14.6667 8.88562 14.6667 8.33333V6.77778C14.6667 6.22549 15.1144 5.77778 15.6667 5.77778H17.2222C17.7745 5.77778 18.2222 6.22549 18.2222 6.77778ZM6.77778 9.33333H8.33333C8.88562 9.33333 9.33333 8.88562 9.33333 8.33333V6.77778C9.33333 6.22549 8.88562 5.77778 8.33333 5.77778H6.77778C6.22549 5.77778 5.77778 6.22549 5.77778 6.77778V8.33333C5.77778 8.88562 6.22549 9.33333 6.77778 9.33333ZM7.44444 18.2222H6.77778C6.22549 18.2222 5.77778 17.7745 5.77778 17.2222V15.6667C5.77778 15.1144 6.22549 14.6667 6.77778 14.6667H7.44444C7.99673 14.6667 8.44444 15.1144 8.44444 15.6667V17.2222C8.44444 17.7745 7.99673 18.2222 7.44444 18.2222Z" stroke="#757575" strokeLinecap="round" strokeLinejoin="round"/> </g>
-
-      </svg>
-                  
-      </Link>
-
-
-
       <Link className='p-3 mb-2 hover:bg-gray-100 hover:rounded-2xl' to={"/login"}>
 
       <svg width="40px" height="40px" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -376,6 +465,69 @@ const HeaderFinal = () => {
     </Nav>
   </Offcanvas.Body>
    </Offcanvas>
+
+
+   <Modal show={showModal} onHide={handleCloseModal} size="md" backdrop="static" keyboard={false} centered>
+       
+       <Modal.Body >
+
+       
+               <ThemeProvider theme={theme}> {/* Aplicar el tema personalizado */}
+               <LocalizationProvider dateAdapter={AdapterDayjs} adapterLocale="es">
+               <DemoContainer components={['StaticDatePicker']}>
+                     <DemoItem>
+                       <StaticDatePicker
+                         displayStaticWrapperAs="desktop"  // 
+                         value={selectedDate}
+                         defaultValue={dayjs('DD/MM/YYYY')}
+                         onChange={handleDateChange}  // Actualiza el estado de la fecha
+                         sx={{
+                           '& .MuiPickersDay-root': {
+                             fontSize: '1.5rem',  // Tamaño de los días
+                           },
+                           '& .MuiPickersCalendarHeader-root': {
+                             fontSize: '1.5rem',  // Tamaño de la cabecera del calendario
+                           },
+                           '& .MuiPickersDay-selected': {
+                             backgroundColor: 'blue',  // Ejemplo de personalización extra (opcional)
+                           },
+                           '& .MuiPickersDay-dayWithMargin': {
+                             margin: '2px',  // Espaciado entre los días
+                           },
+                         }}
+                       />
+                     </DemoItem>
+                   </DemoContainer>
+
+              </LocalizationProvider>
+             </ThemeProvider>
+
+  
+
+
+       </Modal.Body>
+       <Modal.Footer className='no-border'>
+       <Button
+           variant="secondary"
+           className="p-3 bg-white font-nunito text-gray-500 border-gray-300 hover:text-yellow-600 hover:border-yellow-600"
+           onClick={handleCloseModal}
+         >
+           Cancelar
+         </Button>
+         <Button
+           variant="primary"
+          
+           className="bg-yellow-500 border-yellow-500 hover:bg-yellow-600 hover:border-yellow-600 p-3 font-nunito"
+           onClick={handleAccept}
+         >
+           Aceptar
+         </Button>
+       </Modal.Footer>
+       
+   </Modal>
+
+ 
+   <PedidoRapido ref={pedidoRapidoRef} datosCliente={datosCliente} />
 
      
 

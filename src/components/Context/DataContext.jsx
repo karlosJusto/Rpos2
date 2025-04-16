@@ -10,6 +10,10 @@ const DataProvider = ({ children }) => {
   const [cart, setCart] = useState([]);
   const [buscar, setBuscar] = useState(""); // Nuevo estado para el término de búsqueda
 
+  const [libres, setLibres] = useState(0); // Nuevo estado para 'libres'
+ 
+
+
   // Función para actualizar el stock de un producto
   const actualizarStock = async (id_product, nuevoStock) => {
     const idString = String(id_product);
@@ -67,6 +71,10 @@ const DataProvider = ({ children }) => {
         handleSearch, // Pasamos la función de búsqueda
         setBuscar, // Pasar la función setBuscar 
         actualizarStock, // Pasar la función para actualizar el stock
+        libres, // Pasar el estado 'libres'
+        setLibres, // Pasar la función para actualizar 'libres'
+        
+        
       }}
     >
       {children}
