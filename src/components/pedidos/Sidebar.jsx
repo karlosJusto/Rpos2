@@ -12,7 +12,7 @@ const Sidebar = () => {
 
   return (
     <div className="flex justify-center items-center h-screen"> 
-    <ul className=" flex  w-[6vw] flex-col justify-between text-center items-center gap-8   bg-[#f2ac02] rounded-3xl">
+    <ul className=" flex  w-[6vw] flex-col justify-between text-center items-center gap-[1.3vh]   bg-[#f2ac02] rounded-3xl">
 
              <Link className=" p-3 mt-2  hover:bg-gray-100 hover:rounded-2xl " to={"/layout/comida"}>
 

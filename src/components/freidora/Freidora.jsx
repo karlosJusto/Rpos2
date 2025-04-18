@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react';
 import { db } from '../firebase/firebase';
-import { collection, query, where, getDocs } from 'firebase/firestore';
-import { Timestamp } from 'firebase/firestore';
+import { collection, query, where, onSnapshot,getDocs } from 'firebase/firestore'; // Importa onSnapshot
 import patata from '../../assets/freidora/patata.png';
 import pimiento from '../../assets/freidora/pimiento.png';
 import croquetas from '../../assets/freidora/croquetas.png';
@@ -81,216 +80,143 @@ const Freidora = () => {
 
 
 // Función para obtener los pedidos del día
+// Función para obtener los pedidos del día
 useEffect(() => {
-  const obtenerPedidosDelDia = async () => {
-    setLoading(true);
-    setError(null);
+  const hoy = new Date();
+  const dia = String(hoy.getDate()).padStart(2, '0');
+  const mes = String(hoy.getMonth() + 1).padStart(2, '0');
+  const anio = hoy.getFullYear();
+  const horaActual = hoy.getHours();
 
-    try {
-  
-      const hoy = new Date();
-      const dia = String(hoy.getDate()).padStart(2, '0');
-      const mes = String(hoy.getMonth() + 1).padStart(2, '0');
-      const anio = hoy.getFullYear();
-      const horaActual = hoy.getHours();
+  let fechaInicio, fechaFin;
 
-      let fechaInicio, fechaFin;
+  if (horaActual < 18) {
+    fechaInicio = `${dia}/${mes}/${anio} 00:00`;
+    fechaFin = `${dia}/${mes}/${anio} 17:59`;
+  } else {
+    fechaInicio = `${dia}/${mes}/${anio} 18:00`;
+    fechaFin = `${dia}/${mes}/${anio} 23:59`;
+  }
 
-      if (horaActual < 18) {
-        fechaInicio = `${dia}/${mes}/${anio} 00:00`;
-        fechaFin = `${dia}/${mes}/${anio} 17:59`;
-      } else {
-        fechaInicio = `${dia}/${mes}/${anio} 18:00`;
-        fechaFin = `${dia}/${mes}/${anio} 23:59`;
-      }
+  setLoading(true);
+  setError(null);
 
+  const pedidosRef = collection(db, 'pedidos');
+  const q = query(pedidosRef, where('fechahora', '>=', fechaInicio), where('fechahora', '<=', fechaFin));
 
-      const pedidosRef = collection(db, 'pedidos');
-      const q = query(pedidosRef, where('fechahora', '>=', fechaInicio), where('fechahora', '<=', fechaFin));
+  // Establecer el listener en tiempo real
+  const unsubscribe = onSnapshot(q, (snapshot) => {
+    const pedidosDelDia = {};
+    let productosTotales = {};
 
+    snapshot.forEach((doc) => {
+      const pedido = doc.data();
 
-      const querySnapshot = await getDocs(q);
-      //const querySnapshot = await getDocs(pedidosRef);
-      const pedidosDelDia = {}; // Objeto para agrupar productos por bloque horario
+      if (pedido.productos) {
+        const fechaRecogida = dayjs(pedido.fechahora, 'DD/MM/YYYY HH:mm').tz('Europe/Madrid');
 
-      // Convertimos bloqueHorario a día y hora y sumamos 15 minutos
-      const fechaBloqueActual = dayjs(bloqueHorario, 'HH:mm').tz('Europe/Madrid'); // Utilizamos bloqueHorario como inicio
-      const fechaBloqueAnterior = fechaBloqueActual.subtract(15, 'minutes'); // Sumamos 15 minutos al bloque horario
-      const fechaBloquePosterior = fechaBloqueActual.add(15, 'minutes'); // Sumamos 15 minutos al bloque horario
-      setBloqueHorario(bloqueHorario);
+        pedido.productos.forEach((producto) => {
+          if (producto.freidora === true) {
+            let productoConFecha = {
+              id: producto.id,
+              nombre: producto.nombre,
+              alias: producto.alias,
+              categoria: producto.categoria,
+              cantidad: producto.cantidad,
+              celiaco: producto.celiaco,
+              numeropedido: pedido.NumeroPedido,
+              entregado: producto.entregado,
+              cliente: pedido.cliente,
+              fechahora: fechaRecogida.format('HH:mm'),
+              doble: false,
+            };
 
-      let productosTotales = {};
-
-      querySnapshot.forEach((doc) => {
-        const pedido = doc.data();
-       // console.log('->' + JSON.stringify(pedido));
-
-        // Verificamos si la fecha de recogida está hoy
-        if (pedido.productos) {
-          // Utilizamos la fecha desde el objeto pedido
-          const fechaRecogida = dayjs(pedido.fechahora, 'DD/MM/YYYY HH:mm').tz('Europe/Madrid'); // Aseguramos que esté en la zona horaria de España
-         // const fechaHoy = dayjs().tz('Europe/Madrid').startOf('day'); // Hora inicio del día en España
-         // const fechaFinal = dayjs().tz('Europe/Madrid').endOf('day'); // Hora final del día en España
-        // console.log('fechaRecogida: '+fechaRecogida)
-          // Validamos si la fecha de recogida es válida
-          //if (!fechaRecogida.isValid()) {
-          //  return;
-          //}
-
-        
-          // Comprobamos si la fecha de recogida está dentro del rango entre bloqueInicio y bloqueFin
-        //  if (fechaRecogida.isBetween(fechaBloqueActual, fechaBloqueAnterior, null, '[]')) {
-            // Agrupar los productos dentro del mismo pedido, solo si freidora === true
-            pedido.productos.forEach((producto) => {
-              // Solo procesar productos con freidora: true
-              if (producto.freidora === true) {
-                let productoConFecha = {
-                  id: producto.id,
-                  nombre: producto.nombre,
-                  alias: producto.alias,
-                  categoria: producto.categoria, // Añadimos la categoría
-                  cantidad: producto.cantidad,
-                  celiaco: producto.celiaco,
-                  numeropedido: pedido.NumeroPedido,
-                  entregado: producto.entregado, // Agregar el campo entregado
-                  cliente: pedido.cliente,
-                  fechahora: fechaRecogida.format('HH:mm'),
-                  doble: false,
-                };
-
-                //Cantidad de productos para rango horario
-                let clave = `${productoConFecha.id}-${productoConFecha.fechahora}`; // Generar clave única basada en id y hora
-                let producto_doble = false;
-                if ( (producto.id == 10) || (producto.id == 3) )
-                {
-                  if (producto.cantidad>1)
-                  {
-                    clave=clave+"_doble";
-                    producto_doble=true;
-                  }
-                }
-                if (producto.celiaco)
-                {
-                  clave=clave+"_celiaco";
-                }
-                if (pedidosDelDia[clave]) {
-                  // Si ya existe, sumamos la cantidad y también actualizamos la cantidad entregada
-                  if (producto_doble)
-                  {
-                      pedidosDelDia[clave].cantidad += Math.floor(productoConFecha.cantidad/2);
-                      pedidosDelDia[clave].entregado += Math.floor(productoConFecha.entregado/2); // Sumar el entregado también
-
-                      if ( (productoConFecha.cantidad % 2)>0 )
-                      {
-                         pedidosDelDia[clave.replace('_doble', '')].cantidad += productoConFecha.cantidad % 2;
-                         pedidosDelDia[clave.replace('_doble', '')].entregado += productoConFecha.entregado %2 ; 
-                      }
-
-
-                  }else{
-                       pedidosDelDia[clave].cantidad += productoConFecha.cantidad;
-                       pedidosDelDia[clave].entregado += productoConFecha.entregado; // Sumar el entregado también
-                  }
-                 
-                } else {
-                  // Si no existe, añadimos el producto
-                  pedidosDelDia[clave] = productoConFecha;
-                  if (producto_doble)
-                    {
-                      let productoDoble = { ...productoConFecha, alias: pedidosDelDia[clave].alias+" Dobles", cantidad: Math.floor(productoConFecha.cantidad/2), entregado: Math.floor(productoConFecha.entregado/2), doble: true };
-                      pedidosDelDia[clave] = productoDoble;
-
-  
-                        if ( (productoConFecha.cantidad % 2)>0 )
-                        {
-                          let clave_simple=clave.replace('_doble', '');
-                          if (pedidosDelDia[clave_simple]) {
-                            pedidosDelDia[clave_simple].cantidad += productoConFecha.cantidad % 2;
-                            pedidosDelDia[clave_simple].entregado += productoConFecha.entregado %2 ;
-                          } 
-                          else{
-                            let productoSimple = { ...productoConFecha, cantidad:productoConFecha.cantidad%2, entregado: productoConFecha.entregado%2 };
-                            pedidosDelDia[clave_simple] = productoSimple;
-                          }
-
-                        }
-                     
-  
-  
-                    }
-                }
-
-
+            let clave = `${productoConFecha.id}-${productoConFecha.fechahora}`;
+            let producto_doble = false;
+            if ((producto.id == 10) || (producto.id == 3)) {
+              if (producto.cantidad > 1) {
+                clave = clave + "_doble";
+                producto_doble = true;
               }
-            });
-        //  }
+            }
+            if (producto.celiaco) {
+              clave = clave + "_celiaco";
+            }
 
+            if (pedidosDelDia[clave]) {
+              if (producto_doble) {
+                pedidosDelDia[clave].cantidad += Math.floor(productoConFecha.cantidad / 2);
+                pedidosDelDia[clave].entregado += Math.floor(productoConFecha.entregado / 2);
+                if ((productoConFecha.cantidad % 2) > 0) {
+                  pedidosDelDia[clave.replace('_doble', '')].cantidad += productoConFecha.cantidad % 2;
+                  pedidosDelDia[clave.replace('_doble', '')].entregado += productoConFecha.entregado % 2;
+                }
+              } else {
+                pedidosDelDia[clave].cantidad += productoConFecha.cantidad;
+                pedidosDelDia[clave].entregado += productoConFecha.entregado;
+              }
+            } else {
+              pedidosDelDia[clave] = productoConFecha;
+              if (producto_doble) {
+                let productoDoble = { ...productoConFecha, alias: pedidosDelDia[clave].alias + " Dobles", cantidad: Math.floor(productoConFecha.cantidad / 2), entregado: Math.floor(productoConFecha.entregado / 2), doble: true };
+                pedidosDelDia[clave] = productoDoble;
+                if ((productoConFecha.cantidad % 2) > 0) {
+                  let clave_simple = clave.replace('_doble', '');
+                  if (pedidosDelDia[clave_simple]) {
+                    pedidosDelDia[clave_simple].cantidad += productoConFecha.cantidad % 2;
+                    pedidosDelDia[clave_simple].entregado += productoConFecha.entregado % 2;
+                  } else {
+                    let productoSimple = { ...productoConFecha, cantidad: productoConFecha.cantidad % 2, entregado: productoConFecha.entregado % 2 };
+                    pedidosDelDia[clave_simple] = productoSimple;
+                  }
+                }
+              }
+            }
+          }
+        });
+      }
+    });
 
+    const pedidosDelDiaArray = Object.entries(pedidosDelDia);
+    pedidosDelDiaArray.sort(([, pedidoA], [, pedidoB]) => pedidoA.id - pedidoB.id);
 
+    pedidosDelDiaArray.forEach(([clave, bloque]) => {
+      bloque.cantidad -= bloque.entregado;
+      let clave_totales = clave.split("-")[0];
+      if (clave_totales.length + 6 < clave.length) {
+        clave_totales = clave_totales + clave.substring(clave_totales.length + 6);
+      }
+      clave_totales = clave_totales.replace('_celiaco', '');
 
+      if (productosTotales[clave_totales]) {
+        productosTotales[clave_totales].cantidad += bloque.cantidad;
+        productosTotales[clave_totales].entregado += bloque.entregado;
+        productosTotales[clave_totales].celiaco += bloque.celiaco ? bloque.cantidad : 0;
+      } else {
+        productosTotales[clave_totales] = {
+          id: bloque.id,
+          nombre: bloque.nombre,
+          alias: bloque.alias,
+          cantidad: bloque.cantidad,
+          entregado: bloque.entregado,
+          celiaco: bloque.celiaco ? bloque.cantidad : 0,
+          doble: clave_totales.includes('_doble') ? true : false,
+        };
+      }
+    });
 
-        }
-      });
+    setPedidos(Object.values(pedidosDelDia));
+    setPedidosTotales(productosTotales);
+    setLoading(false);
+  }, (error) => {
+    console.error("Error al escuchar los pedidos del día: ", error);
+    setError("Ocurrió un error al obtener los pedidos.");
+    setLoading(false);
+  });
 
-      const pedidosDelDiaArray = Object.entries(pedidosDelDia);
-      pedidosDelDiaArray.sort(([, pedidoA], [, pedidoB]) => pedidoA.id - pedidoB.id);
-
-
-
-      // Calculamos la cantidad total que aún está pendiente de entrega
-     // Object.keys(pedidosDelDia).forEach((clave) => {
-      pedidosDelDiaArray.forEach(([clave, bloque]) => {
-
-
-        //const bloque = pedidosDelDia[clave];
-        // Restamos la cantidad entregada de la cantidad total del bloque
-        bloque.cantidad -= bloque.entregado;
-        //console.log("->"+clave+": "+JSON.stringify(bloque));
-
-        let clave_totales = clave.split("-")[0]; // Obtener la parte antes del primer guión
-        if (clave_totales.length+6 < clave.length)
-        {
-          clave_totales=clave_totales+clave.substring(clave_totales.length+6);
-        }
-        clave_totales = clave_totales.replace('_celiaco', ''); 
-
-
-        if (productosTotales[clave_totales]) {
-          productosTotales[clave_totales].cantidad += bloque.cantidad;
-          productosTotales[clave_totales].entregado += bloque.entregado;
-          productosTotales[clave_totales].celiaco += bloque.celiaco ? bloque.cantidad : 0;
-        } else {
-          productosTotales[clave_totales] = {
-            id: bloque.id,
-            nombre: bloque.nombre,
-            alias: bloque.alias,
-            cantidad: bloque.cantidad,
-            entregado: bloque.entregado,
-            celiaco: bloque.celiaco ? bloque.cantidad : 0,
-            doble: clave_totales.includes('_doble') ? true : false,
-          };
-          
-
-          //console.log("***** New producto:"+JSON.stringify(productosTotales[clave_totales]));
-        }
-
-
-      });
-
-
-      //console.log("->Productos_totales:"+JSON.stringify(productosTotales));
-      // Convertimos el objeto a array para que se pueda mostrar en la interfaz
-      setPedidos(Object.values(pedidosDelDia));
-      setPedidosTotales(productosTotales);
-    } catch (err) {
-      console.error("Error al obtener los pedidos del día: ", err);
-      setError("Ocurrió un error al obtener los pedidos.");
-    }
-    setLoading(false); // Finaliza el estado de carga
-  };
-
-  obtenerPedidosDelDia();
-}, [bloqueHorario]); // Dependemos de bloqueHorario para que se actualizado
+  // Retornar la función de limpieza para cancelar la suscripción cuando el componente se desmonte
+  return () => unsubscribe();
+}, []); // El array vacío ahora es correcto porque onSnapshot se mantiene suscrito
   
 
   

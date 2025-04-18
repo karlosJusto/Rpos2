@@ -235,7 +235,7 @@ const generarEstadisticasDiarias = async () => {
       <h4 className="text-4xl text-gray-500 font-extrabold font-nunito -mt-5">Bienvenido</h4>
       <p className="font-medium text-lg text-gray-400 mt-2 font-nunito border-b-2">Introduce tu PIN!</p>
 
-      <div className="flex flex-col text-2xl text-center p-4">
+      <div className="flex flex-col text-xl text-center p-4">
         <input
           type="password"
           maxLength={5} // Limita el máximo de caracteres a 5

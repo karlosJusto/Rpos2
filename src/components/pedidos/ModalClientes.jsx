@@ -125,7 +125,7 @@ const ModalClientes = ({ show, handleClose, onSave }) => {
             </div>
             <div className="form-floating w-[25vw]">
               <input
-                type="phone"
+                type="number"
                 className="form-control border-2 border-gray-200 font-nunito font-extrabold focus:border-yellow-500 focus:ring-0"
                 id="telefono"
                 placeholder="Teléfono"
