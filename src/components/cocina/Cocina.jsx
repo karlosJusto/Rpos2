@@ -1,5 +1,5 @@
 // --- Cocina.jsx (Completo - Stock Productos + Lógica Original Ensaladas + Refresco Alertas) ---
-import React, { useEffect, useState, useRef, useCallback } from 'react';
+import React, { useEffect, useState, useRef, useCallback, useContext} from 'react';
 import HeaderFinal from './components/HeaderFinal'; // Ajusta la ruta si es necesario
 import ProductCard from './components/ProductCard';  // Ajusta la ruta si es necesario
 import SaladTypeCard from './components/SaladTypeCard'; // Ajusta la ruta si es necesario
@@ -15,6 +15,7 @@ import {
 import dayjs from 'dayjs';
 import isBetween from 'dayjs/plugin/isBetween';
 import customParseFormat from 'dayjs/plugin/customParseFormat';
+import { dataContext } from '../Context/DataContext';
 
 // Extend dayjs plugins
 dayjs.extend(isBetween);
@@ -49,6 +50,8 @@ const Cocina = () => {
   const [isLoadingProductosStock, setIsLoadingProductosStock] = useState(true); // Carga de stock
   const [isLoadingPedidosAndProcessing, setIsLoadingPedidosAndProcessing] = useState(true); // Carga y procesamiento de pedidos
   // const [isLoadingSalads, setIsLoadingSalads] = useState(true); // Opcional: si la carga de ensaladas es crítica
+
+  const { libres,mostrarBarra } = useContext(dataContext); // Asegúrate de consumir 'libres' aquí
 
 
   // --- Efecto para Refresco Periódico (Alertas) ---
@@ -520,7 +523,7 @@ const Cocina = () => {
   return (
     <div className="h-screen flex flex-col">
       {/* Cabecera */}
-      <HeaderFinal title="Cocina" subtitle={turnoText}/>
+     <HeaderFinal title="Cocina" subtitle={turnoText}/> 
 
       {/* Indicador de Carga General */}
       {isLoading && (
@@ -579,6 +582,7 @@ const Cocina = () => {
           )}
           {/* Opcional: Mensaje si no hay datos de ensaladas después de cargar */}
           {/* {!isLoading && saladsData.length === 0 && (<div className="text-center text-sm text-gray-400 pb-4">No hay datos de ensaladas para este día.</div>)} */}
+          <HeaderFinal /* ... otras props ... */ libres={libres} mostrarBarra={mostrarBarra} />
         </>
       )}
     </div>

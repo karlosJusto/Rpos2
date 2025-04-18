@@ -48,6 +48,10 @@ import HeaderFinal from '../cocina/components/HeaderFinal';
 
 
 const Ordenes = () => {
+
+  const { pedidosConOrigenUno, setPedidosConOrigenUno, libres, setLibres, pedidos,dateToPass,setDateToPass, numeroBarra,setNumeroBarra, totalProductosDespuesDeLas18, setTotalProductosDespuesDeLas18, totalbloquesAntesdelas18, setTotalbloquesAntesdelas18,loading, setLoading, mostrarBarra, setMostrarBarra } = useContext(dataContext);
+
+
   const navigate = useNavigate();
 
   // Función para editar pedido
@@ -102,7 +106,7 @@ const handlePedidoRapido = (idProduct) => {
 
   
   const [show, setShow] = useState(false);
-  const [numeroBarra, setNumeroBarra]=useState(0);
+  /*const [numeroBarra, setNumeroBarra]=useState(0);*/
   const [isColorChanged, setIsColorChanged] = useState(false); // Estado para controlar si el color del div cambió
   const [vm, setVm] = useState(0); // Estado para 'VM'
 
@@ -124,7 +128,7 @@ const handlePedidoRapido = (idProduct) => {
   const [selectedDate, setSelectedDate] = useState(dayjs('DD/MM/YYYY'));
 
   // Estado para la fecha que será pasada al otro componente
-  const [dateToPass, setDateToPass] = useState(null);
+  //const [dateToPass, setDateToPass] = useState(null);
 
   //console.log(selectedDate);
 
@@ -132,6 +136,9 @@ const handlePedidoRapido = (idProduct) => {
     const handleDateChange = (newDate) => {
       setSelectedDate(newDate);
     };
+
+
+
 
   const handleAccept = () => {
     setDateToPass(selectedDate);  // Pasa la fecha seleccionada a otro componente
@@ -149,7 +156,7 @@ const handlePedidoRapido = (idProduct) => {
   const [showModal, setShowModal] = useState(false);
   const handleCloseModal = () => setShowModal(false);
   const handleShowModal= () => setShowModal(true);
-  const [loading, setLoading] = useState(false); // Estado de carga
+  
  
 
   //cierre turno fuerza recarga pagina
@@ -182,7 +189,9 @@ const handlePedidoRapido = (idProduct) => {
 
   //origen pedidos, 0 tienda 1 online
 
-  const [pedidosConOrigenUno, setPedidosConOrigenUno] = useState(null);
+
+
+ //const [pedidosConOrigenUno, setPedidosConOrigenUno] = useState(null);
 
   //console.log('ibai:'+pedidosConOrigenUno);
 
@@ -227,7 +236,7 @@ const handlePedidoRapido = (idProduct) => {
 
   // Función para alternar el estado del offcanvas
   const toggleOffcanvas = () => setShow(!show);
-  const [pedidos, setPedidos] = useState([]); // Estado para almacenar todos los pedidos
+  //const [pedidos, setPedidos] = useState([]); // Estado para almacenar todos los pedidos
 
 
 
@@ -297,7 +306,7 @@ const handlePedidoRapido = (idProduct) => {
           
             //Clicks para entregados
             const handleClick = async (numeroPedido, productoId, maxCantidad) => {
-              console.log('------------->>>>', numeroPedido);
+              // console.log('------------->>>>', numeroPedido);
             
               // Encontramos el pedido que contiene el producto
               const pedido = pedidos.find(pedido => pedido.NumeroPedido === numeroPedido); // Comparamos directamente como números
@@ -369,7 +378,7 @@ const handlePedidoRapido = (idProduct) => {
             
             
     
-            useEffect(() => {
+            /*useEffect(() => {
 
               // Si se pasa una fecha específica, usamos esa fecha; de lo contrario, usamos la fecha actual
               const fechaAUsar = dateToPass ? dayjs(dateToPass).locale('es').tz('Europe/Madrid') : dayjs().locale('es').tz('Europe/Madrid');
@@ -457,7 +466,7 @@ const handlePedidoRapido = (idProduct) => {
               // Limpiar la suscripción cuando el componente se desmonta
               return () => unsubscribe();
             
-            }, [dateToPass]); // Solo se ejecuta cuando `dateToPass` cambia
+            }, [dateToPass]); // Solo se ejecuta cuando `dateToPass` cambia*/
             
 
 
@@ -475,7 +484,6 @@ const handlePedidoRapido = (idProduct) => {
 
                   return fechaFormateada;
                 };
-
           
 
 
@@ -568,7 +576,7 @@ const handlePedidoRapido = (idProduct) => {
         }, 0);
 
         // Guardar el resultado en una variable
-        const totalProductosDespuesDeLas18 = bloquesDespuesDeLas18;
+        setTotalProductosDespuesDeLas18(bloquesDespuesDeLas18);
 
         // Cálculo de productos hasta las 18:00
 
@@ -596,7 +604,7 @@ const handlePedidoRapido = (idProduct) => {
         //console.log("Total productos antes de las 18:00 (VM):", bloquesAntesdelas18);
 
         // Guardar el resultado en una variable
-        const totalbloquesAntesdelas18 = bloquesAntesdelas18;
+        setTotalbloquesAntesdelas18(bloquesAntesdelas18);
 
         
 
@@ -637,7 +645,7 @@ const handlePedidoRapido = (idProduct) => {
 
     
       // Función para guardar los datos de estadisticas_diarias
-      const guardarEstadisticasDiarias = async () => {
+     /* const guardarEstadisticasDiarias = async () => {
         try {
           const fecha = obtenerFechaFormateada();
           const docRef = doc(db, "estadisticas_diarias", fecha);
@@ -655,7 +663,7 @@ const handlePedidoRapido = (idProduct) => {
         } catch (e) {
           console.error("Error al guardar los datos: ", e);
         }
-      };
+      };*/
 
       // Llamar a guardarEstadisticasDiarias cada vez que el valor de numeroBarra cambie
  /* useEffect(() => {
@@ -666,41 +674,42 @@ const handlePedidoRapido = (idProduct) => {
 
 
 
-        const [libres, setLibres] = useState(0);  // Estado para 'libres'
+        //const [libres, setLibres] = useState(0);  // Estado para 'libres'
 
         
        
 
   
         // Cuando el numeroBarra o totalProductosDespuesDeLas18 cambien, recalculamos 'libres'
-        useEffect(() => {
-          const calcularLibres = () => {
-            setLoading(true);  // Activamos el spinner
-            const currentTime = dayjs().locale('es').tz('Europe/Madrid');
-            const antesDelas6pm = currentTime.hour() < 18;
-      
-            // Realizamos el cálculo de 'libres' según el turno (mañana o tarde)
-            if (antesDelas6pm) {
-              setLibres(numeroBarra - totalbloquesAntesdelas18);
-            } else {
-              setLibres(numeroBarra - totalProductosDespuesDeLas18);
+       /* useEffect(() => {
+            const calcularLibres = () => {
+              setLoading(true);  // Activamos el spinner
+              const currentTime = dayjs().locale('es').tz('Europe/Madrid');
+              const antesDelas6pm = currentTime.hour() < 18;
+        
+              // Realizamos el cálculo de 'libres' según el turno (mañana o tarde)
+              if (antesDelas6pm) {
+                setLibres(numeroBarra - totalbloquesAntesdelas18);
+              } else {
+                setLibres(numeroBarra - totalProductosDespuesDeLas18);
+              }
+        
+              // Mantener el spinner visible durante 3 segundos
+              setTimeout(() => {
+                setLoading(false);  // Desactivamos el spinner después de 3 segundos
+              }, 0); // 
+            };
+        
+            calcularLibres();  // Llamamos a la función de cálculo de 'libres'
+            if (numeroBarra !== 0)
+            {
+            guardarEstadisticasDiarias();
             }
-      
-            // Mantener el spinner visible durante 3 segundos
-            setTimeout(() => {
-              setLoading(false);  // Desactivamos el spinner después de 3 segundos
-            }, 0); // 
-          };
-      
-          calcularLibres();  // Llamamos a la función de cálculo de 'libres'
-          if (numeroBarra !== 0)
-          {
-          guardarEstadisticasDiarias();
-          }
 
         }, [numeroBarra, totalProductosDespuesDeLas18, totalbloquesAntesdelas18]);
 
-                
+           */
+
           //search clientes 
           const [clientes, setClientes] = useState([]);
           // Estado para el término de búsqueda
@@ -839,7 +848,8 @@ const handlePedidoRapido = (idProduct) => {
     
     console.log("pollosEntregados: "+pollosEntregados);
 
-    let mostraBarra=numeroBarra-pollosEntregados;
+  
+    setMostrarBarra(numeroBarra-pollosEntregados);
 
           
           
@@ -942,10 +952,10 @@ const handlePedidoRapido = (idProduct) => {
 
 
 
-          <div className={`w-[8vw] h-[10vh] ${mostraBarra < 0 ? 'bg-[#cb4335]' : 'bg-gray-500'} flex flex-col justify-center items-center rounded-xl shadow-md`}>
+          <div className={`w-[8vw] h-[10vh] ${mostrarBarra < 0 ? 'bg-[#cb4335]' : 'bg-gray-500'} flex flex-col justify-center items-center rounded-xl shadow-md`}>
             <input
               type="text"
-              value={mostraBarra}
+              value={mostrarBarra}
               onChange={handleInputChange}
               className="text-white text-center font-nunito bg-transparent border-none focus:outline-none w-full h-full text-[2.5vw] max-w-full max-h-[7.4vh]" 
             />
@@ -1305,7 +1315,16 @@ const handlePedidoRapido = (idProduct) => {
       const categoriaA = categoriaPrioridad[a.categoria] || 6; // Si no se encuentra la categoría, asignamos una prioridad baja
       const categoriaB = categoriaPrioridad[b.categoria] || 6;
 
-      return categoriaA - categoriaB; // Ordenamos por prioridad de la categoría
+       // Primero comparar por categoría
+       if (categoriaA !== categoriaB) {
+        return categoriaA - categoriaB;
+      }
+
+      // Si las categorías son iguales, entonces comparar por position
+      const positionA = a.position || 0; // Asegúrate de que 'position' exista y tenga un valor por defecto
+      const positionB = b.position || 0;
+
+      return positionA - positionB; // Ordenar por position dentro de la misma categoría
     })
     .map((producto, index) => {
       let borderColor = 'border-gray-500';
@@ -1345,7 +1364,7 @@ const handlePedidoRapido = (idProduct) => {
                     <strong>{producto.entregado}/{producto.cantidad}</strong> {/* Mostrar entregado y cantidad */}
                     <strong className="text-gray-500"> ] </strong>
                     {producto.celiaco && <img src={singluten} alt="Sin gluten" className="w-5 h-5 ml-2" />}
-                    {producto.tostado && <img src={fire_new} alt="Tostado" className="w-5 h-5 ml-2" />}
+                    {producto.tostado>0 && <img src={fire_new} alt="Tostado" className="w-5 h-5 ml-2" />}
                     {producto.troceado && <img src={tijera_new} alt="Troceado" className="w-5 h-5 ml-2" />}
                     {producto.salsa && <p className="ms-2 font-extrabold font-nunito"> | S.S</p>}
                     {producto.extrasalsa && <p className="ms-2 font-extrabold font-nunito"> | E.S</p>}
@@ -1701,11 +1720,11 @@ const handlePedidoRapido = (idProduct) => {
        
    </Modal>
 
-         
+   
      <PedidoRapido ref={pedidoRapidoRef} datosCliente={datosCliente} />
 
    
-     <SonidoOnChange pedidosConOrigenUno={pedidosConOrigenUno} initialValue={pedidosConOrigenUno} />
+    
    
                         
    </>

@@ -15,7 +15,7 @@ const ProgresoConTabs = () => {
 
   return (
     <div className="p-4">
-      <div className="fixed top-[6.35vh] left-0 right-0 flex justify-center mb-2 bg-white z-10 pt-3 border-b-2 text-gray-700">
+      <div className="fixed top-[5.90vh] left-0 right-0 flex justify-center mb-2 bg-white z-10 pt-3 border-b-2 text-gray-700">
         {/* Pestaña Pollo Detallado */}
         <div
           className={`px-4 py-3 text-md font-semibold cursor-pointer p-2 transition-all duration-300 ease-in-out ${

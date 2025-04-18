@@ -101,19 +101,19 @@ const Layout = () => {
                           (interval, index) => (
                             <button
                               key={index}
-                              className="px-3 py-2 ms-4 border rounded whitespace-nowrap"
+                              className="px-2 py-1 ms-4 border rounded whitespace-nowrap font-nunito"
                             >
-                              {interval.start} (
+                              {interval.start} [
                               <span
                                 className={
                                   interval.orderedCount > interval.maxAllowed
                                     ? "text-red-500"
-                                    : ""
+                                    : "text-green-700 font-extrabold"
                                 }
                               >
                                 {interval.orderedCount}
                               </span>
-                              )
+                              ]
                             </button>
                           )
                         )}

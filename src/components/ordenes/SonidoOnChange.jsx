@@ -1,9 +1,16 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef,useContext } from 'react';
+import { dataContext } from "../Context/DataContext";
 
-const SonidoOnChange = ({ pedidosConOrigenUno }) => {
+const SonidoOnChange = () => {
+
+  const { pedidosConOrigenUno } = useContext(dataContext);
+
+
+  
   const sonidoRef = useRef(null); // Referencia para controlar el sonido
   const prevPedidosConOrigenUnoRef = useRef(pedidosConOrigenUno); // Referencia para guardar el valor previo
-  
+
+
 
   // Crear el sonido cuando el componente se monta
   useEffect(() => {
@@ -13,7 +20,8 @@ const SonidoOnChange = ({ pedidosConOrigenUno }) => {
 
   // Reproducir el sonido cuando pedidosConOrigenUno cambia
   useEffect(() => {
-    if (pedidosConOrigenUno > prevPedidosConOrigenUnoRef.current) { // Verificar si el valor ha cambiado
+
+    if (pedidosConOrigenUno !== null && pedidosConOrigenUno > prevPedidosConOrigenUnoRef.current) { // Verificar si el valor ha cambiado
       if (sonidoRef.current) {
         sonidoRef.current.pause(); // Pausar el audio si ya está sonando
         sonidoRef.current.currentTime = 0; // Reiniciar el audio

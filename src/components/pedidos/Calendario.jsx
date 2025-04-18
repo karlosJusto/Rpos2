@@ -90,7 +90,7 @@ export default function Calendario({ onDateChange }) {
     if (clockType === "hours") {
       if (
         (hour >= 0 && hour < 12) || // Deshabilitar entre las 00:00 y las 12:00
-        (hour >= 15 && hour < 18)   // Deshabilitar entre las 16:00 y las 18:00
+        (hour >= 17 && hour < 18)   // Deshabilitar entre las 16:00 y las 18:00
       ) {
         return true;
       }

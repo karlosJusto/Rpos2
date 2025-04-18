@@ -201,15 +201,15 @@ export const generateAndMergeIntervals = async (productType, dayConfig, date) =>
                 scheduleType: newInt.scheduleType, // Actualiza el tipo de horario
             });
             // Log más específico
-            console.log(`[${config.dailyCollection}/${date}] Intervalo ${newInt.start}: Fusionado. Preserva ${matchingOld.orderedCount} pedidos. Nuevo maxAllowed: ${newInt.maxAllowed}.`);
+          //  console.log(`[${config.dailyCollection}/${date}] Intervalo ${newInt.start}: Fusionado. Preserva ${matchingOld.orderedCount} pedidos. Nuevo maxAllowed: ${newInt.maxAllowed}.`);
         } else {
             // Si no existe un antiguo o el antiguo no tenía pedidos, usar el nuevo tal cual
             mergedIntervalsMap.set(newInt.start, newInt); // orderedCount será 0
-            if (matchingOld) {
+            /*if (matchingOld) {
                  console.log(`[${config.dailyCollection}/${date}] Intervalo ${newInt.start}: Sobrescrito (antiguo tenía 0 pedidos). Nuevo maxAllowed: ${newInt.maxAllowed}.`);
             } else {
                  console.log(`[${config.dailyCollection}/${date}] Intervalo ${newInt.start}: Nuevo. maxAllowed: ${newInt.maxAllowed}.`);
-            }
+            }*/
         }
     });
 
@@ -245,7 +245,7 @@ export const generateAndMergeIntervals = async (productType, dayConfig, date) =>
         lastGenerated: new Date().toISOString(),
      }, { merge: true }); // merge: true preserva otros campos de nivel superior si existieran
 
-    console.log(`%c[${new Date().toISOString()}] Firestore actualizado para ${config.dailyCollection}/${date} (intervals sobrescrito)`, 'color: green;');
+   // console.log(`%c[${new Date().toISOString()}] Firestore actualizado para ${config.dailyCollection}/${date} (intervals sobrescrito)`, 'color: green;');
 
   } catch (error) {
     console.error(`[${new Date().toISOString()}] Error FATAL regenerando ${config.dailyCollection} para ${date}:`, error);
@@ -328,7 +328,7 @@ export const initDailyCalendars = async () => {
       // Esperar a que todas las generaciones terminen
       await Promise.all(generationPromises);
 
-      console.log(`%c[${new Date().toISOString()}] Todos los calendarios diarios generados/actualizados para ${dateString}.`, 'color: green; font-weight: bold;');
+      //console.log(`%c[${new Date().toISOString()}] Todos los calendarios diarios generados/actualizados para ${dateString}.`, 'color: green; font-weight: bold;');
 
     } else {
       // Esto sería un error de configuración si no existe documento para un día (1-9)

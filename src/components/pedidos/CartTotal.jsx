@@ -586,6 +586,7 @@ const CartTotal = ({ datosCliente, setDatosCliente, orderToEdit }) => {
                 troceado: item.troceado || false,
                 categoria: item.categoria || "No especificada",
                 freidora: item.freidora || false,
+                position: item.position,
                 // Guardar precios como strings formateados a 2 decimales
                 precio: item.price.toFixed(2),
                 total: (item.price * item.cantidad).toFixed(2),
@@ -763,14 +764,14 @@ const CartTotal = ({ datosCliente, setDatosCliente, orderToEdit }) => {
       {/* Botón Principal de Acción */}
       <div className="flex text-center justify-center items-center mt-6 mb-4">
         <button
-
-        
           // Llama a sendToFirestore con estado inicial
           onClick={() => { console.log("Click en Botón Generar/Actualizar"); sendToFirestore({ confirmado: false, ignoreCalendarLimits: false }); }}
           // Deshabilitar si está procesando
           disabled={isSubmitting}
           // Clases CSS (ajusta según tu framework o estilos)
-          className={`w-full sm:w-auto min-w-[150px] px-6 py-3 tracking-wide bg-[#f2ac02] text-white font-bold rounded-lg shadow-md hover:bg-yellow-600 focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:ring-opacity-50 transition-all duration-300 ease-in-out flex items-center justify-center ${isSubmitting ? 'opacity-50 cursor-not-allowed' : 'hover:scale-105'}`}
+          className={`w-full sm:w-auto min-w-[150px] px-6 py-3 tracking-wide  ${
+            orderToEdit ? 'bg-gray-600' : 'bg-[#f2ac02] hover:bg-yellow-600'
+            } text-white font-bold rounded-lg shadow-md hover:bg-yellow-600 focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:ring-opacity-50 transition-all duration-300 ease-in-out flex items-center justify-center ${isSubmitting ? 'opacity-50 cursor-not-allowed' : 'hover:scale-105'}`}
         >
           <svg width="28px" height="28px" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
             <path d="M4 18V6" stroke="#ffffff" strokeWidth="1.5" strokeLinecap="round"></path>

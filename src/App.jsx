@@ -37,6 +37,8 @@ import { initDailyCalendars } from './components/dashboard/Calendario/initDailyC
 // --- 1. IMPORTA EL NUEVO COMPONENTE LISTENER ---
 // Ajusta la ruta según donde hayas creado el archivo GlobalOrderListener.jsx
 import GlobalOrderListener from './components/Context/GlobalOrderListener';
+import SonidoOnChange from "./components/ordenes/SonidoOnChange.jsx";
+import HeaderFinal from "./components/cocina/components/HeaderFinal.jsx";
 
 function App() {
   // Este useEffect para inicializar calendarios se mantiene
@@ -48,6 +50,7 @@ function App() {
     // DataProvider envuelve todo
     <DataProvider>
       {/* OrderProvider envuelve lo necesario para pedidos */}
+      <SonidoOnChange /> {/* Coloca el componente de sonido aquí */}
       <OrderProvider>
         {/* --- 2. RENDERIZA EL LISTENER AQUÍ --- */}
         {/* Se monta una vez y permanece mientras OrderProvider esté montado */}
@@ -82,6 +85,8 @@ function App() {
 
             {/* Puedes añadir una ruta por defecto o para páginas no encontradas si quieres */}
             {/* <Route path="*" element={<NotFound />} /> */}
+
+            
 
           </Routes>
         </BrowserRouter>

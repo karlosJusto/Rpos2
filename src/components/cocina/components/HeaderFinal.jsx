@@ -31,12 +31,12 @@ import { dataContext } from '../../Context/DataContext';
 
 
 
-const HeaderFinal = () => {
+const HeaderFinal = ({libres, mostrarBarra}) => {
 
 
-    const { numeroBarra, libres, mostrarBarra } = useContext(dataContext);
+    const { numeroBarra, pedidosConOrigenUno,setNumeroBarra } = useContext(dataContext);
 
-    console.log({mostrarBarra});
+    console.log('******************************'+libres);
 
 
   const [show, setShow] = useState(false);
@@ -128,50 +128,57 @@ const HeaderFinal = () => {
   
 
 
-  //funciones para sumar o restar cantidades
+          // Función para manejar los cambios en el input
+            const handleInputChange = (e) => {
+              const value = e.target.value;  // Obtener el valor del input
+              console.log("value: "+value);
+              const aux=value === "" ? "" : parseFloat(value) + pollosEntregados;
 
+              // Verificar si el valor es un número válido
+              if (value === "" || !isNaN(value)) { 
+                setNumeroBarra(aux);  // Actualizar el estado solo si es un número o está vacío
+              }
+            };
 
-        // Función que suma 5 a la variable 'numero'
-        const sumarCinco = () => {
-          setNumero(numero + 5);
-        };
-        
+            // Función que suma 5 a la variable 'numero'
+            const sumarCinco = () => {
+            setNumeroBarra((prevNumero) => parseFloat(prevNumero) + 5); // Sumamos la cantidad al valor actual
+            };
 
-        // Función que suma 4 a la variable 'numero'
-        const sumarCuatro = () => {
-          setNumero(numero + 4);
-        };
+            // Función para sumar 4 a la variable 'numero'
+            const sumarCuatro = () => {
+            setNumeroBarra((prevNumero) => parseFloat(prevNumero) + 4); // Usamos el valor previo
+            };
 
-        // Función que restar 5 a la variable 'numero'
-        const restarCinco = () => {
-          setNumero(numero - 5);
-        };
-        
+            // Función para restar 5 a la variable 'numero'
+            const restarCinco = () => {
+            setNumeroBarra((prevNumero) => parseFloat(prevNumero) - 5); // Usamos el valor previo
+            };
 
-        // Función que restar 4 a la variable 'numero'
-        const restarCuatro = () => {
-          setNumero(numero - 4);
-        };
+            // Función para restar 4 a la variable 'numero'
+            const restarCuatro = () => {
+            setNumeroBarra((prevNumero) => parseFloat(prevNumero) - 4); // Usamos el valor previo
+            };
 
-        // Función sumar 1 a la variable 'numero'
-        const sumarUno = () => {
-          setNumero(numero + 1);
-        };
+            // Función sumar 1 a la variable 'numero'
+            const sumarUno = () => {
+            setNumeroBarra((prevNumero) => parseFloat(prevNumero) + 1); // Usamos el valor previo
+            };
 
-          // Función restar 1 a la variable 'numero'
-          const restarUno = () => {
-            setNumero(numero - 1);
-          };
+            // Función restar 1 a la variable 'numero'
+            const restarUno = () => {
+            setNumeroBarra((prevNumero) => parseFloat(prevNumero) - 1); // Usamos el valor previo
+            };
 
-          // Función sumar 1/2 a la variable 'numero'
-          const sumaMedio = () => {
-            setNumero(numero + 0.5);
-          };
+            // Función sumar 1/2 a la variable 'numero'
+            const sumaMedio = () => {
+            setNumeroBarra((prevNumero) => parseFloat(prevNumero) + 0.5); // Usamos el valor previo
+            };
 
-          // Función restar 1/2 a la variable 'numero'
-          const restaMedio = () => {
-            setNumero(numero - 0.5);
-          };             
+            // Función restar 1/2 a la variable 'numero'
+            const restaMedio = () => {
+            setNumeroBarra((prevNumero) => parseFloat(prevNumero) - 0.5);  // Usamos el valor previo
+            };
     
 
 
@@ -209,16 +216,18 @@ const HeaderFinal = () => {
           
           <div className="w-1/2 h-[10vh] bg-[#f2ac02] flex flex-col justify-center items-center rounded-xl shadow-md">
             {/* Icono en la parte superior */}
-            <svg width="2vw" height="2vw" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <g id="SVGRepo_bgCarrier" strokeWidth="0"/>
-              <g id="SVGRepo_tracerCarrier" strokeLinecap="round" strokeLinejoin="round"/>
-              <g id="SVGRepo_iconCarrier">
-                <path d="M21 5L19 12H7.37671M20 16H8L6 3H3M11.5 7L13.5 9M13.5 9L15.5 7M13.5 9V3M9 20C9 20.5523 8.55228 21 8 21C7.44772 21 7 20.5523 7 20C7 19.4477 7.44772 19 8 19C8.55228 19 9 19.4477 9 20ZM20 20C20 20.5523 19.5523 21 19 21C18.4477 21 18 20.5523 18 20C18 19.4477 18.4477 19 19 19C19.5523 19 20 19.4477 20 20Z" stroke="#FFFFFF" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-              </g>
+            <svg fill="#FFFFFF" height="2vw" width="2vw" version="1.1" id="Layer_1" xmlns="http://www.w3.org/2000/svg" xmlnsXlink="http://www.w3.org/1999/xlink" viewBox="0 0 512 512" xmlSpace="preserve">
+
+                          <g id="SVGRepo_bgCarrier" strokeWidth="5"/>
+
+                          <g id="SVGRepo_tracerCarrier" strokeLinecap="round" strokeLinejoin="round"/>
+
+                          <g id="SVGRepo_iconCarrier"> <g> <g> <path d="M499.2,409.6H12.8c-7.074,0-12.8,5.726-12.8,12.8s5.726,12.8,12.8,12.8h486.4c7.074,0,12.8-5.726,12.8-12.8 S506.274,409.6,499.2,409.6z"/> </g> </g> <g> <g> <path d="M460.8,76.8H51.2c-14.14,0-25.6,11.46-25.6,25.6v256c0,14.14,11.46,25.6,25.6,25.6h409.6c14.14,0,25.6-11.46,25.6-25.6 v-256C486.4,88.26,474.94,76.8,460.8,76.8z M460.8,358.4H51.2v-256h409.6V358.4z"/> </g> </g> <g> <g> <path d="M353.57,164.233c-4.813-6.673-12.544-10.633-20.77-10.633H194.441l-61.688-24.678c-6.528-2.654-14.012,0.546-16.64,7.125 c-2.628,6.554,0.572,14.003,7.134,16.623l55.953,22.383V256c0,14.14,11.46,25.6,25.6,25.6h102.4 c11.017,0,20.804-7.049,24.286-17.502l25.6-76.8C359.689,179.49,358.383,170.906,353.57,164.233z M307.2,256H204.8v-76.8h128 L307.2,256z"/> </g> </g> <g> <g> <circle cx="204.8" cy="307.2" r="25.6"/> </g> </g> <g> <g> <circle cx="307.2" cy="307.2" r="25.6"/> </g> </g> </g>
+
             </svg>
             
             {/* Texto debajo del ícono */}
-            <p className="text-white text-[0.90vw] text-center bg-green-700 rounded-md py-1 px-3 mt-2">P</p>
+            <p className="text-white text-[0.90vw] text-center bg-green-700 rounded-md py-1 px-3 mt-2">{pedidosConOrigenUno}</p>
         </div>
 
         </div>
@@ -273,10 +282,15 @@ const HeaderFinal = () => {
 
 
 
-     <div className='w-[8vw] h-[10vh]  bg-gray-500 flex flex-col justify-center items-center rounded-xl shadow-md'>
-          <h1 className="text-white text-center text-[3vw] font-nunito">{mostrarBarra}</h1>
-          <h1 className="text-white text-center text-[2w] font-nunito">En barra</h1>
-     </div>   
+     <div className={`w-[8vw] h-[10vh] ${mostrarBarra < 0 ? 'bg-[#cb4335]' : 'bg-gray-500'} flex flex-col justify-center items-center rounded-xl shadow-md`}>
+            <input
+              type="text"
+              value={mostrarBarra}
+              onChange={handleInputChange}
+              className="text-white text-center font-nunito bg-transparent border-none focus:outline-none w-full h-full text-[2.5vw] max-w-full max-h-[7.4vh]" 
+            />
+            <p className="text-white text-center text-[2w] font-nunito pb-[1vh] ">En barra</p>
+          </div> 
 
 
       <div className='w-[8vw] h-[10vh]  bg-gray-700 rounded-xl shadow-md'>
