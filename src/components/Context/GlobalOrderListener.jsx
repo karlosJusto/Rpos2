@@ -59,12 +59,15 @@ const GlobalOrderListener = () => {
         if (change.type === "added") {
           const newOrderData = change.doc.data();
           const orderId = change.doc.id;
+          const timestamp = Date.now(); // Hora actual en milisegundos
+          console.log(`%GLOBAL[Listener ${timestamp}] ---> DETECTADO 'added' PARA DOC ID: ${orderId}`, 'color: blue; font-weight: bold;'); // Log específico
+          const callId = Math.random().toString(36).substring(7); // ID único para esta llamada
 
           // Solo procesar pedidos con origen 0 (online) que necesitan actualizar calendario
           if (newOrderData.origen === 0) {
             console.log(`%c[Listener] ---> NUEVO PEDIDO ONLINE [${orderId}] (Num: ${newOrderData.NumeroPedido || 'N/A'}) DETECTADO. Procesando...`, 'color: green; font-weight: bold;');
-            handleFirestoreUpdateLikeCartTotal(newOrderData, orderId);
-          } else {
+            handleFirestoreUpdateLikeCartTotal(newOrderData, orderId, callId); // Pasar el callId
+        } else {
             // Opcional: Loggear otros pedidos añadidos si es útil para depuración
             // console.log(`[Listener] Pedido añadido ID: ${orderId}, Origen: ${newOrderData.origen} (Ignorado para calendario)`);
           }
@@ -89,8 +92,8 @@ const GlobalOrderListener = () => {
    * usando transacciones de Firestore para atomicidad.
    * Sobreescribe el array 'intervals' completo.
    */
-  const handleFirestoreUpdateLikeCartTotal = async (order, orderId) => {
-    const logPrefix = `[UpdateCal][${orderId}]`; // Prefijo para logs de esta ejecución
+  const handleFirestoreUpdateLikeCartTotal = async (order, orderId,callId) => {
+    const logPrefix = `[UpdateCal][${orderId}][Call ${callId}]`; // Usar callId en logs
     console.log(`${logPrefix} Iniciando procesamiento.`);
 
     try {
@@ -161,7 +164,7 @@ const GlobalOrderListener = () => {
             // Calcular la cantidad a incrementar (lógica específica por producto)
             let cantidadAIncrementar = 0;
             const cantidadPedido = Number(producto.cantidad) || 0;
-
+            
             if (productKey === 'Pollo') {
                 // Asume que 1/2 pollo (alias?) o ID específico cuenta como 0.5 si es necesario
                 // Simplificando: si el nombre incluye '1/2' cuenta 0.5, sino 1 * cantidad. Ajustar si la lógica es otra.
@@ -184,7 +187,7 @@ const GlobalOrderListener = () => {
                 console.warn(`${logPrefix} Cantidad inválida o cero para ${productKey} (${producto.nombre || producto.alias}). Saltando.`);
                 continue;
             }
-
+            
             // Referencia al documento del calendario diario específico
             const calendarDocRef = doc(db, collectionName, calendarDocId);
             console.log(`${logPrefix} ---> Procesando ${productKey} (Cant: ${cantidadAIncrementar}). Transacción en ${calendarDocRef.path}`);
@@ -250,7 +253,7 @@ const GlobalOrderListener = () => {
 
                     // 4.4 Si no se encontró intervalo, fallar la transacción
                     if (!intervalFound) {
-                        throw new Error(`Intervalo para la hora ${orderTimeHHMM} no encontrado para ${productKey} en ${calendarDocRef.path}.`);
+                        //throw new Error(`Intervalo para la hora ${orderTimeHHMM} no encontrado para ${productKey} en ${calendarDocRef.path}.`);
                     }
 
                     // 4.5 Actualizar el contador si no se excede el límite
