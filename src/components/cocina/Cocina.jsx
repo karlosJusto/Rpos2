@@ -159,6 +159,12 @@ const Cocina = () => {
   const selectedDateStr = formatDate(selectedDate);
   const todayStr = formatDate(new Date());
   const isToday = selectedDateStr === todayStr;
+  const showSupervisionHeader = selectedDateStr !== todayStr;
+const handleCloseSupervision = () => {
+  setSelectedDate(new Date()); // Resetea la fecha al día actual
+  // Opcional: puedes añadir un log si quieres
+  // console.log("[Cocina] Exiting supervision mode, returning to today.");
+};
 
   // Determine the text to display for the current shift or selected date
   let turnoText = '';
@@ -647,6 +653,25 @@ const Cocina = () => {
         onDateAccept={handleDateSelectionAccept} // Pass callback for date modal
         currentSelectedDate={selectedDate} // Pass current date for display/modal init
       />
+
+{showSupervisionHeader && (
+        <div className="mt-5 -mb-2 bg-yellow-100 border-b border-yellow-300 text-yellow-800 px-4 py-2 flex justify-between items-center text-sm shadow-sm" >
+          {/* Texto descriptivo */}
+          <span>
+            Modo Supervisión: Viendo pedidos del <strong>{selectedDateStr}</strong>
+          </span>
+          {/* Botón para cerrar */}
+          <button
+            onClick={handleCloseSupervision}
+            className="text-yellow-900 hover:text-yellow-700 font-bold text-lg px-2 leading-none" // Estilos para la 'X'
+            aria-label="Volver al día actual"
+            title="Volver al día actual" // Tooltip opcional
+          >
+            &times; {/* Entidad HTML para el símbolo 'X' */}
+          </button>
+        </div>
+      )}
+
 
       {/* Loading Indicator */}
       {isLoading && (
