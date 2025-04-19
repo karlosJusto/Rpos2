@@ -9,9 +9,11 @@ import dayjs from "dayjs";
 // import timezone from 'dayjs/plugin/timezone';
 import { Modal, Button } from "react-bootstrap"; // Asumiendo que usas react-bootstrap
 import customParseFormat from "dayjs/plugin/customParseFormat";
+import isSameOrAfter from 'dayjs/plugin/isSameOrAfter'; // Importar isSameOrAfter
 
 // Extender dayjs con los plugins necesarios
 dayjs.extend(customParseFormat);
+dayjs.extend(isSameOrAfter); // Añadir isSameOrAfter
 // dayjs.extend(utc);
 // dayjs.extend(timezone);
 // dayjs.tz.setDefault("Europe/Madrid"); // Establecer zona horaria por defecto si es necesario
@@ -62,7 +64,7 @@ const updateSaladCounters = async (cartItems) => {
     const todayId = dayjs().format("DD-MM-YYYY"); // Documento ID es la fecha actual
     const docRef = doc(db, "ensaladas", todayId);
     console.log(`Preparando actualización de contadores de ensaladas para ${todayId}...`);
-  
+
     let incrementEnsaladaGrande = 0;
     let incrementEnsaladaPequena = 0;
     let incrementEnsaladillaGrande = 0;
@@ -75,22 +77,6 @@ const updateSaladCounters = async (cartItems) => {
             return; // Saltar item inválido
         }
 
-  // Calcular hora optimizada
-  const obtenerHoraRedondeada = () => {
-    const now = dayjs(); // Hora actual
-    const minutos = now.minute();
-    const siguienteBloque = Math.floor(minutos / 15) * 15;
-    const nuevaHora = now
-      .minute(siguienteBloque)
-      .second(0)
-      .millisecond(0);
-    return nuevaHora.isBefore(now) ? nuevaHora.add(15, 'minute') : nuevaHora;
-    
-  };
-
-
-  //si no le pasamos hora es la hora mas 15 rendondeada
-  const fechahora = datosCliente.fechahora || obtenerHoraRedondeada().format('DD/MM/YYYY HH:mm');
         const nameLower = item.name.toLowerCase();
         const cantidad = item.cantidad;
         const isPequena = nameLower.includes("1/2"); // Determinar tamaño
@@ -203,7 +189,7 @@ const CartTotal = ({ datosCliente, setDatosCliente, orderToEdit }) => {
   useEffect(() => {
     // Recuperamos el nombre del empleado desde sessionStorage
     const nombre = sessionStorage.getItem('empleadoNombre');
-    
+
     if (nombre) {
       setEmpleadoNombre(nombre);  // Si encontramos el nombre, lo guardamos en el estado
     } else {
@@ -215,15 +201,15 @@ const CartTotal = ({ datosCliente, setDatosCliente, orderToEdit }) => {
   const total = cart.reduce(
     (acc, item) => {
       // Se toma 'price' si existe; de lo contrario, se toma 'precio'
-      const unitPrice = item?.price === 0 
-      ? item?.precio ?? 0 
+      const unitPrice = item?.price === 0
+      ? item?.precio ?? 0
       : item?.price ?? item?.precio ?? 0;
           const quantity = item?.cantidad ?? 1;
       return acc + (unitPrice * quantity);
     },
     0
   );
-  
+
 
   // --- Obtener Hora Redondeada por Defecto ---
   const obtenerHoraRedondeada = () => {
@@ -357,7 +343,7 @@ const CartTotal = ({ datosCliente, setDatosCliente, orderToEdit }) => {
      let mensajesError1 = ""; // Variable para almacenar todos los mensajes de error
 
      const clienteData = sanitizeClientData(datosCliente);
-    
+
      if (!clienteData.telefono) {
       mensajesError += "  El teléfono del cliente es obligatorio.\n" ; // Agrega el mensaje con salto de línea
 
@@ -367,7 +353,7 @@ const CartTotal = ({ datosCliente, setDatosCliente, orderToEdit }) => {
       mensajesError1 += `❗️No has seleccionado hora para el pedido. La hora del pedido será: ${horaRedondeada} \n`; // Añadir al mensaje de error
     }
      console.log("Datos cliente OK (teléfono presente).");
-    
+
      // 2. Validar si incluye pollo (muestra advertencia/confirmación)
      const incluyePollo = currentCart.some(item => item && (item.id_product === 1 || item.id_product === 2));
      if (!incluyePollo) {
@@ -559,10 +545,18 @@ const CartTotal = ({ datosCliente, setDatosCliente, orderToEdit }) => {
       }
        console.log("Hora final del pedido:", horaPedido);
 
+      // --- PASO 2: Determinar si es para otro día y si se debe actualizar stock ---
+      const fechaRealizado = dayjs(); // Momento actual
+      const fechaPedido = dayjs(horaPedido, "DD/MM/YYYY HH:mm");
+      // Compara solo la parte de la fecha (ignora la hora)
+      const esParaOtroDia = !fechaPedido.isSame(fechaRealizado, 'day');
+      console.log(`¿Es para otro día?: ${esParaOtroDia} (Pedido: ${fechaPedido.format('YYYY-MM-DD')}, Realizado: ${fechaRealizado.format('YYYY-MM-DD')})`);
+
+
       // --- PASO 3: Preparar y Guardar/Actualizar Pedido en Firestore ---
       // Si se llega aquí, las validaciones pasaron o se ignoraron los límites.
       console.log("Preparando datos del pedido para guardar en Firestore...");
-      const nowString = dayjs().format("DD/MM/YYYY HH:mm"); // Hora actual para registros
+      const nowString = fechaRealizado.format("DD/MM/YYYY HH:mm"); // Hora actual para registros
 
       // Mapear productos del carrito a formato Firestore (con validación robusta)
       const mappedProducts = currentCart.map((item) => {
@@ -607,6 +601,7 @@ const CartTotal = ({ datosCliente, setDatosCliente, orderToEdit }) => {
           observaciones: clienteData.observaciones, pagado: clienteData.pagado, celiaco: clienteData.celiaco,
           localidad: clienteData.localidad, productos: mappedProducts, total_pedido: totalPedido,
           fechahora_modificado: nowString,
+          paraOtroDia: esParaOtroDia, // <-- AÑADIR FLAG AQUÍ
           // No actualizar fechahora_realizado, empleado, origen al editar (a menos que sea necesario)
         };
         await updateDoc(pedidoRef, updateData);
@@ -619,7 +614,9 @@ const CartTotal = ({ datosCliente, setDatosCliente, orderToEdit }) => {
            NumeroPedido: pedidoId, cliente: clienteData.cliente, telefono: clienteData.telefono,
            fechahora: horaPedido, observaciones: clienteData.observaciones, pagado: clienteData.pagado,
            celiaco: clienteData.celiaco, localidad: clienteData.localidad, empleado: empleadoNombre, origen: 0, // Valores por defecto
-           productos: mappedProducts, total_pedido: totalPedido, fechahora_realizado: nowString,
+           productos: mappedProducts, total_pedido: totalPedido,
+           fechahora_realizado: nowString, // Fecha/hora de creación
+           paraOtroDia: esParaOtroDia, // <-- AÑADIR FLAG AQUÍ
            // No incluir fechahora_modificado al crear
         };
         await setDoc(doc(db, "pedidos", pedidoId.toString()), pedidoData);
@@ -629,68 +626,71 @@ const CartTotal = ({ datosCliente, setDatosCliente, orderToEdit }) => {
       console.log(`Éxito: Pedido ${pedidoId} ${orderToEdit ? 'actualizado' : 'guardado'} en Firestore.`);
 
 
-      // --- PASO 4: Actualizar Stock (POST-Guardado/Actualización de Pedido) ---
-      console.log("Iniciando proceso de actualización de stock...");
-      try {
-          const stockUpdatePromises = [];
-      
-          // --- Actualización para POLLO ---
-          // Los items de pollo (ID 1 y 2) afectan el stock del producto con ID 1.
-          let stockPollos = currentCart.reduce((sum, item) => {
-              if (item?.id_product === 1) return sum + (item.cantidad || 0);
-              if (item?.id_product === 2) return sum + (item.cantidad || 0) / 2; // medio pollo cuenta como 0.5
-              return sum;
-          }, 0);
-          if (stockPollos > 0) {
-               stockUpdatePromises.push(updateStock(1, stockPollos));
-          }
-      
-          // --- Actualización para COSTILLAS ---
-          // Los items de costilla (ID 41 y 48) afectan el stock del producto con ID 41.
-          let stockCostillas = currentCart.reduce((sum, item) => {
-               if (item?.id_product === 41) return sum + (item.cantidad || 0);
-               if (item?.id_product === 48) return sum + (item.cantidad || 0) / 2;
-               return sum;
-          }, 0);
-          if (stockCostillas > 0) {
-               stockUpdatePromises.push(updateStock(41, stockCostillas));
-          }
-      
-          // --- Actualización para el resto de productos ---
-          // Definimos los IDs que ya tienen tratamiento especial:
-          const specialIds = [1, 2, 41, 48];
-          // Agrupamos por ID los productos que no están en specialIds.
-          const otherProductsQuantities = {};
-          currentCart.forEach(item => {
-               if (item && item.cantidad > 0 && !specialIds.includes(item.id_product)) {
-                   if (!otherProductsQuantities[item.id_product]) {
-                       otherProductsQuantities[item.id_product] = 0;
+      // --- PASO 4: Actualizar Stock (CONDICIONAL) ---
+      if (!esParaOtroDia) {
+          console.log("El pedido es para hoy. Procediendo a actualizar stock...");
+          // --- PASO 4: Actualizar Stock (POST-Guardado/Actualización de Pedido) ---
+          console.log("Iniciando proceso de actualización de stock...");
+          try {
+              const stockUpdatePromises = [];
+
+              // --- Actualización para POLLO ---
+              let stockPollos = currentCart.reduce((sum, item) => {
+                  if (item?.id_product === 1) return sum + (item.cantidad || 0);
+                  if (item?.id_product === 2) return sum + (item.cantidad || 0) / 2;
+                  return sum;
+              }, 0);
+              if (stockPollos > 0) {
+                   stockUpdatePromises.push(updateStock(1, stockPollos));
+              }
+
+              // --- Actualización para COSTILLAS ---
+              let stockCostillas = currentCart.reduce((sum, item) => {
+                   if (item?.id_product === 41) return sum + (item.cantidad || 0);
+                   if (item?.id_product === 48) return sum + (item.cantidad || 0) / 2;
+                   return sum;
+              }, 0);
+              if (stockCostillas > 0) {
+                   stockUpdatePromises.push(updateStock(41, stockCostillas));
+              }
+
+              // --- Actualización para el resto de productos ---
+              const specialIds = [1, 2, 41, 48];
+              const otherProductsQuantities = {};
+              currentCart.forEach(item => {
+                   if (item && item.cantidad > 0 && !specialIds.includes(item.id_product)) {
+                       if (!otherProductsQuantities[item.id_product]) {
+                           otherProductsQuantities[item.id_product] = 0;
+                       }
+                       otherProductsQuantities[item.id_product] += item.cantidad;
                    }
-                   otherProductsQuantities[item.id_product] += item.cantidad;
-               }
-          });
-          // Para cada producto agrupado, llamar a updateStock con la cantidad total a restar.
-          for (const productId in otherProductsQuantities) {
-               stockUpdatePromises.push(updateStock(productId, otherProductsQuantities[productId]));
+              });
+              for (const productId in otherProductsQuantities) {
+                   stockUpdatePromises.push(updateStock(productId, otherProductsQuantities[productId]));
+              }
+
+              // Ejecutar todas las actualizaciones en paralelo
+              if (stockUpdatePromises.length > 0) {
+                   console.log(`Ejecutando ${stockUpdatePromises.length} actualizaciones de stock...`);
+                   await Promise.all(stockUpdatePromises);
+                   console.log("Actualización de stock completada con éxito.");
+              } else {
+                   console.log("No se requirieron actualizaciones de stock para este pedido.");
+              }
+          } catch (stockError) {
+              console.error(`¡ERROR CRÍTICO POST-GUARDADO! Pedido ${pedidoId} ${orderToEdit ? 'actualizado' : 'creado'}, PERO FALLÓ LA ACTUALIZACIÓN DE STOCK:`, stockError);
+              setMensajeModal(`¡ATENCIÓN GRAVE! Pedido ${pedidoId} guardado, pero falló al actualizar stock (${stockError.message}). Es necesaria REVISIÓN MANUAL INMEDIATA del inventario.`);
+              setShowModal2(true);
+              setIsSubmitting(false);
+              return; // Detener aquí si el stock falla
           }
-      
-          // Ejecutar todas las actualizaciones en paralelo
-          if (stockUpdatePromises.length > 0) {
-               console.log(`Ejecutando ${stockUpdatePromises.length} actualizaciones de stock...`);
-               await Promise.all(stockUpdatePromises);
-               console.log("Actualización de stock completada con éxito.");
-          } else {
-               console.log("No se requirieron actualizaciones de stock para este pedido.");
-          }
-      } catch (stockError) {
-          console.error(`¡ERROR CRÍTICO POST-GUARDADO! Pedido ${pedidoId} ${orderToEdit ? 'actualizado' : 'creado'}, PERO FALLÓ LA ACTUALIZACIÓN DE STOCK:`, stockError);
-          setMensajeModal(`¡ATENCIÓN GRAVE! Pedido ${pedidoId} guardado, pero falló al actualizar stock (${stockError.message}). Es necesaria REVISIÓN MANUAL INMEDIATA del inventario.`);
-          setShowModal2(true);
-          setIsSubmitting(false);
-          return;
+      } else {
+          console.log("El pedido es para otro día. Omitiendo actualización de stock.");
       }
 
+
       // --- PASO 5.5: Actualizar Contadores de Ensaladas/Ensaladillas (NUEVO) ---
+      // Esta actualización SÍ se hace independientemente de si es para hoy u otro día
       console.log("Iniciando actualización de contadores de ensaladas/ensaladillas...");
       try {
           // Llamar a la nueva función pasando el carrito actual
@@ -716,7 +716,7 @@ const CartTotal = ({ datosCliente, setDatosCliente, orderToEdit }) => {
       // isSubmitting se liberará en el bloque finally
 
     } catch (error) {
-      
+
       // --- Captura de Errores Generales / Inesperados ---
       console.error("Error general no capturado previamente en sendToFirestore:", error);
       // Mostrar modal de error genérico SOLO si no hay otro modal de confirmación activo
@@ -748,6 +748,7 @@ const CartTotal = ({ datosCliente, setDatosCliente, orderToEdit }) => {
 
 
   // --- Renderizado del Componente ---
+  // (El JSX del return permanece igual que en tu código original)
   return cart.length > 0 ? ( // Renderizar contenido solo si el carrito no está vacío
     <>
       {/* Sección del Total */}
@@ -794,7 +795,7 @@ const CartTotal = ({ datosCliente, setDatosCliente, orderToEdit }) => {
 
       {/* Modal 2: Errores o Información General */}
       <Modal show={showModal2} onHide={() => { handleCloseModal2(); setIsSubmitting(false); }} size="md" backdrop="static" keyboard={false} centered>
-        
+
         <Modal.Body className="flex flex-col items-center p-4">
           {/* Puedes añadir un icono de error aquí */}
           <div className='p-1'>
@@ -827,7 +828,7 @@ const CartTotal = ({ datosCliente, setDatosCliente, orderToEdit }) => {
 
       {/* Modal 1: Confirmación (ej. continuar sin pollo) */}
       <Modal show={showModal} onHide={() => { handleCloseModal(); setIsSubmitting(false); }} size="md" backdrop="static" keyboard={false} centered>
-        
+
         <Modal.Body className="flex flex-col items-center p-4">
           {/* Icono de pregunta/aviso */}
           <div className='p-2'>
@@ -845,7 +846,7 @@ const CartTotal = ({ datosCliente, setDatosCliente, orderToEdit }) => {
 
          </div>
           <p className="font-nunito text-lg p-2 text-center text-gray-700">{mensajeModal}</p>
-         
+
         </Modal.Body>
         <Modal.Footer className="border-t-0 flex justify-around p-4">
           {/* Botón Cancelar: Cierra modal y libera isSubmitting */}
@@ -861,7 +862,7 @@ const CartTotal = ({ datosCliente, setDatosCliente, orderToEdit }) => {
 
       {/* Modal 3: Confirmación de Límite Excedido */}
       <Modal show={showLimitModal} onHide={() => { handleCloseLimitModal(); setIsSubmitting(false); }} size="lg" backdrop="static" keyboard={false} centered>
-         
+
         <Modal.Body className="flex flex-col items-center p-4">
            {/* Icono de Advertencia */}
            <div className="p-2 text-red-500">

@@ -1,3 +1,4 @@
+import React, { useEffect, useRef } from 'react'; // <-- Import useRef
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import Home from "./components/home/Home";
 import Login from "./components/login/Login";
@@ -31,20 +32,42 @@ import { OrderProvider } from './components/Context/OrderProviderContext';
 import Cocina from "./components/cocina/Cocina";
 import AdminCalendarioPage from "./components/dashboard/Calendario/AdminCalendarioPage";
 
-import React, { useEffect } from 'react';
 import { initDailyCalendars } from './components/dashboard/Calendario/initDailyCalendars.jsx';
 
 // --- 1. IMPORTA EL NUEVO COMPONENTE LISTENER ---
 // Ajusta la ruta según donde hayas creado el archivo GlobalOrderListener.jsx
 import GlobalOrderListener from './components/Context/GlobalOrderListener';
 import SonidoOnChange from "./components/ordenes/SonidoOnChange.jsx";
-import HeaderFinal from "./components/cocina/components/HeaderFinal.jsx";
+// HeaderFinal no se usa directamente en las rutas, ¿es un componente interno?
+// import HeaderFinal from "./components/cocina/components/HeaderFinal.jsx";
 
 function App() {
-  // Este useEffect para inicializar calendarios se mantiene
+  // Ref to track if the init effect has run its core logic
+  const initEffectRan = useRef(false); // <-- Add useRef
+
+  // useEffect for initializing calendars, preventing StrictMode double run
   useEffect(() => {
+    // Check if we are in development and if the effect has already run once
+    if (import.meta.env.MODE === 'development' && initEffectRan.current) {
+       console.log("App.jsx useEffect [init]: StrictMode re-run detected, skipping initDailyCalendars.");
+       return; // Skip the second run in development Strict Mode
+    }
+
+    // Run the initialization logic
+    console.log("App.jsx useEffect [init]: Running initDailyCalendars...");
     initDailyCalendars();
-  }, []);
+
+    // Mark that the effect's core logic has run
+    initEffectRan.current = true;
+
+    // Cleanup function (optional, but good practice)
+    return () => {
+      console.log("App.jsx useEffect [init]: Cleanup.");
+      // No specific cleanup needed for initDailyCalendars itself,
+      // but we keep the structure. We don't reset the ref here
+      // for a one-time initialization.
+    };
+  }, []); // Empty dependency array ensures it runs only on initial mount
 
   return (
     // DataProvider envuelve todo
@@ -85,8 +108,6 @@ function App() {
 
             {/* Puedes añadir una ruta por defecto o para páginas no encontradas si quieres */}
             {/* <Route path="*" element={<NotFound />} /> */}
-
-            
 
           </Routes>
         </BrowserRouter>
