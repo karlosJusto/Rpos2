@@ -58,6 +58,7 @@ const StockDia = () => {
                     numeropedido: pedido.NumeroPedido,
                     cliente: pedido.cliente,
                     fechahora: fechaRecogida.format('DD/MM/YYYY HH:mm'),
+                    position: producto.position, // Añadimos la posición
                   });
                 }
               });
@@ -78,30 +79,28 @@ const StockDia = () => {
 
   // Agrupar los productos por categoría
   const productosAgrupadosPorCategoria = pedidos.reduce((acc, pedido) => {
-    // Verifica si la categoría ya existe en el acumulador
     if (!acc[pedido.categoria]) {
       acc[pedido.categoria] = [];
     }
-    // Ahora buscamos si el producto ya existe en esa categoría
     const index = acc[pedido.categoria].findIndex(p => p.id === pedido.id);
-
     if (index > -1) {
-      // Si el producto ya existe en esa categoría, solo actualizamos la cantidad
       acc[pedido.categoria][index].cantidadTotal += pedido.cantidad;
     } else {
-      // Si el producto no existe en la categoría, lo agregamos
       acc[pedido.categoria].push({
         id: pedido.id,
         nombre: pedido.nombre,
         cantidadTotal: pedido.cantidad,
+        position: pedido.position, // Incluimos la posición en el objeto agrupado
       });
     }
-
     return acc;
   }, {});
 
-  // Convertir el objeto de categorías a un array para poder renderizarlo
-  const categoriasArray = Object.entries(productosAgrupadosPorCategoria);
+  // Definir el orden deseado de las categorías
+  const ordenCategorias = ["comida", "complementos", "bebidas", "postres", "extras"];
+
+  // Crear un nuevo array de categorías ordenado
+  const categoriasOrdenadas = ordenCategorias.map(categoria => [categoria, productosAgrupadosPorCategoria[categoria]]).filter(item => item[1]);
 
   // Obtener la fecha actual y formatearla
   const fechaHoy = dayjs().tz('Europe/Madrid').format('DD/MM/YYYY');
@@ -111,28 +110,25 @@ const StockDia = () => {
     const polloAsado = productos.find(p => p.id === 1);
     const medioPollo = productos.find(p => p.id === 2);
     const total = (polloAsado ? polloAsado.cantidadTotal : 0) + (medioPollo ? medioPollo.cantidadTotal * 0.5 : 0);
-    return total.toFixed(1); // Retorna el total con dos decimales
+    return total.toFixed(1); // Retorna el total con un decimal
   };
 
   return (
     <div className="p-4 max-w-4xl mx-auto">
-      {/* Mensaje de error */}
       {error && <p className="mt-4 text-red-600 text-center">{error}</p>}
-
-      {/* Cargando */}
       {loading ? (
         <div className="flex justify-center items-center">
           <div className="spinner-border animate-spin border-t-2 border-b-2 border-yellow-500 w-6 h-6 rounded-full"></div>
         </div>
       ) : (
         <div className="flex justify-center gap-8 font-nunito">
-          {/* Tabla de resultados agrupados por categoría */}
           <div className="overflow-x-auto w-1/2 text-center">
             <h1 className="text-center mb-4 font-nunito text-gray-500 text-2xl">Productos ya vendidos - {fechaHoy}</h1>
-            {categoriasArray.length === 0 ? (
+            {categoriasOrdenadas.length === 0 ? (
               <p className="text-center text-gray-500">No hay pedidos. (:</p>
             ) : (
-              categoriasArray.map(([categoria, productos]) => (
+              categoriasOrdenadas.map(([categoria, productos]) => (
+             
                 <div key={categoria} className="mb-6">
                   <h2 className="text-lg font-semibold text-yellow-500">{categoria.toUpperCase()}</h2>
                   <table className="table table-sm w-full border-separate mt-4">
@@ -143,8 +139,8 @@ const StockDia = () => {
                       </tr>
                     </thead>
                     <tbody>
-                      {/* Ordenamos los productos por id antes de mostrarlos */}
-                      {productos.sort((a, b) => a.id - b.id).map((producto) => (
+                      {/* Ordenamos los productos por position dentro de cada categoría */}
+                      {productos.sort((a, b) => a.position - b.position).map((producto) => (
                         <tr key={producto.id}>
                           <td>{producto.nombre}</td>
                           <td className="font-extrabold">{producto.cantidadTotal}</td>
@@ -153,14 +149,14 @@ const StockDia = () => {
                     </tbody>
                     {categoria.toLowerCase() === 'comida' && (
                       <tfoot className="border-2 text-2xl ">
-                      <tr>
-                        <td className="font-extrabold border-b-2 border-gray-300">Total Pollo</td>
-                        <td className="font-extrabold border-b-2 border-gray-300">
-                          {calcularTotalPollo(productos)}
-                        </td>
-                      </tr>
-                    </tfoot>
-                      )}
+                        <tr>
+                          <td className="font-extrabold border-b-2 border-gray-300">Total Pollo</td>
+                          <td className="font-extrabold border-b-2 border-gray-300">
+                            {calcularTotalPollo(productos)}
+                          </td>
+                        </tr>
+                      </tfoot>
+                    )}
                   </table>
                 </div>
               ))

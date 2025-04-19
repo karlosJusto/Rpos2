@@ -36,7 +36,7 @@ const LGStock = () => {
           <Navbar.Collapse id="basic-navbar-nav">
             <Nav className="ms-auto pr-3 pt-1 d-flex justify-content-between w-100">
             <div className="flex justify-center items-center max-w-xl mx-auto">
-              <h1 className="text-xl font-nunito font-extrabold text-gray-600 ms-36">{texto}</h1>
+              <h1 className="text-[1.50vh] font-nunito font-extrabold text-gray-600 ms-36">{texto}</h1>
             </div> 
 
               {/* Componente Reloj, que se coloca a la derecha */}

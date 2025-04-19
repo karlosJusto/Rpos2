@@ -1059,7 +1059,7 @@ const handlePedidoRapido = (idProduct) => {
       </div>
     </div>
 
-    <div className="w-full bg-gray-700 mt-5 p-1 fixed flex ">
+    <div className="w-full bg-gray-700 mt-[4vh] p-1 fixed flex ">
     <div className="flex justify-start items-center"> {/* Alinea ambos divs horizontal y verticalmente */}
       <div className="ms-3 p-1">
         <svg width="28px" height="28px" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -1185,7 +1185,7 @@ const handlePedidoRapido = (idProduct) => {
 
 
 
-          <div className="w-full bg-gray-100 flex flex-col justify-center items-center mt-[6rem] mb-2 pl-1 pr-1">  
+          <div className="w-full bg-gray-100 flex flex-col justify-center items-center mt-[5.4rem] mb-2 pl-1 pr-1 ">  
         {Object.keys(bloquesFiltrados).map((bloque) => (
           <div key={bloque} className="w-full ">
             {/* Título con la franja horaria */}
@@ -1431,7 +1431,7 @@ const handlePedidoRapido = (idProduct) => {
   </Offcanvas.Header>
   <Offcanvas.Body>
     <Nav>
-    <ul className=" ms-2 flex  flex-col justify-between text-center items-center gap-10   bg-[#f2ac02] ">
+    <ul className=" ms-2 flex  flex-col justify-between text-center items-center gap-7  bg-[#f2ac02] ">
 
       <Link className=" p-3 mt-2  hover:bg-gray-100 hover:rounded-2xl " to={"/layout/comida"}>
 

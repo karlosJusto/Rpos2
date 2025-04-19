@@ -94,7 +94,7 @@ const ProductCard = memo(({ product }) => {
     return (
         <div className="border border-gray-200 rounded-lg overflow-hidden bg-[#F3F3F3] shadow-sm flex flex-col h-full">
             {/* Cabecera (sin cambios) */}
-            <div className="flex justify-between items-center p-1 border-b border-gray-200 bg-gray-700"> <div className="truncate text-xl text-white font-nunito flex p-2"> {product.name} </div> <div className="flex gap-4 text-[15px] font-nunito me-4"> <div className="flex flex-col items-center"> <span className="font-semibold text-white">STOCK</span> <span className="font-medium text-white">{product.stock !== undefined ? product.stock : '-'}</span> </div> <div className="flex flex-col items-center"> <span className="font-semibold text-white">PEDIDOS</span> <span className="font-medium text-white">{totalPedidosCount} <span className="px-1 ">[ {listosCount} ]</span></span> </div> </div> </div>
+            <div className="flex justify-between items-center p-1 border-b border-gray-200 bg-gray-700"> <div className="truncate text-lg text-white font-nunito flex p-2"> {product.name} </div> <div className="flex gap-4 text-[15px] font-nunito me-4"> <div className="flex flex-col items-center"> <span className="font-semibold text-white">STOCK</span> <span className="font-medium text-white">{product.stock !== undefined ? product.stock : '-'}</span> </div> <div className="flex flex-col items-center"> <span className="font-semibold text-white">PEDIDOS</span> <span className="font-medium text-white">{totalPedidosCount} <span className="px-1 ">[ {listosCount} ]</span></span> </div> </div> </div>
 
             {/* Tabla de Pedidos */}
             <div className="flex-1 overflow-y-auto">

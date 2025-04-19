@@ -337,7 +337,7 @@ const BuscadorPedidos = () => {
                     <tbody>
                       <tr>
                         <td colSpan="2" className="text-center p-3 pb-1 border-0">
-                          <img src={pedido.codigoQR} alt={`Código QR del Pedido ${pedido.NumeroPedido}`} className="w-32 h-32 mx-auto" />
+                          <img src={pedido.codigoQR} alt={`Código QR del Pedido ${pedido.NumeroPedido}`} className="w-28 h-28 mx-auto" />
                         </td>
                       </tr>
                     </tbody>

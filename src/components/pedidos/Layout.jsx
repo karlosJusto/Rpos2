@@ -75,11 +75,11 @@ const Layout = () => {
               <div className="h-[9%]">
                 <Tabs />
               </div>
-              <div className="p-[2.5vw] pl-[3vw] h-[64%] max-h-[75%] grid grid-cols-5 overflow-y-auto gap-4">
+              <div className="p-[1.5vw] pl-[3vw] h-[58%] max-h-[75%] grid grid-cols-5 overflow-y-auto gap-4">
                 <Card />
               </div>
               {/* Slider con los intervalos */}
-              <div className="w-[90%] pt-[1vh] ms-[3.1vw] mt-[1vh] border-white rounded p-4 bg-white ">
+              <div className="w-[90%] mt-[1.5vh] pt-[1vh] ms-[3.8vw]  border-white rounded p-4 bg-white ">
                 {loading ? (
                   <p>Cargando horarios...</p>
                 ) : (

@@ -139,36 +139,53 @@ useEffect(() => {
                 producto_doble = true;
               }
             }
-            if (producto.celiaco) {
+            /*if (producto.celiaco) {
               clave = clave + "_celiaco";
-            }
+            }*/
 
             if (pedidosDelDia[clave]) {
               if (producto_doble) {
                 pedidosDelDia[clave].cantidad += Math.floor(productoConFecha.cantidad / 2);
                 pedidosDelDia[clave].entregado += Math.floor(productoConFecha.entregado / 2);
+                if (producto.celiaco) {
+                   pedidosDelDia[clave].cantidad_celiaco += Math.floor(productoConFecha.cantidad / 2);
+                }
                 if ((productoConFecha.cantidad % 2) > 0) {
                   pedidosDelDia[clave.replace('_doble', '')].cantidad += productoConFecha.cantidad % 2;
                   pedidosDelDia[clave.replace('_doble', '')].entregado += productoConFecha.entregado % 2;
+                  if (producto.celiaco) {
+                       pedidosDelDia[clave.replace('_doble', '')].cantidad_celiaco += productoConFecha.cantidad % 2;
+                  }
                 }
               } else {
                 pedidosDelDia[clave].cantidad += productoConFecha.cantidad;
                 pedidosDelDia[clave].entregado += productoConFecha.entregado;
+                if (producto.celiaco) {
+                    pedidosDelDia[clave].cantidad_celiaco += productoConFecha.cantidad;
+                }
               }
             } else {
               pedidosDelDia[clave] = productoConFecha;
               if (producto_doble) {
-                let productoDoble = { ...productoConFecha, alias: pedidosDelDia[clave].alias + " Dobles", cantidad: Math.floor(productoConFecha.cantidad / 2), entregado: Math.floor(productoConFecha.entregado / 2), doble: true };
+                let productoDoble = { ...productoConFecha, alias: pedidosDelDia[clave].alias + " Dobles", cantidad: Math.floor(productoConFecha.cantidad / 2),  entregado: Math.floor(productoConFecha.entregado / 2), cantidad_celiaco: Math.floor(productoConFecha.cantidad / 2), doble: true };
                 pedidosDelDia[clave] = productoDoble;
                 if ((productoConFecha.cantidad % 2) > 0) {
                   let clave_simple = clave.replace('_doble', '');
                   if (pedidosDelDia[clave_simple]) {
                     pedidosDelDia[clave_simple].cantidad += productoConFecha.cantidad % 2;
                     pedidosDelDia[clave_simple].entregado += productoConFecha.entregado % 2;
+                    if (producto.celiaco) {
+                      pedidosDelDia[clave].cantidad_celiaco = productoConFecha.cantidad % 2;;
+                    }
                   } else {
-                    let productoSimple = { ...productoConFecha, cantidad: productoConFecha.cantidad % 2, entregado: productoConFecha.entregado % 2 };
+                    let productoSimple = { ...productoConFecha, cantidad: productoConFecha.cantidad % 2, entregado: productoConFecha.entregado % 2, cantidad_celiaco: productoConFecha.cantidad % 2  };
                     pedidosDelDia[clave_simple] = productoSimple;
                   }
+                }
+              } else {
+                if (producto.celiaco) {
+                  let productoSimple = { ...productoConFecha, cantidad_celiaco: productoConFecha.cantidad  };
+                  pedidosDelDia[clave] = productoSimple;
                 }
               }
             }
@@ -186,12 +203,12 @@ useEffect(() => {
       if (clave_totales.length + 6 < clave.length) {
         clave_totales = clave_totales + clave.substring(clave_totales.length + 6);
       }
-      clave_totales = clave_totales.replace('_celiaco', '');
+     // clave_totales = clave_totales.replace('_celiaco', '');
 
       if (productosTotales[clave_totales]) {
         productosTotales[clave_totales].cantidad += bloque.cantidad;
         productosTotales[clave_totales].entregado += bloque.entregado;
-        productosTotales[clave_totales].celiaco += bloque.celiaco ? bloque.cantidad : 0;
+        productosTotales[clave_totales].cantidad_celiaco += bloque.cantidad_celiaco ? bloque.cantidad_celiaco : 0;
       } else {
         productosTotales[clave_totales] = {
           id: bloque.id,
@@ -199,7 +216,7 @@ useEffect(() => {
           alias: bloque.alias,
           cantidad: bloque.cantidad,
           entregado: bloque.entregado,
-          celiaco: bloque.celiaco ? bloque.cantidad : 0,
+          cantidad_celiaco: bloque.cantidad_celiaco ? bloque.cantidad_celiaco : 0,
           doble: clave_totales.includes('_doble') ? true : false,
         };
       }
@@ -231,15 +248,15 @@ useEffect(() => {
     <>
       
       
-        <div className="flex justify-between items-center mx-auto w-full px-4 font-nunito mt-3 ">
+        <div className="flex justify-between items-center mx-auto w-full px-4 font-nunito mt-2 ">
          
           {/* Patatas */}
-          <div className="bg-[#F3F3F3] w-[30%]  rounded-lg h-[45vh]">
-            <div className="flex justify-center p-3">
+          <div className="bg-[#F3F3F3] w-[30%]  rounded-lg h-[40vh]">
+            <div className="flex justify-center p-2">
               <img
                 src={patata}
                 alt="patata"
-                className="w-[20%] h-[20%] p-3 bg-white border-4 border-gray-700 rounded-full"
+                className="w-[15%] h-[15%] p-2 bg-white border-3 border-gray-700 rounded-full"
               />
             </div>
             <div className="text-center p-2 ">
@@ -250,17 +267,22 @@ useEffect(() => {
                   return (
                     <div
                       key={index}
-                      className={`mb-2 p-2 bg-white rounded-md shadow-md border-3 ${borderColor}`}
+                      className={`mb-2 p-2 bg-white rounded-md shadow-md border-2 ${borderColor}`}
                     >
                       <div className="flex items-center justify-center">
+
+                      <h2 className="mr-2 text-md flex items-center">
+                                {`${pedido.cantidad + pedido.entregado}`}
+                                <span className="font-bold px-1">[ {pedido.entregado} ] </span>  x  {pedido.alias} 
+                                {pedido.cantidad_celiaco > 0 && (
+                                  <span className="flex items-center ms-2">
+                                   [ {pedido.cantidad_celiaco} x
+                                    <img src={singluten} alt="Sin gluten" className="w-4 h-4 me-2" /> ]
+                                  </span>
+                                )}
+                              </h2>
                         
-                      <h2 className="mr-2 text-md">{`${pedido.cantidad+pedido.entregado}`}  <span className='font-bold'>[ {`${pedido.entregado}`} ]</span> x {pedido.alias}   </h2>
-                        {pedido.celiaco && (
-                          <img src={singluten} alt="Sin gluten" className="w-6 h-6 me-2" />
-                        )}
-                         {pedido.doble && (
-                          <img src={doble} alt="doble" className="w-7 h-7 " />
-                        )}
+                  
                       </div>
                     </div>
                   );
@@ -269,12 +291,12 @@ useEffect(() => {
           </div>
 
           {/* Pimientos */}
-          <div className="bg-[#F3F3F3] w-[30%] rounded-lg h-[45vh]">
-            <div className="flex justify-center p-3">
+          <div className="bg-[#F3F3F3] w-[30%] rounded-lg h-[40vh]">
+            <div className="flex justify-center p-2">
               <img
                 src={pimiento}
                 alt="pimiento"
-                className="w-[20%] h-[20%] p-3 bg-white border-4 border-gray-700 rounded-full "
+                className="w-[15%] h-[15%] p-2 bg-white border-3 border-gray-700 rounded-full"
               />
             </div>
             <div className="text-center p-2">
@@ -285,16 +307,19 @@ useEffect(() => {
                   return (
                     <div
                       key={index}
-                      className={`mb-2 p-2 bg-white rounded-md shadow-md border-3 ${borderColor}`}
+                      className={`mb-2 p-2 bg-white rounded-md shadow-md border-2 ${borderColor}`}
                     >
                       <div className="flex items-center justify-center">
-                      <h2 className="mr-2 text-md">{`${pedido.cantidad+pedido.entregado}`}  <span className='font-bold'>[ {`${pedido.entregado}`} ]</span> x {pedido.alias}</h2>
-                        {pedido.celiaco && (
-                          <img src={singluten} alt="Sin gluten" className="w-6 h-6 me-2" />
-                        )}
-                         {pedido.doble && (
-                          <img src={doble} alt="doble" className="w-7 h-7 " />
-                        )}
+                      <h2 className="mr-2 text-md flex items-center">
+                                {`${pedido.cantidad + pedido.entregado}`}
+                                <span className="font-bold px-1">[ {pedido.entregado} ] </span>  x  {pedido.alias} 
+                                {pedido.cantidad_celiaco > 0 && (
+                                  <span className="flex items-center ms-2">
+                                   [ {pedido.cantidad_celiaco} x
+                                    <img src={singluten} alt="Sin gluten" className="w-4 h-4 me-2" /> ]
+                                  </span>
+                                )}
+                              </h2>
                       </div>
                     </div>
                   );
@@ -303,12 +328,12 @@ useEffect(() => {
           </div>
 
           {/* Croquetas */}
-          <div className="bg-[#F3F3F3] w-[30%] rounded-lg h-[45vh]">
-            <div className="flex justify-center p-3">
+          <div className="bg-[#F3F3F3] w-[30%] rounded-lg h-[40vh]">
+            <div className="flex justify-center p-2">
               <img
                 src={croquetas}
                 alt="croquetas"
-                className="w-[20%] h-[20%] p-3 bg-white border-4 border-gray-700 rounded-full "
+                 className="w-[15%] h-[15%] p-2 bg-white border-3 border-gray-700 rounded-full"
               />
             </div>
             <div className="text-center p-2">
@@ -319,13 +344,19 @@ useEffect(() => {
                   return (
                     <div
                       key={index}
-                      className={`mb-2 p-2 bg-white rounded-md shadow-md border-3 ${borderColor}`}
+                      className={`mb-2 p-2 bg-white rounded-md shadow-md border-2 ${borderColor}`}
                     >
                       <div className="flex items-center justify-center">
-                      <h2 className="mr-2 text-md">{`${pedido.cantidad+pedido.entregado}`}  <span className='font-bold'>[ {`${pedido.entregado}`} ]</span> x {pedido.alias}</h2>
-                        {pedido.celiaco && (
-                          <img src={singluten} alt="Sin gluten" className="w-6 h-6" />
-                        )}
+                      <h2 className="mr-2 text-md flex items-center">
+                                {`${pedido.cantidad + pedido.entregado}`}
+                                <span className="font-bold px-1">[ {pedido.entregado} ] </span>  x  {pedido.alias} 
+                                {pedido.cantidad_celiaco > 0 && (
+                                  <span className="flex items-center ms-2">
+                                   [ {pedido.cantidad_celiaco} x
+                                    <img src={singluten} alt="Sin gluten" className="w-4 h-4 me-2" /> ]
+                                  </span>
+                                )}
+                              </h2>
                       </div>
                     </div>
                   );
@@ -337,10 +368,10 @@ useEffect(() => {
 
           {/* Parte totales, anteriores y posteriores */}
 
-        <div className="flex justify-between items-center mx-auto w-full px-4 font-nunito mt-4">
+        <div className="flex justify-between items-center mx-auto w-full px-4 font-nunito mt-2">
                 {/* Totales */}
-                <div className="bg-[#F3F3F3] w-[30%] rounded-lg h-[43vh]">
-                    <h1 className="bg-gray-700 p-2 text-white text-xl text-center rounded-md">Totales</h1>
+                <div className="bg-[#F3F3F3] w-[30%] rounded-lg h-[42vh]">
+                    <h1 className="bg-gray-700 p-2 text-white text-lg text-center rounded-md">Totales</h1>
                     <div className="text-center p-2 overflow-y-auto h-[37vh]">
                       {Object.values(pedidosTotales).map((pedido, index) => {
                   
@@ -352,16 +383,16 @@ useEffect(() => {
                         return (
                           <div
                             key={index}
-                            className={`mb-2 p-2 bg-white rounded-md shadow-md border-3 ${borderColor}`}
+                            className={`mb-2 p-2 bg-white rounded-md shadow-md border-2 ${borderColor}`}
                           >
                             <div className="flex items-center justify-center">
                               <h2 className="mr-2 text-md flex items-center">
                                 {`${pedido.cantidad + pedido.entregado}`}
                                 <span className="font-bold px-1">[ {pedido.entregado} ] </span>  x  {pedido.alias} 
-                                {pedido.celiaco > 0 && (
+                                {pedido.cantidad_celiaco > 0 && (
                                   <span className="flex items-center ms-2">
-                                   [ {pedido.celiaco} x
-                                    <img src={singluten} alt="Sin gluten" className="w-6 h-6 me-2" /> ]
+                                   [ {pedido.cantidad_celiaco} x
+                                    <img src={singluten} alt="Sin gluten" className="w-4 h-4 me-2" /> ]
                                   </span>
                                 )}
                               </h2>
@@ -374,25 +405,26 @@ useEffect(() => {
                 
                 {/* Anteriores */}
 
-                <div className="bg-[#F3F3F3] w-[30%] rounded-lg h-[43vh] ">
-                      <h1 className="bg-gray-700 p-2 text-white text-xl text-center rounded-md">Anteriores: {anteriores}</h1>
-                      <div className="text-center p-2 ">
+                <div className="bg-[#F3F3F3] w-[30%] rounded-lg h-[42vh] ">
+                      <h1 className="bg-gray-700 p-2 text-white text-lg text-center rounded-md">Anteriores: {anteriores}</h1>
+                      <div className="text-center p-2 overflow-y-auto h-[37vh]">
                         {pedidos
                           .filter((pedido) => pedido.fechahora === anteriores) // Filtramos solo los pedidos con fecha igual a 'anteriores'
                           .map((pedido, index) => {
                             const borderColor = pedido.cantidad === 0 ? 'border-yellow-500' : 'border-red-500'; // Definimos el color del borde
                             return (
-                              <div key={index} className={`mb-2 p-2 bg-white rounded-md shadow-md border-3 ${borderColor}`}>
+                              <div key={index} className={`mb-2 p-2 bg-white rounded-md shadow-md border-2 ${borderColor}`}>
                                 <div className="flex items-center justify-center">
-                                  <h2 className="mr-2 text-md">
-                                    {`${pedido.cantidad + pedido.entregado}`}{" "}
-                                    <span className="font-bold">[ {pedido.entregado} ]</span> x {pedido.alias} </h2>
-                                  {pedido.celiaco && (
-                                    <img src={singluten} alt="Sin gluten" className="w-6 h-6 me-2" />
-                                  )}
-                                   {pedido.doble && (
-                                      <img src={doble} alt="doble" className="w-7 h-7 " />
-                                    )}
+                                <h2 className="mr-2 text-md flex items-center">
+                                {`${pedido.cantidad + pedido.entregado}`}
+                                <span className="font-bold px-1">[ {pedido.entregado} ] </span>  x  {pedido.alias} 
+                                {pedido.cantidad_celiaco > 0 && (
+                                  <span className="flex items-center ms-2">
+                                   [ {pedido.cantidad_celiaco} x
+                                    <img src={singluten} alt="Sin gluten" className="w-4 h-4 me-2" /> ]
+                                  </span>
+                                )}
+                              </h2>
                                 </div>
                               </div>
                             );
@@ -402,26 +434,26 @@ useEffect(() => {
 
 
                 {/* Posteriores */}
-                <div className="bg-[#F3F3F3] w-[30%] rounded-lg h-[43vh]">
-                      <h1 className="bg-gray-700 p-2 text-white text-xl text-center rounded-md">Posteriores: {posteriores}</h1>
-                      <div className="text-center p-2">
+                <div className="bg-[#F3F3F3] w-[30%] rounded-lg h-[42vh]">
+                      <h1 className="bg-gray-700 p-2 text-white text-lg text-center rounded-md">Posteriores: {posteriores}</h1>
+                      <div className="text-center p-2 overflow-y-auto h-[37vh]">
                         {pedidos
                           .filter((pedido) => pedido.fechahora === posteriores) // Filtramos solo los pedidos con fecha igual a 'anteriores'
                           .map((pedido, index) => {
                             const borderColor = pedido.cantidad === 0 ? 'border-yellow-500' : 'border-red-500'; // Definimos el color del borde
                             return (
-                              <div key={index} className={`mb-2 p-2 bg-white rounded-md shadow-md border-3 ${borderColor}`}>
+                              <div key={index} className={`mb-2 p-2 bg-white rounded-md shadow-md border-2 ${borderColor}`}>
                                 <div className="flex items-center justify-center">
-                                  <h2 className="mr-2 text-md">
-                                    {`${pedido.cantidad + pedido.entregado}`}{" "}
-                                    <span className="font-bold">[ {pedido.entregado} ]</span> x {pedido.alias}  {/* - {pedido.fechahora} */}
-                                  </h2>
-                                  {pedido.celiaco && (
-                                    <img src={singluten} alt="Sin gluten" className="w-6 h-6 me-2" />
-                                  )}
-                                   {pedido.doble && (
-                                    <img src={doble} alt="doble" className="w-7 h-7 " />
-                                  )}
+                                <h2 className="mr-2 text-md flex items-center">
+                                {`${pedido.cantidad + pedido.entregado}`}
+                                <span className="font-bold px-1">[ {pedido.entregado} ] </span>  x  {pedido.alias} 
+                                {pedido.cantidad_celiaco > 0 && (
+                                  <span className="flex items-center ms-2">
+                                   [ {pedido.cantidad_celiaco} x
+                                    <img src={singluten} alt="Sin gluten" className="w-4 h-4 me-2" /> ]
+                                  </span>
+                                )}
+                              </h2>
                                 </div>
                               </div>
                             );

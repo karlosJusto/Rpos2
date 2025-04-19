@@ -22,20 +22,22 @@ import React, { useState, useEffect } from 'react';
   };
 
   return (
-    <div className="overflow-x-auto rounded-lg ">
-      <table className="min-w-full table-auto border-collapse border border-gray-300 bg-white shadow-sm font-nunito">
+    <div className="overflow-x-auto rounded-lg -mt-5 ">
+      <table className="min-w-full table-auto border-collapse  border border-gray-300 bg-white shadow-sm font-nunito">
         <tbody >
           {/* Fila 1: Título y cabeceras principales */}
           <tr className="bg-gray-700">
-            {/* La celda del título ocupa tres filas */}
-            <th className="px-4 py-2 text-left text-white" rowSpan="3">
+            {/* La celda del título ocupa tres filas 
+            <th className="px-4 py-2 text-left text-white" rowSpan="1">
               {type.toUpperCase()}
-            </th>
+            </th>*/}
+            
             <th className="px-4 py-2 text-center text-white " colSpan="2">
-              GRANDES
+            {type.toUpperCase()} GRANDES
             </th>
+         
             <th className="px-4 py-2 text-center text-white" colSpan="2">
-              PEQUEÑAS
+            {type.toUpperCase()} PEQUEÑAS
             </th>
           </tr>
           {/* Fila 2: Subcabeceras */}

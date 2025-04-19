@@ -37,7 +37,7 @@ const LGBuscadorPedidos = () => {
             <Nav className="ms-auto pr-3 pt-1 d-flex justify-content-between w-100">
               {/* Contenedor que centra el texto 'hola' */}
               <div className="d-flex justify-content-center flex-grow-1">
-                <h1 className="text-xl font-nunito font-extrabold text-gray-600 ms-20">{texto}</h1>
+                <h1 className="text-[1.50vh] font-nunito font-extrabold text-gray-600 ms-20">{texto}</h1>
               </div>
 
               {/* Componente Reloj, que se coloca a la derecha */}

@@ -241,7 +241,7 @@ const generarEstadisticasDiarias = async () => {
           maxLength={5} // Limita el máximo de caracteres a 5
           value={valorInput}
           readOnly
-          className="w-24 pl-2 pr-6 text-yellow-500 bg-white text-center"
+          className="w-[6.5vw]  text-yellow-500 bg-white text-center"
         />
       </div>
 

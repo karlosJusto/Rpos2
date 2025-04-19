@@ -107,7 +107,7 @@ const Ticket = (props) => {
 
         </Link>
 
-              <div className="me-5">
+              <div className="me-4">
                 <h1 className="flex items-center justify-start text-sm text-gray-400 font-nunito ">Empleado</h1>
                 <h1 className="text-gray-800 font-nunito text-center">{empleadoNombre}</h1>
 
@@ -151,7 +151,7 @@ const Ticket = (props) => {
             </Link>
 
               <Link className=' p-[0.30vw] rounded-lg   bg-green-700 '>
-                <h1 className='p-[0.40vw]  font-nunito text-white'>{pedidosConOrigenUno}</h1>
+                <h1 className='p-[0.40vw]   font-nunito text-white'>{pedidosConOrigenUno}</h1>
             </Link>
           </div>
 

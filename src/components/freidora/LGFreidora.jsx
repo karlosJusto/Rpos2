@@ -90,7 +90,7 @@ const LGFreidora = ( ) => {
           <Navbar.Collapse id="basic-navbar-nav">
             <Nav className="ms-auto pr-3 pt-1 d-flex justify-content-between w-100">
               {/* Contenedor que centra el texto 'hola' */}
-              <h1 className="text-2xl font-nunito font-extrabold text-gray-400 ms-12 ">{texto}</h1>
+              <h1 className="text-xl font-nunito font-extrabold text-gray-400 ms-12 ">{texto}</h1>
               <div className="d-flex justify-content-center flex-grow-1">
                
                 <h1 className="text-xl font-nunito font-extrabold text-gray-600 ms-5 mt-2">En preparación: </h1>
