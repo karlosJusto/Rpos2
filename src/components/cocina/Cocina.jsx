@@ -1,4 +1,4 @@
-// --- Cocina.jsx (Completo, sin omisiones, con corrección de bucle) ---
+// --- Cocina.jsx (Completo, sin omisiones, con corrección de bucle y eliminación de useEffect 2 de ensaladas) ---
 import React, { useEffect, useState, useRef, useCallback, useContext } from 'react';
 import HeaderFinal from './components/HeaderFinal';
 import ProductCard from './components/ProductCard';
@@ -8,9 +8,9 @@ import {
   collection,
   doc,
   onSnapshot,
-  setDoc,
+  setDoc, // setDoc puede que ya no sea necesario si no creas el doc aquí
   updateDoc,
-  getDoc
+  getDoc // getDoc puede que ya no sea necesario aquí
 } from 'firebase/firestore';
 import dayjs from 'dayjs';
 import isBetween from 'dayjs/plugin/isBetween';
@@ -40,7 +40,7 @@ const Cocina = () => {
   // --- States ---
   const [cocinaProducts, setCocinaProducts] = useState([]);
   const [productsData, setProductsData] = useState([]);
-  const [saladsData, setSaladsData] = useState([]);
+  const [saladsData, setSaladsData] = useState([]); // Estado para los datos de ensaladas leídos
   const [selectedDate, setSelectedDate] = useState(new Date()); // Default to today
   const [currentPedidosMap, setCurrentPedidosMap] = useState(new Map());
   const [productosStockMap, setProductosStockMap] = useState(new Map());
@@ -438,36 +438,52 @@ const Cocina = () => {
   // --- Salad Logic ---
   const todayDocId = selectedDateStr.replace(/\//g, '-'); // Create Firestore doc ID from date string
 
-  // useEffect 1: Subscribe to/Create daily salad document
+  // useEffect 1: Subscribe to daily salad document FOR DISPLAY
+  // ESTE SE QUEDA: Es el que lee los datos de ensaladas para mostrarlos
   useEffect(() => {
     const saladsRef = doc(db, SALADS_COLLECTION_NAME, todayDocId); // Reference to the specific daily doc
+    console.log(`[Salads Display Effect] Subscribing to ${SALADS_COLLECTION_NAME}/${todayDocId}`);
+
     // Subscribe to snapshot changes for the daily salad doc
     const unsubscribe = onSnapshot(saladsRef, (docSnapshot) => {
       if (docSnapshot.exists()) {
+        console.log(`[Salads Display Effect] Data received for ${todayDocId}:`, docSnapshot.data());
         // If doc exists, update local state
-        setSaladsData([docSnapshot.data()]);
+        const data = docSnapshot.data();
+        // Optional: Deep comparison to prevent unnecessary re-renders
+        // if (!isEqual(saladsData[0], data)) {
+        //   setSaladsData([data]);
+        // }
+        // Simple update:
+        setSaladsData([data]);
       } else {
-        // If doc doesn't exist, create it with initial structure
-        const initialData = {
-          name: `Ensaladas y Ensaladillas del ${selectedDateStr}`,
-          ensaladas: { grandes: { preparadas: 0, pedidas: 0 }, pequenas: { preparadas: 0, pedidas: 0 } },
-          ensaladillas: { grandes: { preparadas: 0, pedidas: 0 }, pequenas: { preparadas: 0, pedidas: 0 } },
-        };
-        // Create doc in Firestore, then update local state
-        setDoc(saladsRef, initialData, { merge: true }) // merge:true avoids overwriting if created concurrently
-          .then(() => setSaladsData([initialData]))
-          .catch(err => console.error("Error creating initial salad doc:", err));
+        // Document doesn't exist (e.g., first time viewing the day)
+        console.log(`[Salads Display Effect] Document ${todayDocId} does not exist yet.`);
+        setSaladsData([]); // Clear data or set to initial state
       }
-    }, (error) => console.error("Error fetching salads data:", error));
+    }, (error) => {
+        console.error(`[Salads Display Effect] Error fetching salads data for ${todayDocId}:`, error);
+        setSaladsData([]); // Clear data on error
+    });
+
     // Cleanup subscription when dependencies change or component unmounts
-    return () => unsubscribe();
-  }, [todayDocId, selectedDateStr]); // Re-run if the selected date changes
+    return () => {
+        console.log(`[Salads Display Effect] Unsubscribing from ${todayDocId}`);
+        unsubscribe();
+    };
+  }, [todayDocId]); // Re-run only if the document ID (date) changes
+
 
   // useEffect 2: Update 'pedidas' count for salads based on orders
+  // ¡¡¡ ESTE useEffect SE ELIMINA O COMENTA COMPLETAMENTE !!!
+  // Era el responsable de recalcular 'pedidas' y sobrescribir el valor en Firestore.
+  /*
   useEffect(() => {
     const pedidosRef = collection(db, 'pedidos'); // Reference to 'pedidos' collection
+    console.log(`[Salads Pedidas Calc Effect] Setting up listener for pedidos to calculate salad counts for ${selectedDateStr}`);
     // Subscribe to all pedidos (filtering happens locally)
     const unsubscribe = onSnapshot(pedidosRef, (querySnapshot) => {
+      console.log(`[Salads Pedidas Calc Effect] Pedidos snapshot received (${querySnapshot.size} docs). Filtering...`);
       const allPedidosRaw = [];
       querySnapshot.forEach((doc) => allPedidosRaw.push({ id: doc.id, ...doc.data() }));
 
@@ -481,12 +497,13 @@ const Cocina = () => {
         if (fechaPedido !== selectedDateStr) return false;
         if (isToday) {
           const { startTime, endTime } = getTurnoActual();
-          const orderDateTime = dayjs(`${fechaPedido} ${horaPedido}`, 'DD/MM/YYYY HH:mm');
+          const orderDateTime = dayjs(`${fechaPedido} ${horaPedido}`, 'DD/MM/YYYY HH:mm', true);
           if (!orderDateTime.isValid()) return false;
           return orderDateTime.toDate() >= startTime && orderDateTime.toDate() <= endTime;
         }
         return true;
       });
+      console.log(`[Salads Pedidas Calc Effect] ${pedidosDelTurnoOfiltered.length} orders found for date ${selectedDateStr} / shift.`);
 
       // Calculate total ordered quantities for each salad type/size
       let ensaladasPedidasGr = 0, ensaladasPedidasPeq = 0;
@@ -495,59 +512,107 @@ const Cocina = () => {
          if (pedido.productos && Array.isArray(pedido.productos)) {
             pedido.productos.forEach((prod) => {
                 const cantidad = prod.cantidad || 1;
-                // Identify size (grande/pequena)
-                const sizeIdentifier = (prod.size || prod.nombre || '').toLowerCase();
-                const esPequena = sizeIdentifier.includes('peque');
-                // Sum quantities based on product ID
-                if (prod.id === 12) { // Ensalada
-                    if (esPequena) ensaladasPedidasPeq += cantidad; else ensaladasPedidasGr += cantidad;
-                } else if (prod.id === 13) { // Ensaladilla
-                    if (esPequena) ensaladillasPedidasPeq += cantidad; else ensaladillasPedidasGr += cantidad;
+                // Identify size (grande/pequena) - Asumiendo que el nombre o un campo 'size' lo indica
+                const nameLower = (prod.nombre || '').toLowerCase();
+                const isPequena = nameLower.includes("1/2") || nameLower.includes("peque"); // Ajusta según tus nombres
+
+                // Sum quantities based on product ID (Ajusta IDs si son diferentes)
+                if (prod.id === 12) { // Asumiendo ID 12 = Ensalada
+                    if (isPequena) ensaladasPedidasPeq += cantidad; else ensaladasPedidasGr += cantidad;
+                } else if (prod.id === 13) { // Asumiendo ID 13 = Ensaladilla
+                    if (isPequena) ensaladillasPedidasPeq += cantidad; else ensaladillasPedidasGr += cantidad;
                 }
+                // Añade más 'else if' si tienes otros IDs para ensaladas/ensaladillas
             });
          }
       });
+       console.log(`[Salads Pedidas Calc Effect] Calculated totals: EnsG=${ensaladasPedidasGr}, EnsP=${ensaladasPedidasPeq}, EnsadG=${ensaladillasPedidasGr}, EnsadP=${ensaladillasPedidasPeq}`);
 
-      // Update Firestore only if calculated counts differ from current counts
+      // Update Firestore 'pedidas' fields based ONLY on the filtered orders for this date/shift
       const saladsRef = doc(db, SALADS_COLLECTION_NAME, todayDocId);
-      getDoc(saladsRef).then((docSnapshot) => { // Get current data once
-        if (docSnapshot.exists()) {
-          const currentData = docSnapshot.data();
-          // Get current counts from Firestore, default to 0
-          const currentEnsGr = currentData.ensaladas?.grandes?.pedidas ?? 0;
-          const currentEnsPeq = currentData.ensaladas?.pequenas?.pedidas ?? 0;
-          const currentEnsadGr = currentData.ensaladillas?.grandes?.pedidas ?? 0;
-          const currentEnsadPeq = currentData.ensaladillas?.pequenas?.pedidas ?? 0;
+      // Intenta obtener el documento primero para ver si existe
+      getDoc(saladsRef).then((docSnapshot) => {
+        const updateData = { // Datos a actualizar
+            "ensaladas.grandes.pedidas": ensaladasPedidasGr,
+            "ensaladas.pequenas.pedidas": ensaladasPedidasPeq,
+            "ensaladillas.grandes.pedidas": ensaladillasPedidasGr,
+            "ensaladillas.pequenas.pedidas": ensaladillasPedidasPeq,
+        };
 
-          // Compare and update if different
+        if (docSnapshot.exists()) {
+          // Si existe, compara si los valores calculados son diferentes a los actuales
+          const currentData = docSnapshot.data();
+          const currentEnsGr = currentData.ensaladas?.grandes?.pedidas ?? -1; // Usa -1 para forzar update si falta
+          const currentEnsPeq = currentData.ensaladas?.pequenas?.pedidas ?? -1;
+          const currentEnsadGr = currentData.ensaladillas?.grandes?.pedidas ?? -1;
+          const currentEnsadPeq = currentData.ensaladillas?.pequenas?.pedidas ?? -1;
+
           if (currentEnsGr !== ensaladasPedidasGr || currentEnsPeq !== ensaladasPedidasPeq ||
-            currentEnsadGr !== ensaladillasPedidasGr || currentEnsadPeq !== ensaladillasPedidasPeq) {
-            console.log("[Salads Pedidas Calc Effect] Counts changed. Updating Firestore...");
-            updateDoc(saladsRef, { // Update specific fields
-              "ensaladas.grandes.pedidas": ensaladasPedidasGr,
-              "ensaladas.pequenas.pedidas": ensaladasPedidasPeq,
-              "ensaladillas.grandes.pedidas": ensaladillasPedidasGr,
-              "ensaladillas.pequenas.pedidas": ensaladillasPedidasPeq,
-            }).catch(err => console.error("Error updating salad pedidas:", err));
+              currentEnsadGr !== ensaladillasPedidasGr || currentEnsadPeq !== ensaladillasPedidasPeq) {
+             console.log("[Salads Pedidas Calc Effect] Counts changed. Updating Firestore...");
+             updateDoc(saladsRef, updateData)
+               .then(() => console.log(`[Salads Pedidas Calc Effect] Firestore 'pedidas' updated for ${todayDocId}.`))
+               .catch(err => console.error("Error updating salad pedidas:", err));
+          } else {
+             console.log("[Salads Pedidas Calc Effect] Calculated counts match Firestore. No update needed.");
           }
+        } else {
+           // Si no existe, crea el documento con los valores calculados y preparadas a 0
+           console.log(`[Salads Pedidas Calc Effect] Document ${todayDocId} does not exist. Creating with calculated 'pedidas'...`);
+           const initialData = {
+                ensaladas: {
+                    grandes: { pedidas: ensaladasPedidasGr, preparadas: 0 },
+                    pequenas: { pedidas: ensaladasPedidasPeq, preparadas: 0 }
+                },
+                ensaladillas: {
+                    grandes: { pedidas: ensaladillasPedidasGr, preparadas: 0 },
+                    pequenas: { pedidas: ensaladillasPedidasPeq, preparadas: 0 }
+                }
+            };
+           setDoc(saladsRef, initialData)
+             .then(() => console.log(`[Salads Pedidas Calc Effect] Firestore document created for ${todayDocId}.`))
+             .catch(err => console.error("Error creating salad document:", err));
         }
       }).catch(err => console.error("Error reading current salad doc for update check:", err));
 
-    }, (error) => console.error("Error fetching pedidos for salad count:", error));
+    }, (error) => console.error("[Salads Pedidas Calc Effect] Error fetching pedidos for salad count:", error));
+
     // Cleanup subscription
-    return () => unsubscribe();
+    return () => {
+        console.log("[Salads Pedidas Calc Effect] Cleaning up listener.");
+        unsubscribe();
+    };
   // Dependencies: Re-run if date or shift logic changes
   }, [selectedDateStr, todayDocId, isToday, getTurnoActual]);
+  */
 
   // Function to update 'preparadas' count in Firestore (called by SaladTypeCard buttons)
+  // ESTA FUNCIÓN SE QUEDA: Es para los botones de +/- de preparadas
   const updateSaladCount = async (type, size, amount) => {
     const sizeKey = size.toLowerCase().startsWith('grande') ? 'grandes' : 'pequenas'; // Determine key
-    const newAmount = Math.max(0, parseInt(amount, 10) || 0); // Ensure non-negative integer
+    // Asegurarse que amount es un número antes de intentar parsearlo
+    const currentAmount = parseInt(amount, 10);
+    if (isNaN(currentAmount)) {
+        console.error(`[Update Salad Count] Invalid amount received: ${amount}`);
+        return; // No hacer nada si no es un número
+    }
+    const newAmount = Math.max(0, currentAmount); // Asegurar que no sea negativo
+
     const saladsRef = doc(db, SALADS_COLLECTION_NAME, todayDocId); // Doc reference
     const updatePath = `${type}.${sizeKey}.preparadas`; // Field path (e.g., "ensaladas.grandes.preparadas")
-    console.log(`[Update Salad Count] Updating ${updatePath} to ${newAmount}`);
+    console.log(`[Update Salad Count] Updating ${updatePath} to ${newAmount} in ${todayDocId}`);
     try {
-      await updateDoc(saladsRef, { [updatePath]: newAmount }); // Update Firestore
+      // Comprobar si el documento existe antes de intentar actualizarlo
+      const docSnap = await getDoc(saladsRef);
+      if (docSnap.exists()) {
+          await updateDoc(saladsRef, { [updatePath]: newAmount }); // Update Firestore
+          console.log(`[Update Salad Count] ${updatePath} updated successfully.`);
+      } else {
+          console.warn(`[Update Salad Count] Document ${todayDocId} does not exist. Cannot update preparadas count.`);
+          // Opcionalmente, podrías intentar crearlo aquí si tiene sentido en tu flujo,
+          // pero generalmente CartTotal ya debería haberlo creado si hubo pedidos.
+          // await setDoc(saladsRef, { /* estructura inicial */, [updatePath]: newAmount }, { merge: true });
+      }
     } catch (error) {
       console.error(`Error updating ${updatePath}:`, error);
     }
@@ -612,25 +677,28 @@ const Cocina = () => {
           )}
 
           {/* Salad Section */}
-          {saladsData.length > 0 && (
-            // Display salad cards if data exists
+          {/* Asegúrate que en el JSX, SaladTypeCard recibe correctamente los datos de `saladsData` */}
+          {/* que ahora son poblados únicamente por el useEffect 1 (el de suscripción directa). */}
+          {saladsData.length > 0 && saladsData[0] && ( // Añadir chequeo por si saladsData[0] es undefined
             <div className="p-6 bg-white -mt-5"> {/* Styling for salad section */}
               <div className="flex flex-wrap md:flex-nowrap"> {/* Layout for salad cards */}
                 {/* Ensaladas Card */}
-                {saladsData[0].ensaladas && (
+                {saladsData[0].ensaladas && ( // Chequeo extra
                   <div className="w-full md:w-1/2 p-2">
                     <SaladTypeCard
                       type="ensaladas"
+                      // Pasar directamente el objeto ensaladas
                       data={saladsData[0].ensaladas}
                       updateSaladCount={updateSaladCount} // Pass update function
                     />
                   </div>
                 )}
                 {/* Ensaladillas Card */}
-                {saladsData[0].ensaladillas && (
+                {saladsData[0].ensaladillas && ( // Chequeo extra
                   <div className="w-full md:w-1/2 p-2">
                     <SaladTypeCard
                       type="ensaladillas"
+                      // Pasar directamente el objeto ensaladillas
                       data={saladsData[0].ensaladillas}
                       updateSaladCount={updateSaladCount} // Pass update function
                     />
