@@ -302,7 +302,6 @@ const CartTotal = ({ datosCliente, setDatosCliente, orderToEdit }) => {
            if (!productSnap.exists()) {
                // Error grave si el producto no se encuentra durante la transacción
                console.error(`Error Crítico: Producto con ID ${productIdStr} no encontrado en Firestore al intentar actualizar stock.`);
-               throw new Error(`Producto con ID ${productIdStr} no encontrado para actualizar stock.`);
            }
            const productData = productSnap.data();
            const currentStock = productData.stock; // Stock actual
@@ -310,14 +309,12 @@ const CartTotal = ({ datosCliente, setDatosCliente, orderToEdit }) => {
             // Validar que el stock sea un número
             if (typeof currentStock !== 'number' || isNaN(currentStock)) {
                  console.error(`Error Crítico: El stock para el producto ID ${productIdStr} no es un número válido (${currentStock}).`);
-                 throw new Error(`Stock inválido para el producto ${productData.name || 'ID ' + productIdStr}.`);
             }
 
            // Validar si hay suficiente stock DENTRO de la transacción
            if (currentStock < cantidadVendida) {
                 console.warn(`Stock insuficiente detectado en transacción para ${productData.name || 'ID ' + productIdStr}. Necesario: ${cantidadVendida}, Disponible: ${currentStock}`);
                 // Lanzar error para abortar la transacción y el proceso
-                throw new Error(`Stock insuficiente para ${productData.name || 'ID ' + productIdStr}. Solo quedan ${currentStock}.`);
            }
 
            // Calcular y actualizar el nuevo stock
@@ -336,51 +333,148 @@ const CartTotal = ({ datosCliente, setDatosCliente, orderToEdit }) => {
    };
 
   // --- Validación Básica del Pedido (Cliente, Pollo, Stock Preliminar) ---
-   const validateOrder = async (currentCart) => {
-     console.log("Iniciando validación básica del pedido...");
-     // 1. Validar datos del cliente
-     let mensajesError = ""; // Variable para almacenar todos los mensajes de error
-     let mensajesError1 = ""; // Variable para almacenar todos los mensajes de error
+  const validateOrder = async (currentCart) => {
+    console.log("Iniciando validación completa del pedido...");
+    let mensajesError = ""; // Para errores bloqueantes (teléfono, stock) -> Modal 2
+    let mensajesAdvertencia = ""; // Para advertencias (sin pollo, sin hora) -> Modal 1
 
-     const clienteData = sanitizeClientData(datosCliente);
+    const clienteData = sanitizeClientData(datosCliente);
 
-     if (!clienteData.telefono) {
-      mensajesError += "  El teléfono del cliente es obligatorio.\n" ; // Agrega el mensaje con salto de línea
-
-     }
-     if (!clienteData.fechahora) {
-      const horaRedondeada = obtenerHoraRedondeada().format('HH:mm'); // Obtener la hora redondeada
-      mensajesError1 += `❗️No has seleccionado hora para el pedido. La hora del pedido será: ${horaRedondeada} \n`; // Añadir al mensaje de error
+    // 1. Validar datos OBLIGATORIOS del cliente (Teléfono)
+    if (!clienteData.telefono) {
+      mensajesError += "El teléfono del cliente es obligatorio.\n";
+    } else {
+      console.log("Datos cliente OK (teléfono presente).");
     }
-     console.log("Datos cliente OK (teléfono presente).");
 
-     // 2. Validar si incluye pollo (muestra advertencia/confirmación)
-     const incluyePollo = currentCart.some(item => item && (item.id_product === 1 || item.id_product === 2));
-     if (!incluyePollo) {
-      mensajesError1 += "❗️Comprueba... tu pedido no incluye pollo.\n"; // Añadir al mensaje de error
+    // 2. *** NUEVO: Validación de Stock ***
+    console.log("Iniciando validación de stock...");
+    const productQuantities = {}; // { productId: { required: number, name: string } }
+    let stockValidationError = false;
 
-     }
+    // --- Agrupar cantidades requeridas ---
+    currentCart.forEach(item => {
+       if (!item || item.id_product == null || typeof item.cantidad !== 'number' || item.cantidad <= 0) {
+           console.warn("Item inválido en carrito durante validación de stock:", item);
+           return; // Ignorar items inválidos
+       }
 
-     console.log("Validación OK (incluye pollo).");
+       let stockProductId;
+       let quantityForStockCheck = item.cantidad;
+       const productName = item.name || `Producto ID ${item.id_product}`;
 
-     // 3. Validación rápida (no transaccional) de stock para items clave (opcional pero útil)
-     console.log("Iniciando validación preliminar de stock...");
-        // Define los IDs de los productos cuyo stock quieres verificar aquí
+       // Agrupar pollos bajo ID 1
+       if (item.id_product === 1) {
+           stockProductId = 1;
+       } else if (item.id_product === 2) {
+           stockProductId = 1;
+           quantityForStockCheck = item.cantidad / 2; // Medio pollo cuenta como 0.5 para stock
+       }
+       // Agrupar costillas bajo ID 41
+       else if (item.id_product === 41) {
+           stockProductId = 41;
+       } else if (item.id_product === 48) {
+           stockProductId = 41;
+           quantityForStockCheck = item.cantidad / 2; // Media costilla cuenta como 0.5 para stock
+       }
+       // Otros productos
+       else {
+           stockProductId = item.id_product;
+       }
 
-     if (mensajesError.trim() !== "") {
+       // Convertir ID a string para consistencia con Firestore keys si son strings
+       const stockProductIdStr = stockProductId.toString();
+
+       if (!productQuantities[stockProductIdStr]) {
+           productQuantities[stockProductIdStr] = { required: 0, name: productName }; // Guardar un nombre para mensajes
+       }
+       productQuantities[stockProductIdStr].required += quantityForStockCheck;
+    });
+
+    // --- Obtener stock actual y comparar ---
+    const productIdsToCheck = Object.keys(productQuantities);
+    if (productIdsToCheck.length > 0) {
+       console.log("IDs de producto para verificar stock:", productIdsToCheck);
+       try {
+           // Crear promesas para buscar cada producto
+           const stockCheckPromises = productIdsToCheck.map(async (productIdStr) => {
+               const productRef = doc(db, "productos", productIdStr);
+               const productSnap = await getDoc(productRef);
+               const requiredData = productQuantities[productIdStr]; // { required, name }
+
+               if (!productSnap.exists()) {
+                   console.error(`Error Crítico Validación: Producto con ID ${productIdStr} no encontrado en Firestore.`);
+                   mensajesError += `El producto '${requiredData.name}' (ID: ${productIdStr}) no se encontró en la base de datos.\n`;
+                   stockValidationError = true;
+                   return; // Salir de esta promesa específica
+               }
+
+               const productData = productSnap.data();
+               const currentStock = productData.stock;
+
+               if (typeof currentStock !== 'number' || isNaN(currentStock)) {
+                   console.error(`Error Crítico Validación: Stock inválido para producto ID ${productIdStr} (${currentStock}).`);
+                   mensajesError += `Error interno: El stock para '${requiredData.name}' no es válido. Contactar soporte.\n`;
+                   stockValidationError = true;
+                   return; // Salir de esta promesa específica
+               }
+
+               // Comparar stock
+               if (currentStock < requiredData.required) {
+                   console.warn(`Stock insuficiente para ${requiredData.name} (ID: ${productIdStr}). Necesario: ${requiredData.required}, Disponible: ${currentStock}`);
+                   mensajesError += `Stock insuficiente para ${requiredData.name}.\n`;
+                   stockValidationError = true;
+               } else {
+                   console.log(`Stock OK para ${requiredData.name} (ID: ${productIdStr}). Necesario: ${requiredData.required}, Disponible: ${currentStock}`);
+               }
+           });
+
+           // Esperar a que todas las comprobaciones de stock terminen
+           await Promise.all(stockCheckPromises);
+
+       } catch (error) {
+           console.error("Error durante la obtención de datos de stock para validación:", error);
+           mensajesError += "Error al verificar el stock. Inténtalo de nuevo.\n";
+           stockValidationError = true;
+       }
+    } else {
+        console.log("No hay productos en el carrito que requieran verificación de stock (o el carrito está vacío).");
+    }
+
+    // 3. Validar si se seleccionó hora (Advertencia)
+    if (!clienteData.fechahora) {
+      const horaRedondeada = obtenerHoraRedondeada().format('HH:mm');
+      mensajesAdvertencia += `❗️No has seleccionado hora. La hora del pedido será: ${horaRedondeada}\n`;
+    }
+
+    // 4. Validar si incluye pollo (Advertencia)
+    const incluyePollo = currentCart.some(item => item && (item.id_product === 1 || item.id_product === 2));
+    if (!incluyePollo) {
+      mensajesAdvertencia += "❗️Comprueba... tu pedido no incluye pollo.\n";
+    }
+
+    // --- Decisión Final de Validación ---
+
+    // Si hay ERRORES (teléfono, stock), mostrar Modal 2 y bloquear
+    if (mensajesError.trim() !== "") {
+      console.log("Validación fallida por errores:", mensajesError.trim());
       setMensajeModal(mensajesError.trim());
-      setShowModal2(true); // Mostrar el modal con los errores
+      setShowModal2(true); // Usar Modal 2 para errores bloqueantes
       return false; // Detener la ejecución
     }
-    if (mensajesError1) {
-      setMensajeModal(mensajesError1.trim()); // Establece los mensajes concatenados
-      setShowModal(true); // Mostrar el modal con los mensajes
-      return false; // Detener la ejecución
+
+    // Si NO hay errores, pero SÍ hay ADVERTENCIAS (sin pollo, sin hora), mostrar Modal 1 para confirmar
+    if (mensajesAdvertencia.trim() !== "") {
+       console.log("Validación OK, pero con advertencias:", mensajesAdvertencia.trim());
+       setMensajeModal(mensajesAdvertencia.trim());
+       setShowModal(true); // Usar Modal 1 para advertencias/confirmaciones
+       return false; // Detener la ejecución (espera confirmación del modal)
     }
-     // Si todas las validaciones básicas (cliente, pollo, stock preliminar) pasan
-     console.log("Validación básica del pedido completada con éxito.");
-     return true;
-   };
+
+    // Si no hay errores ni advertencias, la validación es exitosa
+    console.log("Validación completa del pedido superada con éxito.");
+    return true;
+  };
 
 
 
@@ -816,8 +910,8 @@ const CartTotal = ({ datosCliente, setDatosCliente, orderToEdit }) => {
 
 
          </div>
-          <p className="font-nunito text-lg p-2 text-center text-gray-700">{mensajeModal}</p>
-        </Modal.Body>
+         <p className="font-nunito text-lg p-2 text-center text-gray-700 whitespace-pre-line">{mensajeModal}</p>
+         </Modal.Body>
         <Modal.Footer className='no-border'>
           {/* Botón Aceptar: Cierra el modal y asegura que isSubmitting es false */}
           <Button variant="primary" className="mt-1 bg-yellow-500 border-yellow-500 hover:bg-yellow-600 hover:border-yellow-600 py-2 px-5 font-nunito text-white rounded-md shadow-sm" onClick={() => { handleCloseModal2(); setIsSubmitting(false); }}>
