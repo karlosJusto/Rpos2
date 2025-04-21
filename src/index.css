@@ -112,6 +112,40 @@ swiper-slide:nth-child(5) {
 }
 
 
+/* Aumenta el tamaño del calendario */
+.react-datepicker {
+  font-size: 1.2rem;
+  padding: 1rem;
+}
+
+/* Quitar fondo gris del encabezado */
+.react-datepicker__header {
+  background-color: white; /* o usa transparent si prefieres */
+  padding-top: 1rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid #ddd;
+}
+
+/* Día y nombre del día más grandes y con más espacio */
+.react-datepicker__day,
+.react-datepicker__day-name {
+  width: 2rem;
+  line-height: 2rem;
+  margin: 0.3rem;
+}
+
+/* Texto del mes actual más grande */
+.react-datepicker__current-month,
+.react-datepicker-time__header,
+.react-datepicker-year-header {
+  font-size: 1.4rem;
+  font-weight: bold;
+}
+
+/* Botones de navegación ajustados */
+.react-datepicker__navigation {
+  top: 1.2rem;
+}
 
 
 

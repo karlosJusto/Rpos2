@@ -188,14 +188,14 @@ const Login = () => {
           <h4 className="text-4xl text-gray-700 font-extrabold font-nunito -mt-5">Bienvenido</h4>
           <p className="font-medium text-lg text-gray-400 mt-2 font-nunito border-b-2">Introduce tu PIN!</p>
 
-          <div className="flex flex-col text-2xl text-center p-4">
+          <div className="flex flex-col text-xl text-center p-4">
             {/* input con maxLength */}
             <input
               type="password"
               maxLength={5} // Limita el máximo de caracteres a 5
               value={valorInput}
               readOnly
-              className="w-24 pl-2 pr-6 text-gray-700 bg-white text-center"
+              className="w-[6.5vw] text-gray-700 bg-white text-center"
             />
           </div>
 

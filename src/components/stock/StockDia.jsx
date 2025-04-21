@@ -114,57 +114,51 @@ const StockDia = () => {
   };
 
   return (
-    <div className="p-4 max-w-4xl mx-auto">
-      {error && <p className="mt-4 text-red-600 text-center">{error}</p>}
-      {loading ? (
-        <div className="flex justify-center items-center">
-          <div className="spinner-border animate-spin border-t-2 border-b-2 border-yellow-500 w-6 h-6 rounded-full"></div>
-        </div>
-      ) : (
-        <div className="flex justify-center gap-8 font-nunito">
-          <div className="overflow-x-auto w-1/2 text-center">
-            <h1 className="text-center mb-4 font-nunito text-gray-500 text-2xl">Productos ya vendidos - {fechaHoy}</h1>
-            {categoriasOrdenadas.length === 0 ? (
-              <p className="text-center text-gray-500">No hay pedidos. (:</p>
-            ) : (
-              categoriasOrdenadas.map(([categoria, productos]) => (
-             
-                <div key={categoria} className="mb-6">
-                  <h2 className="text-lg font-semibold text-yellow-500">{categoria.toUpperCase()}</h2>
-                  <table className="table table-sm w-full border-separate mt-4">
-                    <thead>
-                      <tr>
-                        <th>Producto</th>
-                        <th>Cantidad Total</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {/* Ordenamos los productos por position dentro de cada categoría */}
-                      {productos.sort((a, b) => a.position - b.position).map((producto) => (
-                        <tr key={producto.id}>
-                          <td>{producto.nombre}</td>
-                          <td className="font-extrabold">{producto.cantidadTotal}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                    {categoria.toLowerCase() === 'comida' && (
-                      <tfoot className="border-2 text-2xl ">
-                        <tr>
-                          <td className="font-extrabold border-b-2 border-gray-300">Total Pollo</td>
-                          <td className="font-extrabold border-b-2 border-gray-300">
-                            {calcularTotalPollo(productos)}
-                          </td>
-                        </tr>
-                      </tfoot>
-                    )}
-                  </table>
-                </div>
-              ))
-            )}
-          </div>
-        </div>
-      )}
-    </div>
+    <div className="max-w-full mx-auto">
+      <h1 className="text-center mb-4 font-nunito text-gray-500 text-2xl">Productos ya vendidos - {fechaHoy}</h1>
+    {error && <p className="mt-4 text-red-600 text-center">{error}</p>}
+    {loading ? (
+      <div className="flex justify-center items-cente">
+        <div className="spinner-border animate-spin border-t-2 border-b-2 border-yellow-500 w-6 h-6 rounded-full"></div>
+      </div>
+    ) : (
+      <div className="flex justify-center gap-3 font-nunito ">
+        {categoriasOrdenadas.length === 0 ? (
+          <p className="text-center text-gray-500">No hay pedidos. (:</p>
+        ) : (
+          categoriasOrdenadas.map(([categoria, productos]) => (
+            <div key={categoria} className="bg-white rounded-md shadow-lg p-4 w-full sm:w-1/2 md:w-1/3 lg:w-1/4 xl:w-1/5 min-w-[200px]">
+              <h2 className="text-lg font-extrabold text-yellow-500 mb-2 text-center">{categoria.toUpperCase()}</h2>
+              <table className="table table-sm w-full border-separate">
+                <thead>
+                  <tr>
+                    <th className="text-left">Producto</th>
+                    <th className="text-right">Cant.</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {productos.sort((a, b) => a.position - b.position).map((producto) => (
+                    <tr key={producto.id}>
+                      <td className="text-left">{producto.nombre}</td>
+                      <td className="text-right font-extrabold">{producto.cantidadTotal}</td>
+                    </tr>
+                  ))}
+                </tbody>
+                {categoria.toLowerCase() === 'comida' && (
+                  <tfoot className="border-t-2 mt-2">
+                    <tr>
+                      <td className="font-extrabold text-left">Total Pollo</td>
+                      <td className="font-extrabold text-right">{calcularTotalPollo(productos)}</td>
+                    </tr>
+                  </tfoot>
+                )}
+              </table>
+            </div>
+          ))
+        )}
+      </div>
+    )}
+  </div>
   );
 };
 

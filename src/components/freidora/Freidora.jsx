@@ -277,7 +277,7 @@ useEffect(() => {
                                 {pedido.cantidad_celiaco > 0 && (
                                   <span className="flex items-center ms-2">
                                    [ {pedido.cantidad_celiaco} x
-                                    <img src={singluten} alt="Sin gluten" className="w-4 h-4 me-2" /> ]
+                                    <img src={singluten} alt="Sin gluten" className="w-4 h-4 ms-1 me-1" /> ]
                                   </span>
                                 )}
                               </h2>
@@ -316,7 +316,7 @@ useEffect(() => {
                                 {pedido.cantidad_celiaco > 0 && (
                                   <span className="flex items-center ms-2">
                                    [ {pedido.cantidad_celiaco} x
-                                    <img src={singluten} alt="Sin gluten" className="w-4 h-4 me-2" /> ]
+                                    <img src={singluten} alt="Sin gluten" className="w-4 h-4 ms-1 me-1" /> ]
                                   </span>
                                 )}
                               </h2>
@@ -353,7 +353,7 @@ useEffect(() => {
                                 {pedido.cantidad_celiaco > 0 && (
                                   <span className="flex items-center ms-2">
                                    [ {pedido.cantidad_celiaco} x
-                                    <img src={singluten} alt="Sin gluten" className="w-4 h-4 me-2" /> ]
+                                    <img src={singluten} alt="Sin gluten" className="w-4 h-4 ms-1 me-1" /> ]
                                   </span>
                                 )}
                               </h2>
@@ -390,9 +390,9 @@ useEffect(() => {
                                 {`${pedido.cantidad + pedido.entregado}`}
                                 <span className="font-bold px-1">[ {pedido.entregado} ] </span>  x  {pedido.alias} 
                                 {pedido.cantidad_celiaco > 0 && (
-                                  <span className="flex items-center ms-2">
+                                  <span className="flex items-center ms-2 gap-[0.1vw]">
                                    [ {pedido.cantidad_celiaco} x
-                                    <img src={singluten} alt="Sin gluten" className="w-4 h-4 me-2" /> ]
+                                    <img src={singluten} alt="Sin gluten" className="w-4 h-4 ms-1 me-1" />]
                                   </span>
                                 )}
                               </h2>
@@ -421,7 +421,7 @@ useEffect(() => {
                                 {pedido.cantidad_celiaco > 0 && (
                                   <span className="flex items-center ms-2">
                                    [ {pedido.cantidad_celiaco} x
-                                    <img src={singluten} alt="Sin gluten" className="w-4 h-4 me-2" /> ]
+                                    <img src={singluten} alt="Sin gluten" className="w-4 h-4 ms-1 me-1" /> ]
                                   </span>
                                 )}
                               </h2>
@@ -450,7 +450,7 @@ useEffect(() => {
                                 {pedido.cantidad_celiaco > 0 && (
                                   <span className="flex items-center ms-2">
                                    [ {pedido.cantidad_celiaco} x
-                                    <img src={singluten} alt="Sin gluten" className="w-4 h-4 me-2" /> ]
+                                    <img src={singluten} alt="Sin gluten" className="w-4 h-4 ms-1 me-1" /> ]
                                   </span>
                                 )}
                               </h2>

@@ -100,7 +100,7 @@ const ProductCard = memo(({ product }) => {
             <div className="flex-1 overflow-y-auto">
                 <table className="w-full text-[15px] font-nunito">
                     {/* Cabecera Tabla (sin cambios) */}
-                     <thead className="bg-gray-50 sticky top-0 text-center z-10"> <tr> <th className="py-1 px-2 text-gray-900 font-semibold">HORA</th> <th className="py-1 px-2 text-gray-900 font-semibold">PEDIDO</th> <th className="py-1 px-2 text-gray-900 font-semibold">NOMBRE</th> <th className="py-1 px-2 text-gray-900 font-semibold">CANTIDAD</th> <th className="py-1 px-2 text-gray-900 font-semibold">DESCRIPCION</th> </tr> </thead>
+                     <thead className="bg-gray-50 sticky top-0 text-center z-10"> <tr> <th className="py-1 px-2 text-gray-900 font-semibold">HORA</th> <th className="py-1 px-2 text-gray-900 font-semibold">PEDIDO</th> <th className="py-1 px-2 text-gray-900 font-semibold">NOMBRE</th> <th className="py-1 px-2 text-gray-900 font-semibold">CANTIDAD</th> <th className="py-1 px-2 text-gray-900 font-semibold">DESCRIPCION</th> </tr></thead>
                     {/* Cuerpo Tabla */}
                     <tbody>
                         {product.orders.length === 0 ? (

@@ -5,6 +5,7 @@ import { db } from '../firebase/firebase';
 import Calendario from './Calendario';
 import Ticket from './Ticket';
 import Layout from './Layout';
+import CalendarioDropdown from './CalendarioDropdown';
 
 const ModalClientes = ({ show, handleClose, onSave }) => {
   const [formData, setFormData] = useState({
@@ -102,14 +103,14 @@ const ModalClientes = ({ show, handleClose, onSave }) => {
 
   return (
     <>
-      <Modal show={show} onHide={handleClose} size="xl" backdrop="static" keyboard={false} centered>
+      <Modal show={show} onHide={handleClose} size="lg" backdrop="static" keyboard={false} centered>
         
-          <Modal.Title className='text-center p-3 mt-2 font-nunito text-gray-600'>Datos Pedido</Modal.Title>
+          <Modal.Title className='text-center pt-2  font-nunito text-gray-600'>Datos Pedido</Modal.Title>
        
 
         <Modal.Body>
           <div className="bg-white rounded-lg flex justify-around gap-3 appearance-none px-[3vw]">
-            <div className="form-floating mb-3 w-[25vw]">
+            <div className="form-floating  w-[25vw]">
               <input
                 type="text"
                 className="form-control border-2 border-gray-200 font-nunito font-extrabold focus:border-yellow-500 focus:ring-0"
@@ -125,7 +126,10 @@ const ModalClientes = ({ show, handleClose, onSave }) => {
             </div>
             <div className="form-floating w-[25vw]">
               <input
-                type="number"
+                type="text"
+                pattern="[0-9]*"
+                inputMode='numeric'
+
                 className="form-control border-2 border-gray-200 font-nunito font-extrabold focus:border-yellow-500 focus:ring-0"
                 id="telefono"
                 placeholder="Teléfono"
@@ -141,7 +145,7 @@ const ModalClientes = ({ show, handleClose, onSave }) => {
           </div>
 
           {/* Lista de clientes con scroll */}
-          <div className="max-h-40 overflow-y-auto mt-4">
+          <div className="max-h-40 overflow-y-auto mt-2">
             {filteredClientes.length > 0 ? (
               filteredClientes.map((cliente, index) => (
                 <div key={index} className="py-2 px-4 cursor-pointer" onClick={() => {
@@ -171,7 +175,8 @@ const ModalClientes = ({ show, handleClose, onSave }) => {
 
           {/* Calendario */}
           <div className='p-[4.5vh]'>
-            <Calendario onDateChange={handleDateChange} />
+            {/*<Calendario onDateChange={handleDateChange} />*/}
+            <CalendarioDropdown onDateChange={handleDateChange}  />
           </div>
 
           

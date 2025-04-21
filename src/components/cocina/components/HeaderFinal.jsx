@@ -29,11 +29,12 @@ dayjs.extend(customParseFormat);
 dayjs.locale('es'); // Set locale globally once
 
 // *** Receive onDateAccept and currentSelectedDate props ***
-const HeaderFinal = ({ libres, mostrarBarra, onDateAccept, currentSelectedDate }) => {
+const HeaderFinal = ({ libres, mostrarBarra, onDateAccept, currentSelectedDate, showSupervisionHeader }) => {
 
   const { numeroBarra, pedidosConOrigenUno, setNumeroBarra } = useContext(dataContext);
 
   // console.log('HeaderFinal - Libres:', libres); // Log received props
+
 
   const [show, setShow] = useState(false);
   // const [numero, setNumero] = useState(0); // This seems unused here
@@ -66,7 +67,7 @@ const HeaderFinal = ({ libres, mostrarBarra, onDateAccept, currentSelectedDate }
   };
 
   // Style for the clock div (unchanged)
-  const divStyle = isColorChanged
+  const divStyle = showSupervisionHeader
     ? 'w-[8vw] h-[10vh] bg-[#75adab]'
     : 'w-[8vw] h-[10vh] bg-[#f2ac02]';
 

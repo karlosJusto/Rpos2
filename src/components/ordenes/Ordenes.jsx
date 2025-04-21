@@ -1118,7 +1118,18 @@ const handlePedidoRapido = (idProduct) => {
           <div>
             {dateToPass && (
               // Si dateToPass está presente, mostrar "Modo Supervisión" encima del div
-              <span className="text-[#75adab] font-nunito font-extrabold -ms-[10vw]">MODO SUPERVISIÓN PEDIDOS</span>
+              <span className="text-[#75adab] font-nunito font-bold -ms-[15vw] mt-1 flex items-center justify-between">
+              MODO SUPERVISIÓN DE PEDIDOS
+              <button
+                onClick={() => {
+                  window.location.reload(); // Recarga la página al hacer clic en el enlace
+                }}
+                className=" text-[#75adab] hover:text-yellow-700 font-bold text-lg leading-none -me-[40vw]" // Estilos para la 'X'
+                aria-label="Volver al día actual"
+              >
+                &times; {/* Entidad HTML para el símbolo 'X' */}
+              </button>
+            </span>
             )}
         
             <div
@@ -1449,8 +1460,8 @@ const handlePedidoRapido = (idProduct) => {
       </Link>
 
       <Link className='p-3   hover:bg-gray-100 hover:rounded-2xl' to={"/ordenes"} onClick={() => {
-          window.location.reload(); // Recarga la página al hacer clic en el enlace
-        }}>
+                  window.location.reload(); // Recarga la página al hacer clic en el enlace
+                }}>
 
       <svg width="40px" height="40px" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
 

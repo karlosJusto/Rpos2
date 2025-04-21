@@ -28,6 +28,8 @@ const Layout = () => {
   const [calendarData, setCalendarData] = useState(null);
   const [loading, setLoading] = useState(true);
 
+  console.log(calendarData);
+
   const today = new Date();
   const formattedDate = today.toISOString().split("T")[0];
 
@@ -79,7 +81,7 @@ const Layout = () => {
                 <Card />
               </div>
               {/* Slider con los intervalos */}
-              <div className="w-[90%] mt-[1.5vh] pt-[1vh] ms-[3.8vw]  border-white rounded p-4 bg-white ">
+              <div className="w-[90%]  pt-[1vh] ms-[3.8vw]  border-white rounded p-4 bg-white ">
                 {loading ? (
                   <p>Cargando horarios...</p>
                 ) : (
@@ -118,6 +120,9 @@ const Layout = () => {
                           )
                         )}
                       </div>
+                    </SwiperSlide>
+                    <SwiperSlide>
+                      <h1>hola</h1>
                     </SwiperSlide>
                   </Swiper>
                 )}

@@ -94,7 +94,7 @@ const LGFreidora = ( ) => {
               <div className="d-flex justify-content-center flex-grow-1">
                
                 <h1 className="text-xl font-nunito font-extrabold text-gray-600 ms-5 mt-2">En preparación: </h1>
-                <h1 className="text-3xl digital-clock font-extrabold text-gray-600 ms-4 px-4  border-2 border-yellow-500 rounded-md ">{bloqueHorario}</h1>
+                <h1 className="text-2xl font-nunito font-extrabold text-gray-600 ms-4 px-4  border-2 border-yellow-500 rounded-md ">{bloqueHorario}</h1>
               </div>
 
               {/* Componente Reloj, que se coloca a la derecha */}

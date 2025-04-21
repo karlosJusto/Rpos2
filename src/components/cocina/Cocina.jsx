@@ -278,7 +278,7 @@ const handleCloseSupervision = () => {
               hora: pedido.fechahora,
               nombre: pedido.cliente || 'Sin nombre',
               cantidad: prod.cantidad || 1,
-              descripcion: prod.observaciones || "",
+              descripcion: pedido.observaciones || "",
               isNew: isNew, // Flag for UI highlighting
               needsCookingAlert: false, // Initial state, calculated in Effect C
               isOverdue: false, // Initial state, calculated in Effect C
@@ -652,24 +652,25 @@ const handleCloseSupervision = () => {
         mostrarBarra={mostrarBarra} // Pass context value (updated by Effect B)
         onDateAccept={handleDateSelectionAccept} // Pass callback for date modal
         currentSelectedDate={selectedDate} // Pass current date for display/modal init
+        showSupervisionHeader={showSupervisionHeader}
       />
 
 {showSupervisionHeader && (
-        <div className="mt-5 -mb-2 bg-yellow-100 border-b border-yellow-300 text-yellow-800 px-4 py-2 flex justify-between items-center text-sm shadow-sm" >
-          {/* Texto descriptivo */}
-          <span>
-            Modo Supervisión: Viendo pedidos del <strong>{selectedDateStr}</strong>
-          </span>
-          {/* Botón para cerrar */}
-          <button
-            onClick={handleCloseSupervision}
-            className="text-yellow-900 hover:text-yellow-700 font-bold text-lg px-2 leading-none" // Estilos para la 'X'
-            aria-label="Volver al día actual"
-            title="Volver al día actual" // Tooltip opcional
-          >
-            &times; {/* Entidad HTML para el símbolo 'X' */}
-          </button>
-        </div>
+      <div className="mt-5 -mb-8 text-[#75adab] bg-gray-700 px-4 py-2 flex justify-between items-center text-sm " >
+      {/* Texto descriptivo */}
+      <span className='font-nunito text-center flex-grow font-bold'>
+      MODO SUPERVISIÓN DE COCINA
+      </span>
+      {/* Botón para cerrar */}
+      <button
+        onClick={handleCloseSupervision}
+        className=" text-[#75adab] hover:text-yellow-700 font-bold text-lg leading-none" // Estilos para la 'X'
+        aria-label="Volver al día actual"
+        title="Volver al día actual" // Tooltip opcional
+      >
+        &times; {/* Entidad HTML para el símbolo 'X' */}
+      </button>
+    </div>
       )}
 
 
