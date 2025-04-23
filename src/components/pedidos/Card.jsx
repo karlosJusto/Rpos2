@@ -19,6 +19,8 @@ const Card = () => {
   const { categoria } = useParams();
   const { data, buscar } = useContext(dataContext);
 
+  
+
   // Filtrado por búsqueda
   const filteredBySearch = data.filter((product) =>
     product.name?.toLowerCase().includes(buscar.toLowerCase())

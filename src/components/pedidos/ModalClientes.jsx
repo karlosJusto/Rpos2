@@ -15,6 +15,8 @@ const ModalClientes = ({ show, handleClose, onSave }) => {
     observaciones: '',
     pagado: false,
     celiaco: false,
+    img_perfil: '', // <-- agregar esto campo
+    
   });
 
   // Manejar la fecha seleccionada
@@ -34,6 +36,7 @@ const ModalClientes = ({ show, handleClose, onSave }) => {
     const fetchClientes = async () => {
       const clientesSnapshot = await getDocs(collection(db, 'clientes'));
       const clientesList = clientesSnapshot.docs.map((doc) => doc.data());
+     // console.log('<<<<<<<<<<<'+JSON.stringify(clientesList));
       setClientes(clientesList); // Guardamos todos los clientes
       setFilteredClientes(clientesList); // Inicialmente mostramos todos los clientes
     };
@@ -52,6 +55,7 @@ const ModalClientes = ({ show, handleClose, onSave }) => {
       const clientesFiltrados = clientes.filter((cliente) => {
         const nombre = cliente.nombre ? cliente.nombre.toLowerCase() : ''; // Si no hay nombre, usamos una cadena vacía
         const telefono = cliente.telefono ? cliente.telefono : ''; // Si no hay teléfono, usamos una cadena vacía
+        //const foto= cliente.img_perfil ? cliente.img_perfil :'';
 
         // Compara tanto nombre como teléfono
         return nombre.includes(termLower) || telefono.includes(termLower);
@@ -97,8 +101,10 @@ const ModalClientes = ({ show, handleClose, onSave }) => {
       observaciones: '',
       pagado: false,  // Si el estado tiene esta propiedad
       celiaco: false,  // Si el estado tiene esta propiedad
+      img_perfil: "", // acá está bien
+
     });
-    handleClose(); // Función que probablemente cierra el modal o formulario
+    handleClose(); 
   };
 
   return (
@@ -156,6 +162,8 @@ const ModalClientes = ({ show, handleClose, onSave }) => {
                     observaciones: cliente.observaciones || '',  // Asigna las observaciones del cliente a formData
                     pagado: formData.pagado,
                     celiaco: formData.celiaco,
+                    img_perfil: cliente.img_perfil || '', // <-- importante
+                    
                   });
                   // handleClose(); // Cierra el modal cuando seleccionas un cliente
                 }}>
@@ -169,7 +177,7 @@ const ModalClientes = ({ show, handleClose, onSave }) => {
                 </div>
               ))
             ) : (
-              <p className='text-center'>No se encontraron resultados</p>
+              <p className='text-center mt-4 font-nunito text-red-500'>No hay coincidencias</p>
             )}
           </div>
 

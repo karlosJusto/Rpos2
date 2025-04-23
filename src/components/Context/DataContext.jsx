@@ -304,6 +304,7 @@ const obtenerFechaFormateada = () => {
         ...doc.data(),
       }));
       setData(productosList); // Actualizamos el estado con los datos en tiempo real
+     
     });
 
     // Limpiar el listener cuando el componente se desmonte

@@ -18,6 +18,8 @@ const Ticket = (props) => {
   const location = useLocation();
   const orderToEditId = props.orderToEdit || location.state?.orderToEdit || null;
 
+ 
+
   const [orderToEdit, setOrderToEdit] = useState(null);
   const { cart, setCart, data } = useContext(dataContext);
 
@@ -28,7 +30,13 @@ const Ticket = (props) => {
     observaciones: "",
     pagado: false,
     celiaco: false,
+    img_perfil: "", // <-- agregamos este campo
+   
   });
+
+
+
+
 
   const [orderAlreadyLoaded, setOrderAlreadyLoaded] = useState(false);
 
@@ -60,7 +68,9 @@ const Ticket = (props) => {
         observaciones: orderToEdit.observaciones || "",
         pagado: orderToEdit.pagado || false,
         celiaco: orderToEdit.celiaco || false,
+        img_perfil: orderToEdit.img_perfil || "", // <-- también lo seteamos
       });
+      
 
       const productosCompletos = orderToEdit.productos.map((prod, index) => {
         const productoInfo = data.find((p) => Number(p.id_product) === Number(prod.id));
@@ -76,7 +86,13 @@ const Ticket = (props) => {
       setCart(productosCompletos);
       setOrderAlreadyLoaded(true);
     }
+
+   // console.log(cart);
+
+
   }, [orderToEdit, orderAlreadyLoaded, data, setCart]);
+
+  //console.log(orderToEdit);
 
   const [show, setShow] = useState(false);
   const handleClose = () => setShow(false);
@@ -85,6 +101,8 @@ const Ticket = (props) => {
   const handleDataFromModal = (data) => {
     setDatosCliente(data);
   };
+
+
 
   const empleadoNombre=sessionStorage.getItem('empleadoNombre');
 
@@ -162,11 +180,13 @@ const Ticket = (props) => {
       </div>
 
       <div className="flex items-center text-center justify-center" onClick={handleShow}>
-        <img
-          src={avatar}
+      <img
+          src={datosCliente.img_perfil ? datosCliente.img_perfil : avatar}
           alt="avatar"
-          className="w-[3.5vw] mt-2 rounded-lg border-2 border-yellow-500"
+          className="w-[3.5vw] mt-2 rounded-lg border-2 border-yellow-500 object-cover"
         />
+
+
         <div className="ms-[1vw] font-nunito">
           <h3 className="text-gray-600 font-bold">{datosCliente.cliente}</h3>
           <h3 className="text-gray-600">{datosCliente.telefono}</h3>
