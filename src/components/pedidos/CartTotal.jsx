@@ -12,32 +12,7 @@ import isSameOrAfter from 'dayjs/plugin/isSameOrAfter';
 dayjs.extend(customParseFormat);
 dayjs.extend(isSameOrAfter);
 
-// --- Helper Function: Convert HH:mm to minutes ---
-// (Sin cambios)
-const convertTimeToMinutes = (timeStr) => {
-  try {
-      if (!timeStr || typeof timeStr !== 'string' || !timeStr.includes(':')) {
-          console.warn("Formato de tiempo inválido proporcionado a convertTimeToMinutes:", timeStr);
-          return -1;
-      }
-      const parts = timeStr.split(":");
-      if (parts.length !== 2) {
-          console.warn("Formato de tiempo inválido (no HH:MM):", timeStr);
-          return -1;
-      }
-      const hours = parseInt(parts[0], 10);
-      const minutes = parseInt(parts[1], 10);
 
-      if (isNaN(hours) || isNaN(minutes) || hours < 0 || hours > 23 || minutes < 0 || minutes > 59) {
-           console.warn("Valores de hora/minuto inválidos en:", timeStr);
-           return -1;
-      }
-      return hours * 60 + minutes;
-  } catch (e) {
-      console.error("Error inesperado en convertTimeToMinutes para:", timeStr, e);
-      return -1;
-  }
-};
 
 // --- Función para Actualizar Contadores de Ensaladas/Ensaladillas ---
 // (Sin cambios)
