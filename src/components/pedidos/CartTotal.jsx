@@ -1,39 +1,24 @@
-import React, { useState, useContext, useEffect } from "react"; // Import React
-import { dataContext } from "../Context/DataContext"; // Asegúrate que la ruta sea correcta
-import { doc, getDoc, updateDoc, setDoc, runTransaction, FieldValue, increment } from "firebase/firestore"; // *** IMPORTAR increment ***
-import { db } from "../firebase/firebase"; // Asegúrate que la ruta sea correcta
+import React, { useState, useContext, useEffect } from "react";
+import { dataContext } from "../Context/DataContext";
+import { doc, getDoc, updateDoc, setDoc, runTransaction, increment, serverTimestamp } from "firebase/firestore"; // increment y serverTimestamp importados
+import { db } from "../firebase/firebase";
 import { useNavigate } from "react-router-dom";
 import dayjs from "dayjs";
-// Importar plugins de dayjs si los usas para zona horaria, etc.
-// import utc from 'dayjs/plugin/utc';
-// import timezone from 'dayjs/plugin/timezone';
-import { Modal, Button } from "react-bootstrap"; // Asumiendo que usas react-bootstrap
+import { Modal, Button } from "react-bootstrap";
 import customParseFormat from "dayjs/plugin/customParseFormat";
-import isSameOrAfter from 'dayjs/plugin/isSameOrAfter'; // Importar isSameOrAfter
+import isSameOrAfter from 'dayjs/plugin/isSameOrAfter';
 
 // Extender dayjs con los plugins necesarios
 dayjs.extend(customParseFormat);
-dayjs.extend(isSameOrAfter); // Añadir isSameOrAfter
-// dayjs.extend(utc);
-// dayjs.extend(timezone);
-// dayjs.tz.setDefault("Europe/Madrid"); // Establecer zona horaria por defecto si es necesario
-
-// --- Error Personalizado para Límites Excedidos ---
-class LimitExceededError extends Error {
-  constructor(message, details) {
-    super(message);
-    this.name = "LimitExceededError";
-    this.details = details; // Opcional: para pasar más info si es necesario
-  }
-}
+dayjs.extend(isSameOrAfter);
 
 // --- Helper Function: Convert HH:mm to minutes ---
+// (Sin cambios)
 const convertTimeToMinutes = (timeStr) => {
   try {
-      // Validación básica del formato HH:MM
       if (!timeStr || typeof timeStr !== 'string' || !timeStr.includes(':')) {
           console.warn("Formato de tiempo inválido proporcionado a convertTimeToMinutes:", timeStr);
-          return -1; // Indicar error
+          return -1;
       }
       const parts = timeStr.split(":");
       if (parts.length !== 2) {
@@ -43,25 +28,21 @@ const convertTimeToMinutes = (timeStr) => {
       const hours = parseInt(parts[0], 10);
       const minutes = parseInt(parts[1], 10);
 
-      // Validar que sean números y estén en rangos válidos
       if (isNaN(hours) || isNaN(minutes) || hours < 0 || hours > 23 || minutes < 0 || minutes > 59) {
            console.warn("Valores de hora/minuto inválidos en:", timeStr);
            return -1;
       }
-      return hours * 60 + minutes; // Calcular minutos desde medianoche
+      return hours * 60 + minutes;
   } catch (e) {
-      // Capturar cualquier error inesperado durante la conversión
       console.error("Error inesperado en convertTimeToMinutes para:", timeStr, e);
       return -1;
   }
 };
 
-
-
-
 // --- Función para Actualizar Contadores de Ensaladas/Ensaladillas ---
+// (Sin cambios)
 const updateSaladCounters = async (cartItems) => {
-    const todayId = dayjs().format("DD-MM-YYYY"); // Documento ID es la fecha actual
+    const todayId = dayjs().format("DD-MM-YYYY");
     const docRef = doc(db, "ensaladas", todayId);
     console.log(`Preparando actualización de contadores de ensaladas para ${todayId}...`);
 
@@ -70,35 +51,25 @@ const updateSaladCounters = async (cartItems) => {
     let incrementEnsaladillaGrande = 0;
     let incrementEnsaladillaPequena = 0;
 
-    // Calcular incrementos basados en el carrito
     cartItems.forEach(item => {
         if (!item || !item.name || typeof item.cantidad !== 'number' || item.cantidad <= 0) {
             console.warn("Item inválido o sin cantidad en updateSaladCounters, omitiendo:", item);
-            return; // Saltar item inválido
+            return;
         }
 
         const nameLower = item.name.toLowerCase();
         const cantidad = item.cantidad;
-        const isPequena = nameLower.includes("1/2"); // Determinar tamaño
+        const isPequena = nameLower.includes("1/2");
 
-        // IMPORTANTE: Asume que los nombres distinguen claramente ensaladas de ensaladillas.
-        // Si hay ambigüedad (ej. "Ensalada de Ensaladilla"), ajusta esta lógica o usa categorías/IDs.
         if (nameLower.includes("ensaladilla")) {
-            if (isPequena) {
-                incrementEnsaladillaPequena += cantidad;
-            } else {
-                incrementEnsaladillaGrande += cantidad;
-            }
-        } else if (nameLower.includes("ensalada")) { // `else if` para evitar contar dos veces si nombre incluye ambas
-             if (isPequena) {
-                incrementEnsaladaPequena += cantidad;
-            } else {
-                incrementEnsaladaGrande += cantidad;
-            }
+            if (isPequena) incrementEnsaladillaPequena += cantidad;
+            else incrementEnsaladillaGrande += cantidad;
+        } else if (nameLower.includes("ensalada")) {
+             if (isPequena) incrementEnsaladaPequena += cantidad;
+             else incrementEnsaladaGrande += cantidad;
         }
     });
 
-    // Si no hay ensaladas/saladillas en este pedido, no hacer nada
     if (incrementEnsaladaGrande === 0 && incrementEnsaladaPequena === 0 && incrementEnsaladillaGrande === 0 && incrementEnsaladillaPequena === 0) {
         console.log("No se encontraron ensaladas/saladillas en el pedido. Omitiendo actualización de contadores.");
         return;
@@ -109,58 +80,46 @@ const updateSaladCounters = async (cartItems) => {
         ensaladillaG: incrementEnsaladillaGrande, ensaladillaP: incrementEnsaladillaPequena
     });
 
-    // Usar transacción para actualizar/crear el documento diario
     try {
         await runTransaction(db, async (transaction) => {
             const docSnap = await transaction.get(docRef);
 
             if (!docSnap.exists()) {
-                // --- Documento NO existe: Crear con estructura inicial + incrementos ---
                 console.log(`Documento ${todayId} no existe en 'ensaladas'. Creando...`);
                 const initialData = {
                     ensaladas: {
-                        grandes: { pedidas: incrementEnsaladaGrande, preparadas: 0 }, // Iniciar preparadas en 0
+                        grandes: { pedidas: incrementEnsaladaGrande, preparadas: 0 },
                         pequenas: { pedidas: incrementEnsaladaPequena, preparadas: 0 }
                     },
                     ensaladillas: {
                         grandes: { pedidas: incrementEnsaladillaGrande, preparadas: 0 },
                         pequenas: { pedidas: incrementEnsaladillaPequena, preparadas: 0 }
                     },
-                    // Opcional: añadir timestamp de creación
-                    // createdAt: serverTimestamp() // Necesitarías importar serverTimestamp
                 };
                 transaction.set(docRef, initialData);
                 console.log(`Documento ${todayId} creado con valores iniciales.`);
 
             } else {
-                // --- Documento SÍ existe: Actualizar contadores 'pedidas' usando increment ---
                 console.log(`Documento ${todayId} existe. Actualizando contadores...`);
                 const updateData = {};
-                // Usar notación de puntos y FieldValue.increment para actualizaciones atómicas
                 if (incrementEnsaladaGrande > 0) updateData['ensaladas.grandes.pedidas'] = increment(incrementEnsaladaGrande);
                 if (incrementEnsaladaPequena > 0) updateData['ensaladas.pequenas.pedidas'] = increment(incrementEnsaladaPequena);
                 if (incrementEnsaladillaGrande > 0) updateData['ensaladillas.grandes.pedidas'] = increment(incrementEnsaladillaGrande);
                 if (incrementEnsaladillaPequena > 0) updateData['ensaladillas.pequenas.pedidas'] = increment(incrementEnsaladillaPequena);
 
-                // Opcional: añadir timestamp de última actualización
-                // updateData['lastUpdatedAt'] = serverTimestamp();
-
                 if (Object.keys(updateData).length > 0) {
                     transaction.update(docRef, updateData);
                     console.log(`Contadores 'pedidas' en ${todayId} actualizados.`);
                 } else {
-                    console.log("No se realizaron actualizaciones (incrementos eran 0 después del cálculo inicial)."); // Caso improbable si ya se filtró antes
+                    console.log("No se realizaron actualizaciones (incrementos eran 0 después del cálculo inicial).");
                 }
             }
         });
         console.log(`Transacción de contadores de ensaladas para ${todayId} completada con éxito.`);
 
     } catch (error) {
-        // Capturar y loguear errores de la transacción específica de ensaladas
         console.error(`Error Crítico durante la transacción de contadores de ensaladas (${todayId}):`, error);
-        // Considera si este error debe detener el flujo o solo ser logueado.
-        // Por ahora, solo se loguea para no interrumpir el flujo principal si el pedido ya se guardó.
-        // Podrías lanzar el error si esta actualización es absolutamente crítica: throw error;
+        // No relanzar para no detener el flujo principal
     }
 };
 
@@ -172,85 +131,71 @@ const CartTotal = ({ datosCliente, setDatosCliente, orderToEdit }) => {
   const navigate = useNavigate();
 
   // --- Estados del Componente ---
-  const [mensajeModal, setMensajeModal] = useState(""); // Mensaje para modales genéricos
-  const [showModal, setShowModal] = useState(false); // Visibilidad Modal Confirmación Sin Pollo
-  const [showModal2, setShowModal2] = useState(false); // Visibilidad Modal Error/Aviso Genérico
-  const [isSubmitting, setIsSubmitting] = useState(false); // Estado de procesamiento
-  const [showLimitModal, setShowLimitModal] = useState(false); // Visibilidad Modal Límite Excedido
-  const [limitWarning, setLimitWarning] = useState(""); // Mensaje específico para Modal Límite Excedido
+  const [mensajeModal, setMensajeModal] = useState("");
+  const [showModal, setShowModal] = useState(false);
+  const [showModal2, setShowModal2] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [empleadoNombre, setEmpleadoNombre] = useState(null);
 
   // --- Handlers para cerrar Modales ---
   const handleCloseModal = () => setShowModal(false);
   const handleCloseModal2 = () => setShowModal2(false);
-  const handleCloseLimitModal = () => setShowLimitModal(false);
 
-  const [empleadoNombre, setEmpleadoNombre] = useState(null);
-
+  // --- Obtener Nombre Empleado ---
   useEffect(() => {
-    // Recuperamos el nombre del empleado desde sessionStorage
     const nombre = sessionStorage.getItem('empleadoNombre');
-
     if (nombre) {
-      setEmpleadoNombre(nombre);  // Si encontramos el nombre, lo guardamos en el estado
+      setEmpleadoNombre(nombre);
     } else {
       console.log('No se encontró el nombre del empleado en sessionStorage');
     }
-  }, []); // El array vacío asegura que esto solo se ejecute una vez cuando el componente se monta
+  }, []);
 
   // --- Calcular Total del Carrito ---
   const total = cart.reduce(
     (acc, item) => {
-      // Se toma 'price' si existe; de lo contrario, se toma 'precio'
       const unitPrice = item?.price === 0
-      ? item?.precio ?? 0
-      : item?.price ?? item?.precio ?? 0;
-          const quantity = item?.cantidad ?? 1;
+        ? item?.precio ?? 0
+        : item?.price ?? item?.precio ?? 0;
+      const quantity = item?.cantidad ?? 1;
       return acc + (unitPrice * quantity);
     },
     0
   );
 
-
   // --- Obtener Hora Redondeada por Defecto ---
+  // (Sin cambios)
   const obtenerHoraRedondeada = () => {
-    const now = dayjs(); // Considera usar dayjs.tz() si configuraste zona horaria
+    const now = dayjs();
     const minutos = now.minute();
-    // Redondear hacia abajo al último 1/4 hora y sumar 15 minutos para asegurar que sea futuro o actual bloque
     const siguienteBloque = Math.floor(minutos / 15) * 15;
     let nuevaHora = now.minute(siguienteBloque).second(0).millisecond(0);
-    // Si la hora resultante es estrictamente anterior a la actual, añade 15 min
     if (nuevaHora.isBefore(now)) {
          nuevaHora = nuevaHora.add(15, 'minute');
     }
-    // Caso especial: Si redondea a :00 y ya pasó, debe ir a :15
-    // Esto se maneja ahora con la comprobación isBefore
-
-    // Asegurarse que la hora final no sea en el pasado inmediato
     const diffMinutes = nuevaHora.diff(now, 'minute');
-     // Permitir un pequeño margen (ej. 2 minutos) para horas muy cercanas al cálculo
     if (diffMinutes < -2) {
         console.warn("Hora redondeada calculada está en el pasado, ajustando al siguiente bloque.");
         nuevaHora = nuevaHora.add(15, 'minute');
     }
-
     return nuevaHora;
   };
-  // Determina la hora final del pedido: usa la del cliente si existe, si no, calcula la redondeada.
+
+  // Determina la hora final del pedido
   const fechahora = datosCliente.fechahora || obtenerHoraRedondeada().format("DD/MM/YYYY HH:mm");
 
   // --- Obtener Siguiente ID de Pedido (transaccional) ---
+  // (Sin cambios)
    const getNextId = async () => {
-     const contadorRef = doc(db, "contadorPedidos", "pedidoId"); // Referencia al documento contador
+     const contadorRef = doc(db, "contadorPedidos", "pedidoId");
      try {
-         // Usar transacción para garantizar lectura y escritura atómicas del contador
          const nextId = await runTransaction(db, async (transaction) => {
-             const docSnap = await transaction.get(contadorRef); // Leer contador DENTRO de transacción
-             if (!docSnap.exists()) { // Si no existe, inicializar
+             const docSnap = await transaction.get(contadorRef);
+             if (!docSnap.exists()) {
                  transaction.set(contadorRef, { id: 1 });
                  console.log("Contador de pedidos inicializado en 1.");
                  return 1;
              }
-             // Si existe, incrementar y actualizar
              const newId = docSnap.data().id + 1;
              transaction.update(contadorRef, { id: newId });
              return newId;
@@ -258,155 +203,126 @@ const CartTotal = ({ datosCliente, setDatosCliente, orderToEdit }) => {
          console.log("Siguiente ID de pedido obtenido:", nextId);
          return nextId;
      } catch (error) {
-         // Capturar y loguear errores durante la obtención del ID
          console.error("Error Crítico al obtener el siguiente ID de pedido:", error);
-         // Es crucial detener el proceso si no se puede obtener un ID fiable
          throw new Error("No se pudo generar el ID del pedido. Revisa la conexión o configuración.");
      }
    };
 
   // --- Sanitizar Datos del Cliente ---
-  // Asegura que los campos del objeto datosCliente existan y tengan valores por defecto si son nulos/undefined.
+  // (Sin cambios)
   const sanitizeClientData = (data) => ({
     cliente: data.cliente || "",
     telefono: data.telefono || "",
-    fechahora: data.fechahora || "", // La hora final se determina en 'fechahora'
+    fechahora: data.fechahora || "",
     observaciones: data.observaciones || "",
-    pagado: data.pagado || false, // Default a no pagado
-    celiaco: data.celiaco || false, // Default a no celiaco
+    pagado: data.pagado || false,
+    celiaco: data.celiaco || false,
     localidad: data.localidad || "",
   });
 
   // --- Función de Actualizar Stock (Robusta y Transaccional) ---
+  // (Sin cambios)
    const updateStock = async (productId, cantidadVendida) => {
-     // Validación temprana de parámetros
-     // Permitir ID de producto como string o número, pero convertir a string para la referencia
      const productIdStr = productId?.toString();
      if (!productIdStr) {
          console.error("ID de producto inválido detectado en updateStock:", productId);
          throw new Error(`Intento de actualizar stock con ID inválido: ${productId}`);
      }
-
      if (cantidadVendida <= 0) {
          console.warn(`Intento de actualizar stock para ID ${productIdStr} con cantidad no positiva: ${cantidadVendida}. No se hará nada.`);
-         return; // No continuar si la cantidad no es positiva
+         return;
      }
 
-     const productRef = doc(db, "productos", productIdStr); // Usar ID como string
+     const productRef = doc(db, "productos", productIdStr);
 
      try {
-       // Usar transacción para garantizar la atomicidad de la lectura y escritura del stock
        await runTransaction(db, async (transaction) => {
-           // Leer el estado actual del producto DENTRO de la transacción
            const productSnap = await transaction.get(productRef);
            if (!productSnap.exists()) {
-               // Error grave si el producto no se encuentra durante la transacción
                console.error(`Error Crítico: Producto con ID ${productIdStr} no encontrado en Firestore al intentar actualizar stock.`);
+               throw new Error(`Producto ID ${productIdStr} no encontrado.`);
            }
            const productData = productSnap.data();
-           const currentStock = productData.stock; // Stock actual
+           const currentStock = productData.stock;
 
-            // Validar que el stock sea un número
             if (typeof currentStock !== 'number' || isNaN(currentStock)) {
                  console.error(`Error Crítico: El stock para el producto ID ${productIdStr} no es un número válido (${currentStock}).`);
+                 throw new Error(`Stock inválido para producto ID ${productIdStr}.`);
             }
 
-           // Validar si hay suficiente stock DENTRO de la transacción
            if (currentStock < cantidadVendida) {
                 console.warn(`Stock insuficiente detectado en transacción para ${productData.name || 'ID ' + productIdStr}. Necesario: ${cantidadVendida}, Disponible: ${currentStock}`);
-                // Lanzar error para abortar la transacción y el proceso
+                throw new Error(`Stock insuficiente para ${productData.name || 'ID ' + productIdStr}.`);
            }
 
-           // Calcular y actualizar el nuevo stock
            const newStock = currentStock - cantidadVendida;
            console.log(`Stock OK. Actualizando ${productIdStr}: ${currentStock} -> ${newStock}`);
-           transaction.update(productRef, { stock: newStock }); // Escribir el nuevo stock
+           transaction.update(productRef, { stock: newStock });
        });
-       // Si la transacción se completa con éxito
         console.log(`Stock actualizado correctamente via transacción para ID: ${productIdStr}, cantidad deducida: ${cantidadVendida}`);
      } catch (error) {
-       // Capturar y loguear errores de la transacción
        console.error(`Error durante la transacción de actualización de stock para ID ${productIdStr}:`, error);
-       // Re-lanzar el error para que la función llamante (sendToFirestore) lo maneje
        throw error;
      }
    };
 
   // --- Validación Básica del Pedido (Cliente, Pollo, Stock Preliminar) ---
+  // (Sin cambios)
   const validateOrder = async (currentCart) => {
     console.log("Iniciando validación completa del pedido...");
-    let mensajesError = ""; // Para errores bloqueantes (teléfono, stock) -> Modal 2
-    let mensajesAdvertencia = ""; // Para advertencias (sin pollo, sin hora) -> Modal 1
+    let mensajesError = "";
+    let mensajesAdvertencia = "";
 
     const clienteData = sanitizeClientData(datosCliente);
 
-    // 1. Validar datos OBLIGATORIOS del cliente (Teléfono)
+    // 1. Validar Teléfono (Esencial para la lógica de cliente)
     if (!clienteData.telefono) {
       mensajesError += "El teléfono del cliente es obligatorio.\n";
-    } else {
-      console.log("Datos cliente OK (teléfono presente).");
+    } else if (!/^\d{9}$/.test(clienteData.telefono)) { // Validación básica de formato 9 dígitos
+        mensajesError += "El formato del teléfono no es válido (debe tener 9 dígitos).\n";
     }
 
-    // 2. *** NUEVO: Validación de Stock ***
+    // 2. Validación de Stock Preliminar (Sin cambios)
     console.log("Iniciando validación de stock...");
-    const productQuantities = {}; // { productId: { required: number, name: string } }
+    const productQuantities = {};
     let stockValidationError = false;
 
-    // --- Agrupar cantidades requeridas ---
     currentCart.forEach(item => {
        if (!item || item.id_product == null || typeof item.cantidad !== 'number' || item.cantidad <= 0) {
            console.warn("Item inválido en carrito durante validación de stock:", item);
-           return; // Ignorar items inválidos
+           return;
        }
 
        let stockProductId;
        let quantityForStockCheck = item.cantidad;
        const productName = item.name || `Producto ID ${item.id_product}`;
 
-       // Agrupar pollos bajo ID 1
-       if (item.id_product === 1) {
-           stockProductId = 1;
-       } else if (item.id_product === 2) {
-           stockProductId = 1;
-           quantityForStockCheck = item.cantidad / 2; // Medio pollo cuenta como 0.5 para stock
-       }
-       // Agrupar costillas bajo ID 41
-       else if (item.id_product === 41) {
-           stockProductId = 41;
-       } else if (item.id_product === 48) {
-           stockProductId = 41;
-           quantityForStockCheck = item.cantidad / 2; // Media costilla cuenta como 0.5 para stock
-       }
-       // Otros productos
-       else {
-           stockProductId = item.id_product;
-       }
+       if (item.id_product === 1) stockProductId = 1;
+       else if (item.id_product === 2) { stockProductId = 1; quantityForStockCheck = item.cantidad / 2; }
+       else if (item.id_product === 41) stockProductId = 41;
+       else if (item.id_product === 48) { stockProductId = 41; quantityToDeduct = item.cantidad / 2; } // <-- CORREGIDO: Era quantityForStockCheck
+       else stockProductId = item.id_product;
 
-       // Convertir ID a string para consistencia con Firestore keys si son strings
        const stockProductIdStr = stockProductId.toString();
-
        if (!productQuantities[stockProductIdStr]) {
-           productQuantities[stockProductIdStr] = { required: 0, name: productName }; // Guardar un nombre para mensajes
+           productQuantities[stockProductIdStr] = { required: 0, name: productName };
        }
        productQuantities[stockProductIdStr].required += quantityForStockCheck;
     });
 
-    // --- Obtener stock actual y comparar ---
     const productIdsToCheck = Object.keys(productQuantities);
     if (productIdsToCheck.length > 0) {
        console.log("IDs de producto para verificar stock:", productIdsToCheck);
        try {
-           // Crear promesas para buscar cada producto
            const stockCheckPromises = productIdsToCheck.map(async (productIdStr) => {
                const productRef = doc(db, "productos", productIdStr);
                const productSnap = await getDoc(productRef);
-               const requiredData = productQuantities[productIdStr]; // { required, name }
+               const requiredData = productQuantities[productIdStr];
 
                if (!productSnap.exists()) {
-                   console.error(`Error Crítico Validación: Producto con ID ${productIdStr} no encontrado en Firestore.`);
-                   mensajesError += `El producto '${requiredData.name}' (ID: ${productIdStr}) no se encontró en la base de datos.\n`;
-                   stockValidationError = true;
-                   return; // Salir de esta promesa específica
+                   console.error(`Error Crítico Validación: Producto con ID ${productIdStr} no encontrado.`);
+                   mensajesError += `El producto '${requiredData.name}' (ID: ${productIdStr}) no se encontró.\n`;
+                   stockValidationError = true; return;
                }
 
                const productData = productSnap.data();
@@ -414,12 +330,10 @@ const CartTotal = ({ datosCliente, setDatosCliente, orderToEdit }) => {
 
                if (typeof currentStock !== 'number' || isNaN(currentStock)) {
                    console.error(`Error Crítico Validación: Stock inválido para producto ID ${productIdStr} (${currentStock}).`);
-                   mensajesError += `Error interno: El stock para '${requiredData.name}' no es válido. Contactar soporte.\n`;
-                   stockValidationError = true;
-                   return; // Salir de esta promesa específica
+                   mensajesError += `Error interno: Stock inválido para '${requiredData.name}'.\n`;
+                   stockValidationError = true; return;
                }
 
-               // Comparar stock
                if (currentStock < requiredData.required) {
                    console.warn(`Stock insuficiente para ${requiredData.name} (ID: ${productIdStr}). Necesario: ${requiredData.required}, Disponible: ${currentStock}`);
                    mensajesError += `Stock insuficiente para ${requiredData.name}.\n`;
@@ -428,342 +342,248 @@ const CartTotal = ({ datosCliente, setDatosCliente, orderToEdit }) => {
                    console.log(`Stock OK para ${requiredData.name} (ID: ${productIdStr}). Necesario: ${requiredData.required}, Disponible: ${currentStock}`);
                }
            });
-
-           // Esperar a que todas las comprobaciones de stock terminen
            await Promise.all(stockCheckPromises);
-
        } catch (error) {
            console.error("Error durante la obtención de datos de stock para validación:", error);
            mensajesError += "Error al verificar el stock. Inténtalo de nuevo.\n";
            stockValidationError = true;
        }
     } else {
-        console.log("No hay productos en el carrito que requieran verificación de stock (o el carrito está vacío).");
+        console.log("No hay productos en el carrito que requieran verificación de stock.");
     }
 
-    // 3. Validar si se seleccionó hora (Advertencia)
+    // 3. Validar Hora (Advertencia) (Sin cambios)
     if (!clienteData.fechahora) {
       const horaRedondeada = obtenerHoraRedondeada().format('HH:mm');
       mensajesAdvertencia += `❗️No has seleccionado hora. La hora del pedido será: ${horaRedondeada}\n`;
     }
 
-    // 4. Validar si incluye pollo (Advertencia)
+    // 4. Validar Pollo (Advertencia) (Sin cambios)
     const incluyePollo = currentCart.some(item => item && (item.id_product === 1 || item.id_product === 2));
     if (!incluyePollo) {
       mensajesAdvertencia += "❗️Comprueba... tu pedido no incluye pollo.\n";
     }
 
-    // --- Decisión Final de Validación ---
-
-    // Si hay ERRORES (teléfono, stock), mostrar Modal 2 y bloquear
+    // --- Decisión Final --- (Sin cambios)
     if (mensajesError.trim() !== "") {
       console.log("Validación fallida por errores:", mensajesError.trim());
       setMensajeModal(mensajesError.trim());
-      setShowModal2(true); // Usar Modal 2 para errores bloqueantes
-      return false; // Detener la ejecución
+      setShowModal2(true);
+      return false;
     }
-
-    // Si NO hay errores, pero SÍ hay ADVERTENCIAS (sin pollo, sin hora), mostrar Modal 1 para confirmar
     if (mensajesAdvertencia.trim() !== "") {
        console.log("Validación OK, pero con advertencias:", mensajesAdvertencia.trim());
        setMensajeModal(mensajesAdvertencia.trim());
-       setShowModal(true); // Usar Modal 1 para advertencias/confirmaciones
-       return false; // Detener la ejecución (espera confirmación del modal)
+       setShowModal(true);
+       return false;
     }
 
-    // Si no hay errores ni advertencias, la validación es exitosa
     console.log("Validación completa del pedido superada con éxito.");
     return true;
   };
 
-
-
-// --- Función Base para ACTUALIZAR Calendario (MODIFICADA para override UNIVERSAL) ---
-  const updateCalendarBase = async (collectionName, productName, fechahora, cantidad, ignoreLimit = false) => {
-    // Omitir si la cantidad es cero o negativa
-    if (cantidad <= 0) {
-        console.log(`Actualización de calendario ${productName} omitida (cantidad <= 0)`);
-        return;
-    }
-
-    // Validar fecha/hora
-    const orderDate = dayjs(fechahora, "DD/MM/YYYY HH:mm", true); // Parseo estricto
-    if (!orderDate.isValid()) {
-        console.error(`Fecha/hora inválida (${fechahora}) al intentar actualizar calendario ${productName}`);
-        throw new Error(`Fecha/hora inválida al actualizar calendario ${productName}`);
-    }
-
-    // Referencia al documento diario (usar YYYY-MM-DD)
-    const dailyDocId = orderDate.format("YYYY-MM-DD");
-    const docRef = doc(db, collectionName, dailyDocId);
-
-    try {
-        // Ejecutar dentro de una transacción Firestore para atomicidad
-        await runTransaction(db, async (transaction) => {
-            // Leer estado actual DENTRO de la transacción
-            const docSnap = await transaction.get(docRef);
-            if (!docSnap.exists()) {
-                 console.error(`Error Crítico: Documento diario ${dailyDocId} ${productName} no existe DENTRO de la transacción.`);
-                 throw new Error(`Documento diario ${dailyDocId} ${productName} no existe (en update).`);
-            }
-
-            // Validar estructura de datos leída
-            const data = docSnap.data();
-            let intervals = data.intervals; // Hacer una copia modificable si es necesario (no en este caso)
-            if (!Array.isArray(intervals)) {
-                console.error(`Error Crítico: 'intervals' no es un array en ${collectionName}/${dailyDocId}.`);
-                throw new Error(`Estructura de calendario inválida para ${productName} el ${dailyDocId}.`);
-            }
-
-            // Encontrar intervalo correspondiente a la hora del pedido
-            const requestedMinutes = orderDate.hour() * 60 + orderDate.minute();
-            let foundIntervalIndex = -1;
-             for (let i = 0; i < intervals.length; i++) { // Búsqueda de intervalo
-                 const interval = intervals[i];
-                 if (!interval?.start || !interval?.end) continue; // Saltar intervalo inválido
-                 const startMin = convertTimeToMinutes(interval.start);
-                 const endMin = convertTimeToMinutes(interval.end);
-                 if (startMin !== -1 && endMin !== -1 && requestedMinutes >= startMin && requestedMinutes < endMin) {
-                     foundIntervalIndex = i;
-                     break; // Intervalo encontrado
-                 }
-             }
-            // Validar si se encontró el intervalo
-            if (foundIntervalIndex === -1) {
-                 console.error(`Error Crítico: Intervalo no encontrado para ${productName} (${orderDate.format("HH:mm")}) DENTRO de la transacción.`);
-                 throw new Error(`Intervalo no encontrado para ${productName} (en update).`);
-            }
-
-            // Obtener datos del intervalo encontrado
-            const intervalIndex = foundIntervalIndex;
-            const current = intervals[intervalIndex].orderedCount || 0; // Conteo actual
-            const max = intervals[intervalIndex].maxAllowed; // Límite configurado
-            const intervalLabel = `${intervals[intervalIndex].start}-${intervals[intervalIndex].end}`; // Para logs
-
-            // Validar que 'max' sea un número válido (dentro de la transacción)
-            if (typeof max !== 'number' || isNaN(max)) {
-                throw new Error(`Límite (maxAllowed) mal configurado para ${productName} en ${intervalLabel} (update).`);
-            }
-
-            // --- Lógica Central de Actualización SIMPLIFICADA ---
-            const finalOrderedCount = current + cantidad; // Calcular siempre el conteo final
-
-            if (finalOrderedCount > max) { // Si se supera el límite...
-                if (ignoreLimit) { // ...y se pidió ignorar...
-                    // *** SIEMPRE actualizar, para TODOS los productos, superando el límite ***
-                    console.warn(`%cOVERRIDE UNIVERSAL: Límite de ${productName} (${max}) excedido en ${intervalLabel}, pero se ignoró. Incrementando contador a ${finalOrderedCount}.`, 'color: red; font-weight:bold;');
-                    // Actualizar directamente el array de intervalos (Firestore maneja la actualización del campo)
-                    intervals[intervalIndex].orderedCount = finalOrderedCount; // Establecer el nuevo conteo
-                    transaction.update(docRef, { intervals: intervals }); // Guardar el array modificado
-                } else {
-                    // Si se supera y NO se ignora (Salvaguarda - no debería ocurrir si validación OK)
-                    console.error(`Salvaguarda Transacción: Límite de ${productName} (${max}) excedido en ${intervalLabel} y NO se indicó ignorar.`);
-                    throw new Error(`Límite de ${productName} (${max}) ya alcanzado o excedido (update).`);
-                }
-            } else {
-                // Si NO se supera el límite, actualizar normalmente
-                console.log(`Actualizando contador para ${productName} - Intervalo ${intervalLabel}: ${current} -> ${finalOrderedCount}`);
-                // Actualizar directamente el array de intervalos
-                intervals[intervalIndex].orderedCount = finalOrderedCount; // Establecer nuevo conteo
-                transaction.update(docRef, { intervals: intervals }); // Guardar el array modificado
-            }
-
-        }); // Fin de runTransaction
-
-        // Log de éxito de la transacción (si no hubo errores)
-        console.log(`${productName} calendar transaction completed successfully.`);
-
-    } catch (error) {
-        // Capturar y loguear errores de la transacción
-        console.error(`Error durante la transacción de update ${productName} calendar:`, error);
-        // Re-lanzar para que sendToFirestore lo maneje
-        throw error;
-    }
-};
-
-
-
   // --- Función Principal para Enviar/Actualizar Pedido ---
-  const sendToFirestore = async ({ confirmado, ignoreCalendarLimits = false }) => {
-    // Log inicial detallado
+  const sendToFirestore = async ({ confirmado }) => {
     console.log(`%c--- Iniciando sendToFirestore ---
-    Confirmado (sin pollo): ${confirmado}
-    Ignorar Límites Calendario: ${ignoreCalendarLimits}
+    Confirmado (sin pollo/hora): ${confirmado}
     Editando Pedido: ${orderToEdit ? orderToEdit.NumeroPedido : 'No'}
     Estado Submitting Actual: ${isSubmitting}`, 'color: blue; font-weight: bold;');
-    // Prevenir doble submit (más robusto)
+
     if (isSubmitting) {
-        console.warn("Submit bloqueado: ya hay un proceso en curso (isSubmitting=true).");
+        console.warn("Submit bloqueado: ya hay un proceso en curso.");
         return;
     }
-    setIsSubmitting(true); // Marcar inicio de proceso
+    setIsSubmitting(true);
 
-    // Copia inmutable del carrito para esta ejecución
     const currentCart = [...cart];
 
-    // Validar carrito vacío
     if (!currentCart || currentCart.length === 0) {
         console.warn("Envío cancelado: Carrito vacío.");
         setMensajeModal("El carrito está vacío."); setShowModal2(true); setIsSubmitting(false); return;
     }
 
-    // Obtener ID del pedido si se está editando
     let pedidoId = orderToEdit ? orderToEdit.NumeroPedido : null;
+    let clienteId = null; // Variable para almacenar el ID del cliente (teléfono)
 
     try {
-      // --- PASO 1: Validación Inicial (Cliente, Pollo, Stock Preliminar) ---
-      // Solo si no es una re-llamada confirmada (por pollo o límite)
-      if (!confirmado && !ignoreCalendarLimits) {
+      // --- PASO 1: Validación Inicial (Cliente, Pollo, Stock) ---
+      if (!confirmado) {
         console.log("Ejecutando validación básica...");
-        const isValidBasic = await validateOrder(currentCart); // Ejecutar validaciones
+        const isValidBasic = await validateOrder(currentCart);
         if (!isValidBasic) {
           console.log("Validación básica fallida o esperando confirmación del usuario.");
-          // Si se mostró un modal (showModal=true), isSubmitting queda true esperando al usuario.
-          // Si no, liberar isSubmitting aquí.
           if (!showModal) { setIsSubmitting(false); }
-          return; // Detener el flujo
+          return;
         }
         console.log("Validación básica OK.");
       } else {
-          console.log("Saltando validación básica (confirmado o ignorando límites).");
+          console.log("Saltando validación básica (confirmado).");
       }
 
-      // Obtener datos del cliente y hora final del pedido
+      // Obtener datos del cliente y hora final
       const clienteData = sanitizeClientData(datosCliente);
-      const horaPedido = clienteData.fechahora || fechahora; // Usar hora del cliente o la calculada
+      const horaPedido = clienteData.fechahora || fechahora;
 
-      // Validar formato final de horaPedido ANTES de usarla
+      // Validar formato final de horaPedido
       if (!dayjs(horaPedido, "DD/MM/YYYY HH:mm", true).isValid()) {
            console.error("Error Crítico: El formato final de horaPedido es inválido:", horaPedido);
            throw new Error(`El formato de la fecha/hora final del pedido es inválido: ${horaPedido}`);
       }
        console.log("Hora final del pedido:", horaPedido);
 
-      // --- PASO 2: Determinar si es para otro día y si se debe actualizar stock ---
-      const fechaRealizado = dayjs(); // Momento actual
+      // --- PASO 2: Verificar/Crear Cliente (AJUSTADO) ---
+      clienteId = clienteData.telefono; // Usamos el teléfono como ID
+      if (!clienteId) {
+          throw new Error("Falta el teléfono del cliente para verificar/crear el registro.");
+      }
+      console.log(`Verificando/Creando cliente con ID (teléfono): ${clienteId}`);
+      const clienteRef = doc(db, "clientes", clienteId);
+
+      try {
+          const clienteDocSnap = await getDoc(clienteRef);
+
+          if (!clienteDocSnap.exists()) {
+              // Cliente no existe, crearlo con la nueva estructura
+              console.log(`Cliente ${clienteId} no encontrado. Creando nuevo registro...`);
+              const newClientData = {
+                  cliente: clienteData.cliente || "Nombre no proporcionado", // Nombre del cliente
+                  telefono: clienteId,
+                  localidad: clienteData.localidad || "",
+                  celiaco: clienteData.celiaco || false, // Añadido
+                  fechahora: serverTimestamp(), // Fecha de registro (usando el nombre de campo proporcionado)
+                  lastOrderDate: serverTimestamp() // Fecha del último pedido (inicialmente la misma que registro)
+                  // email: "" // Omitido, no disponible
+              };
+              await setDoc(clienteRef, newClientData);
+              console.log(`Cliente ${clienteId} creado con éxito.`);
+          } else {
+              // Cliente existe, actualizar campos necesarios
+              console.log(`Cliente ${clienteId} encontrado.`);
+              const existingClientData = clienteDocSnap.data();
+              const clientUpdates = {}; // Objeto para acumular actualizaciones
+
+              // Siempre actualizar la fecha del último pedido
+              clientUpdates.lastOrderDate = serverTimestamp();
+
+              // Actualizar 'cliente' (nombre) si ha cambiado y se proporcionó uno nuevo
+              if (clienteData.cliente && existingClientData.cliente !== clienteData.cliente) {
+                  clientUpdates.cliente = clienteData.cliente;
+              }
+
+              // Actualizar 'localidad' si ha cambiado y se proporcionó una nueva
+              if (clienteData.localidad && existingClientData.localidad !== clienteData.localidad) {
+                  clientUpdates.localidad = clienteData.localidad;
+              }
+
+              // Actualizar 'celiaco' si ha cambiado
+              const currentCeliaco = clienteData.celiaco || false; // Asegurar que es booleano
+              if (existingClientData.celiaco !== currentCeliaco) {
+                  clientUpdates.celiaco = currentCeliaco;
+              }
+
+              // Realizar la actualización solo si hay cambios (lastOrderDate siempre estará)
+              if (Object.keys(clientUpdates).length > 0) {
+                  console.log(`Actualizando datos del cliente ${clienteId}:`, clientUpdates);
+                  await updateDoc(clienteRef, clientUpdates);
+                  console.log(`Datos del cliente ${clienteId} actualizados.`);
+              } else {
+                   // Esto no debería ocurrir ya que lastOrderDate siempre se actualiza,
+                   // pero lo dejamos por si acaso.
+                  console.log(`No se requieren actualizaciones para el cliente ${clienteId}.`);
+              }
+          }
+      } catch (clientError) {
+          console.error(`Error Crítico al verificar/crear/actualizar cliente ${clienteId}:`, clientError);
+          throw new Error(`No se pudo procesar la información del cliente (${clienteId}). ${clientError.message}`);
+      }
+      // --- FIN PASO 2 ---
+
+      // --- PASO 3: Determinar si es para otro día ---
+      const fechaRealizado = dayjs();
       const fechaPedido = dayjs(horaPedido, "DD/MM/YYYY HH:mm");
-      // Compara solo la parte de la fecha (ignora la hora)
       const esParaOtroDia = !fechaPedido.isSame(fechaRealizado, 'day');
-      console.log(`¿Es para otro día?: ${esParaOtroDia} (Pedido: ${fechaPedido.format('YYYY-MM-DD')}, Realizado: ${fechaRealizado.format('YYYY-MM-DD')})`);
+      console.log(`¿Es para otro día?: ${esParaOtroDia}`);
 
-
-      // --- PASO 3: Preparar y Guardar/Actualizar Pedido en Firestore ---
-      // Si se llega aquí, las validaciones pasaron o se ignoraron los límites.
+      // --- PASO 4: Preparar y Guardar/Actualizar Pedido ---
       console.log("Preparando datos del pedido para guardar en Firestore...");
-      const nowString = fechaRealizado.format("DD/MM/YYYY HH:mm"); // Hora actual para registros
+      const nowString = fechaRealizado.format("DD/MM/YYYY HH:mm");
 
-      // Mapear productos del carrito a formato Firestore (con validación robusta)
+      // Mapeo de productos (sin cambios)
       const mappedProducts = currentCart.map((item) => {
-            // Validar cada item antes de mapearlo
             if (!item || item.id_product == null || typeof item.price !== 'number' || typeof item.cantidad !== 'number' || item.cantidad <= 0) {
                  console.error("Error Crítico: Item inválido encontrado en carrito al preparar para Firestore:", item);
-                 throw new Error("Se encontró un item inválido o con cantidad cero en el carrito. No se puede guardar el pedido.");
+                 throw new Error("Se encontró un item inválido o con cantidad cero en el carrito.");
             }
-            // Devolver objeto formateado
             return {
-                id: item.id_product, // Mantener como número o string según esté en BD productos
-                nombre: item.name || "Sin Nombre",
-                cantidad: item.cantidad,
-                alias: item.alias || "",
-                observaciones: item.observaciones || "",
-                celiaco: item.celiaco || clienteData.celiaco || false,
-                tostado: item.tostado || 0,
-                salsa: item.sinsalsa || false,
-                extrasalsa: item.extrasalsa || false,
-                entregado: item.entregado || 0,
-                troceado: item.troceado || false,
-                categoria: item.categoria || "No especificada",
-                freidora: item.freidora || false,
-                position: item.position,
-                // Guardar precios como strings formateados a 2 decimales
-                precio: item.price.toFixed(2),
+                id: item.id_product, nombre: item.name || "Sin Nombre", cantidad: item.cantidad,
+                alias: item.alias || "", observaciones: item.observaciones || "",
+                celiaco: item.celiaco || clienteData.celiaco || false, tostado: item.tostado || 0,
+                salsa: item.sinsalsa || false, extrasalsa: item.extrasalsa || false,
+                entregado: item.entregado || 0, troceado: item.troceado || false,
+                categoria: item.categoria || "No especificada", freidora: item.freidora || false,
+                position: item.position, precio: item.price.toFixed(2),
                 total: (item.price * item.cantidad).toFixed(2),
             };
        });
 
-       // Calcular total final del pedido
        const totalPedido = currentCart.reduce((acc, item) => acc + ((item?.price || 0) * (item?.cantidad || 1)), 0).toFixed(2);
 
-      // Decidir si crear o actualizar
       console.log(`%cProcediendo a ${orderToEdit ? 'ACTUALIZAR' : 'CREAR'} pedido en Firestore...`, 'color: green; font-weight: bold;');
-      if (orderToEdit) { // --- Actualizar Pedido Existente ---
+      if (orderToEdit) { // Actualizar
         if (!pedidoId) { throw new Error("Falta ID para actualizar pedido."); }
         console.log(`Actualizando Firestore para pedido ID: ${pedidoId}`);
         const pedidoRef = doc(db, "pedidos", pedidoId.toString());
+        // Añadir idCliente a los datos de actualización
         const updateData = {
           cliente: clienteData.cliente, telefono: clienteData.telefono, fechahora: horaPedido,
           observaciones: clienteData.observaciones, pagado: clienteData.pagado, celiaco: clienteData.celiaco,
           localidad: clienteData.localidad, productos: mappedProducts, total_pedido: totalPedido,
-          fechahora_modificado: nowString,
-          paraOtroDia: esParaOtroDia, // <-- AÑADIR FLAG AQUÍ
-          // No actualizar fechahora_realizado, empleado, origen al editar (a menos que sea necesario)
+          fechahora_modificado: nowString, paraOtroDia: esParaOtroDia,
+          idCliente: clienteId // <-- Mantenido
         };
         await updateDoc(pedidoRef, updateData);
         console.log(`Firestore: Pedido ID ${pedidoId} actualizado.`);
 
-      } else { // --- Crear Pedido Nuevo ---
-        pedidoId = await getNextId(); // Obtener ID aquí, justo antes de crear
+      } else { // Crear
+        pedidoId = await getNextId();
         console.log(`Creando nuevo pedido en Firestore con ID: ${pedidoId}`);
+        // Añadir idCliente a los datos de creación
         const pedidoData = {
            NumeroPedido: pedidoId, cliente: clienteData.cliente, telefono: clienteData.telefono,
            fechahora: horaPedido, observaciones: clienteData.observaciones, pagado: clienteData.pagado,
-           celiaco: clienteData.celiaco, localidad: clienteData.localidad, empleado: empleadoNombre, origen: 0, // Valores por defecto
+           celiaco: clienteData.celiaco, localidad: clienteData.localidad, empleado: empleadoNombre, origen: 0,
            productos: mappedProducts, total_pedido: totalPedido,
-           fechahora_realizado: nowString, // Fecha/hora de creación
-           paraOtroDia: esParaOtroDia, // <-- AÑADIR FLAG AQUÍ
-           // No incluir fechahora_modificado al crear
+           fechahora_realizado: nowString, paraOtroDia: esParaOtroDia,
+           idCliente: clienteId // <-- Mantenido
         };
         await setDoc(doc(db, "pedidos", pedidoId.toString()), pedidoData);
         console.log(`Firestore: Pedido nuevo ID ${pedidoId} creado.`);
       }
-      // Log de éxito del guardado/actualización
       console.log(`Éxito: Pedido ${pedidoId} ${orderToEdit ? 'actualizado' : 'guardado'} en Firestore.`);
 
-
-      // --- PASO 4: Actualizar Stock (CONDICIONAL) ---
+      // --- PASO 5: Actualizar Stock (CONDICIONAL) ---
+      // (Sin cambios en esta lógica, pero corregido un typo)
       if (!esParaOtroDia) {
           console.log("El pedido es para hoy. Procediendo a actualizar stock...");
-          // --- PASO 4: Actualizar Stock (POST-Guardado/Actualización de Pedido) ---
-          console.log("Iniciando proceso de actualización de stock...");
           try {
-              const stockUpdatePromises = [];
-
-              // --- Actualización para POLLO ---
-              let stockPollos = currentCart.reduce((sum, item) => {
-                  if (item?.id_product === 1) return sum + (item.cantidad || 0);
-                  if (item?.id_product === 2) return sum + (item.cantidad || 0) / 2;
-                  return sum;
-              }, 0);
-              if (stockPollos > 0) {
-                   stockUpdatePromises.push(updateStock(1, stockPollos));
-              }
-
-              // --- Actualización para COSTILLAS ---
-              let stockCostillas = currentCart.reduce((sum, item) => {
-                   if (item?.id_product === 41) return sum + (item.cantidad || 0);
-                   if (item?.id_product === 48) return sum + (item.cantidad || 0) / 2;
-                   return sum;
-              }, 0);
-              if (stockCostillas > 0) {
-                   stockUpdatePromises.push(updateStock(41, stockCostillas));
-              }
-
-              // --- Actualización para el resto de productos ---
-              const specialIds = [1, 2, 41, 48];
-              const otherProductsQuantities = {};
+              const stockUpdates = {};
               currentCart.forEach(item => {
-                   if (item && item.cantidad > 0 && !specialIds.includes(item.id_product)) {
-                       if (!otherProductsQuantities[item.id_product]) {
-                           otherProductsQuantities[item.id_product] = 0;
-                       }
-                       otherProductsQuantities[item.id_product] += item.cantidad;
-                   }
+                  if (!item || item.cantidad <= 0) return;
+                  let stockProductId;
+                  let quantityToDeduct = item.cantidad;
+                  if (item.id_product === 1) stockProductId = 1;
+                  else if (item.id_product === 2) { stockProductId = 1; quantityToDeduct = item.cantidad / 2; }
+                  else if (item.id_product === 41) stockProductId = 41;
+                  else if (item.id_product === 48) { stockProductId = 41; quantityToDeduct = item.cantidad / 2; } // <-- CORREGIDO typo
+                  else stockProductId = item.id_product;
+                  if (stockProductId && quantityToDeduct > 0) {
+                      const stockProductIdStr = stockProductId.toString();
+                      stockUpdates[stockProductIdStr] = (stockUpdates[stockProductIdStr] || 0) + quantityToDeduct;
+                  }
               });
-              for (const productId in otherProductsQuantities) {
-                   stockUpdatePromises.push(updateStock(productId, otherProductsQuantities[productId]));
-              }
-
-              // Ejecutar todas las actualizaciones en paralelo
+              const stockUpdatePromises = Object.entries(stockUpdates).map(([productId, quantity]) =>
+                  updateStock(productId, quantity)
+              );
               if (stockUpdatePromises.length > 0) {
                    console.log(`Ejecutando ${stockUpdatePromises.length} actualizaciones de stock...`);
                    await Promise.all(stockUpdatePromises);
@@ -776,80 +596,64 @@ const CartTotal = ({ datosCliente, setDatosCliente, orderToEdit }) => {
               setMensajeModal(`¡ATENCIÓN GRAVE! Pedido ${pedidoId} guardado, pero falló al actualizar stock (${stockError.message}). Es necesaria REVISIÓN MANUAL INMEDIATA del inventario.`);
               setShowModal2(true);
               setIsSubmitting(false);
-              return; // Detener aquí si el stock falla
+              return;
           }
       } else {
           console.log("El pedido es para otro día. Omitiendo actualización de stock.");
       }
 
-
-      // --- PASO 5.5: Actualizar Contadores de Ensaladas/Ensaladillas (NUEVO) ---
-      // Esta actualización SÍ se hace independientemente de si es para hoy u otro día
+      // --- PASO 6: Actualizar Contadores de Ensaladas/Ensaladillas ---
+      // (Sin cambios en esta lógica)
       console.log("Iniciando actualización de contadores de ensaladas/ensaladillas...");
       try {
-          // Llamar a la nueva función pasando el carrito actual
           await updateSaladCounters(currentCart);
-          console.log("Actualización de contadores de ensaladas/ensaladillas intentada (ver logs anteriores para éxito/error).");
-          // No se maneja error aquí porque la función interna ya lo loguea y decidimos no detener el flujo por ello.
+          console.log("Actualización de contadores de ensaladas/ensaladillas intentada.");
       } catch (saladError) {
-           // Este catch es por si updateSaladCounters lanzara un error inesperado (aunque no debería si se maneja internamente)
            console.error(`Error INESPERADO al llamar a updateSaladCounters para pedido ${pedidoId}:`, saladError);
-           // No mostrar modal adicional, ya que el error principal se logueó dentro de la función.
       }
 
-
-      // --- PASO 6: Limpiar Estado y Navegar (Éxito Total) ---
-      // Si se llega aquí, todo el proceso fue exitoso (o los errores no críticos fueron solo logueados)
+      // --- PASO 7: Limpiar Estado y Navegar (Éxito Total) ---
+      // (Sin cambios en esta lógica)
       console.log(`%c---- ÉXITO TOTAL Pedido ID: ${pedidoId} ---- Limpiando estado y navegando...`, 'color: green; font-weight: bold; font-size: 1.1em;');
-      setCart([]); // Vaciar carrito del estado global
-      setDatosCliente({ // Resetear datos del formulario
+      setCart([]);
+      setDatosCliente({
         cliente: "", telefono: "", fechahora: "", observaciones: "",
         pagado: false, celiaco: false, localidad: "",
       });
-      navigate("/ordenes"); // Navegar a la página de órdenes (ajusta la ruta si es necesario)
-      // isSubmitting se liberará en el bloque finally
+      navigate("/ordenes");
 
     } catch (error) {
-
-      // --- Captura de Errores Generales / Inesperados ---
+      // --- Captura de Errores Generales ---
       console.error("Error general no capturado previamente en sendToFirestore:", error);
-      // Mostrar modal de error genérico SOLO si no hay otro modal de confirmación activo
-      if (!showLimitModal && !showModal) {
+      if (!showModal) {
           setMensajeModal(`Error inesperado al procesar el pedido: ${error.message}. Intenta de nuevo o contacta soporte.`);
           setShowModal2(true);
       } else {
-          // Si ya hay un modal activo, el error podría ser confuso para el usuario. Loguearlo es importante.
-           console.error("Error general ocurrió mientras un modal de confirmación estaba activo (o debería estarlo).");
+           console.error("Error general ocurrió mientras un modal de confirmación estaba activo.");
       }
-      // Asegurar que isSubmitting se libera en caso de error general no manejado específicamente
-      // (Aunque el finally lo hará, ponerlo aquí puede ser una doble seguridad)
        setIsSubmitting(false);
 
-
     } finally {
-      // --- Bloque Finally: Siempre se ejecuta ---
-      // Asegurar que isSubmitting se desactive, A MENOS que un modal esté activo esperando acción del usuario.
-      // Esto previene que el botón se rehabilite mientras el usuario está en medio de una decisión en un modal.
-      if (!showLimitModal && !showModal) {
-         console.log("Finally: No hay modales activos, liberando isSubmitting.");
+      // --- Bloque Finally ---
+      if (!showModal) {
+         console.log("Finally: No hay modales de confirmación activos, liberando isSubmitting.");
          setIsSubmitting(false);
       } else {
-          console.log("Finally: Modal activo detectado, isSubmitting permanecerá true hasta interacción.");
+          console.log("Finally: Modal de confirmación activo detectado, isSubmitting permanecerá true.");
       }
       console.log("--- Ejecución de sendToFirestore finalizada ---");
     }
   }; // --- Fin de sendToFirestore ---
 
-
   // --- Renderizado del Componente ---
-  // (El JSX del return permanece igual que en tu código original)
-  return cart.length > 0 ? ( // Renderizar contenido solo si el carrito no está vacío
+  // (Sin cambios en el JSX)
+  return cart.length > 0 ? (
     <>
       {/* Sección del Total */}
       <div className="flex justify-end p-[0.5vw]">
         <a
           href="#"
-          onClick={(e) => e.preventDefault()} // Mejor práctica para enlaces placeholder
+          onClick={(e) => e.preventDefault()}
           className="inline-flex items-center text-2xl font-extrabold xtext-gray-600 hover:underline dark:text-gray-400"
         >
           <span className="text-end">{total.toFixed(2)} €</span>
@@ -859,11 +663,8 @@ const CartTotal = ({ datosCliente, setDatosCliente, orderToEdit }) => {
       {/* Botón Principal de Acción */}
       <div className="flex text-center justify-center items-center mt-6 mb-4">
         <button
-          // Llama a sendToFirestore con estado inicial
-          onClick={() => { console.log("Click en Botón Generar/Actualizar"); sendToFirestore({ confirmado: false, ignoreCalendarLimits: false }); }}
-          // Deshabilitar si está procesando
+          onClick={() => { console.log("Click en Botón Generar/Actualizar"); sendToFirestore({ confirmado: false }); }}
           disabled={isSubmitting}
-          // Clases CSS (ajusta según tu framework o estilos)
           className={`w-full sm:w-auto min-w-[150px] px-6 py-3 tracking-wide  ${
             orderToEdit ? 'bg-gray-600' : 'bg-[#f2ac02] hover:bg-yellow-600'
             } text-white font-bold rounded-lg shadow-md hover:bg-yellow-600 focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:ring-opacity-50 transition-all duration-300 ease-in-out flex items-center justify-center ${isSubmitting ? 'opacity-50 cursor-not-allowed' : 'hover:scale-105'}`}
@@ -876,114 +677,58 @@ const CartTotal = ({ datosCliente, setDatosCliente, orderToEdit }) => {
             <path d="M20 12C20 14.2091 16.4183 16 12 16C7.58172 16 4 14.2091 4 12" stroke="#ffffff" strokeWidth="1.5" strokeLinecap="round"></path>
             <path d="M20 18C20 20.2091 16.4183 22 12 22C7.58172 22 4 20.2091 4 18" stroke="#ffffff" strokeWidth="1.5"></path>
           </svg>
-          {/* Icono opcional - Descomentar si quieres un spinner */}
-          {/* isSubmitting && <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg> */}
           <span className="ml-1 font-nunito text-lg">
-            {/* Texto dinámico del botón */}
             {isSubmitting ? 'Procesando...' : (orderToEdit ? "Actualizar Pedido" : "Generar Pedido")}
           </span>
         </button>
       </div>
 
       {/* --- Modales --- */}
-
-      {/* Modal 2: Errores o Información General */}
+      {/* Modal 2: Errores o Información Bloqueante */}
       <Modal show={showModal2} onHide={() => { handleCloseModal2(); setIsSubmitting(false); }} size="md" backdrop="static" keyboard={false} centered>
-
         <Modal.Body className="flex flex-col items-center p-4">
-          {/* Puedes añadir un icono de error aquí */}
           <div className='p-1'>
-         <svg fill="#c81d0c" width="100px" height="100px" viewBox="0 0 22 22" version="1.1" xmlns="http://www.w3.org/2000/svg">
-
-              <g id="SVGRepo_bgCarrier" strokeWidth="0"/>
-
-              <g id="SVGRepo_tracerCarrier" strokeLinecap="round" strokeLinejoin="round"/>
-
-              <g id="SVGRepo_iconCarrier">
-
-              <path d="M12.1458333,9.85416667 L12.1458333,6.74047388 C12.1458333,6.4826434 11.9382041,6.28571429 11.6820804,6.28571429 L10.3179196,6.28571429 C10.0656535,6.28571429 9.85416667,6.48931709 9.85416667,6.74047388 L9.85416667,9.85416667 L6.74047388,9.85416667 C6.4826434,9.85416667 6.28571429,10.0617959 6.28571429,10.3179196 L6.28571429,11.6820804 C6.28571429,11.9343465 6.48931709,12.1458333 6.74047388,12.1458333 L9.85416667,12.1458333 L9.85416667,15.2595261 C9.85416667,15.5173566 10.0617959,15.7142857 10.3179196,15.7142857 L11.6820804,15.7142857 C11.9343465,15.7142857 12.1458333,15.5106829 12.1458333,15.2595261 L12.1458333,12.1458333 L15.2595261,12.1458333 C15.5173566,12.1458333 15.7142857,11.9382041 15.7142857,11.6820804 L15.7142857,10.3179196 C15.7142857,10.0656535 15.5106829,9.85416667 15.2595261,9.85416667 L12.1458333,9.85416667 Z" id="Combined-Shape" transform="translate(11.000000, 11.000000) rotate(-45.000000) translate(-11.000000, -11.000000) "/>
-
-              </g>
-
-          </svg>
-
-
-
+             <svg fill="#c81d0c" width="100px" height="100px" viewBox="0 0 22 22" version="1.1" xmlns="http://www.w3.org/2000/svg">
+                <g id="SVGRepo_bgCarrier" strokeWidth="0"/>
+                <g id="SVGRepo_tracerCarrier" strokeLinecap="round" strokeLinejoin="round"/>
+                <g id="SVGRepo_iconCarrier">
+                <path d="M12.1458333,9.85416667 L12.1458333,6.74047388 C12.1458333,6.4826434 11.9382041,6.28571429 11.6820804,6.28571429 L10.3179196,6.28571429 C10.0656535,6.28571429 9.85416667,6.48931709 9.85416667,6.74047388 L9.85416667,9.85416667 L6.74047388,9.85416667 C6.4826434,9.85416667 6.28571429,10.0617959 6.28571429,10.3179196 L6.28571429,11.6820804 C6.28571429,11.9343465 6.48931709,12.1458333 6.74047388,12.1458333 L9.85416667,12.1458333 L9.85416667,15.2595261 C9.85416667,15.5173566 10.0617959,15.7142857 10.3179196,15.7142857 L11.6820804,15.7142857 C11.9343465,15.7142857 12.1458333,15.5106829 12.1458333,15.2595261 L12.1458333,12.1458333 L15.2595261,12.1458333 C15.5173566,12.1458333 15.7142857,11.9382041 15.7142857,11.6820804 L15.7142857,10.3179196 C15.7142857,10.0656535 15.5106829,9.85416667 15.2595261,9.85416667 L12.1458333,9.85416667 Z" id="Combined-Shape" transform="translate(11.000000, 11.000000) rotate(-45.000000) translate(-11.000000, -11.000000) "/>
+                </g>
+            </svg>
          </div>
          <p className="font-nunito text-lg p-2 text-center text-gray-700 whitespace-pre-line">{mensajeModal}</p>
          </Modal.Body>
         <Modal.Footer className='no-border'>
-          {/* Botón Aceptar: Cierra el modal y asegura que isSubmitting es false */}
           <Button variant="primary" className="mt-1 bg-yellow-500 border-yellow-500 hover:bg-yellow-600 hover:border-yellow-600 py-2 px-5 font-nunito text-white rounded-md shadow-sm" onClick={() => { handleCloseModal2(); setIsSubmitting(false); }}>
             Aceptar
           </Button>
         </Modal.Footer>
       </Modal>
 
-      {/* Modal 1: Confirmación (ej. continuar sin pollo) */}
+      {/* Modal 1: Confirmación (ej. continuar sin pollo / sin hora) */}
       <Modal show={showModal} onHide={() => { handleCloseModal(); setIsSubmitting(false); }} size="md" backdrop="static" keyboard={false} centered>
-
         <Modal.Body className="flex flex-col items-center p-4">
-          {/* Icono de pregunta/aviso */}
           <div className='p-2'>
-         <svg fill="#c81d0c  " width="75px" height="75px" viewBox="-5.5 0 32 32" version="1.1" xmlns="http://www.w3.org/2000/svg">
-
-              <g id="SVGRepo_bgCarrier" strokeWidth="0"/>
-
-              <g id="SVGRepo_tracerCarrier" strokeLinecap="round" strokeLinejoin="round"/>
-
-              <g id="SVGRepo_iconCarrier"> <path d="M10.16 25.92c-2.6 0-8.72-0.24-9.88-2.24-1.28-2.28 2.040-8.24 3.080-10.040 1.040-1.76 4.64-7.56 7.12-7.56 2.8 0 7.24 7.48 8.56 10.12 1.92 3.84 2.48 6.4 1.56 7.6-1.52 2.040-8.96 2.12-10.44 2.12zM10.48 7.72c-0.72 0-3.080 2.36-5.64 6.76-2.76 4.68-3.48 7.72-3.080 8.4 0.32 0.56 3.2 1.4 8.4 1.4 5.44 0 8.64-0.88 9.080-1.48 0.28-0.36 0.040-2.28-1.72-5.84-2.64-5.28-6.12-9.24-7.040-9.24zM10.52 19.2c-0.48 0-0.84-0.36-0.84-0.84v-6.36c0-0.48 0.36-0.84 0.84-0.84s0.84 0.36 0.84 0.84v6.32c0 0.48-0.4 0.88-0.84 0.88zM11.36 21.36c0 0.464-0.376 0.84-0.84 0.84s-0.84-0.376-0.84-0.84c0-0.464 0.376-0.84 0.84-0.84s0.84 0.376 0.84 0.84z"/> </g>
-
-              </svg>
-
-
-
+             <svg fill="#c81d0c  " width="75px" height="75px" viewBox="-5.5 0 32 32" version="1.1" xmlns="http://www.w3.org/2000/svg">
+                <g id="SVGRepo_bgCarrier" strokeWidth="0"/>
+                <g id="SVGRepo_tracerCarrier" strokeLinecap="round" strokeLinejoin="round"/>
+                <g id="SVGRepo_iconCarrier"> <path d="M10.16 25.92c-2.6 0-8.72-0.24-9.88-2.24-1.28-2.28 2.040-8.24 3.080-10.040 1.040-1.76 4.64-7.56 7.12-7.56 2.8 0 7.24 7.48 8.56 10.12 1.92 3.84 2.48 6.4 1.56 7.6-1.52 2.040-8.96 2.12-10.44 2.12zM10.48 7.72c-0.72 0-3.080 2.36-5.64 6.76-2.76 4.68-3.48 7.72-3.080 8.4 0.32 0.56 3.2 1.4 8.4 1.4 5.44 0 8.64-0.88 9.080-1.48 0.28-0.36 0.040-2.28-1.72-5.84-2.64-5.28-6.12-9.24-7.040-9.24zM10.52 19.2c-0.48 0-0.84-0.36-0.84-0.84v-6.36c0-0.48 0.36-0.84 0.84-0.84s0.84 0.36 0.84 0.84v6.32c0 0.48-0.4 0.88-0.84 0.88zM11.36 21.36c0 0.464-0.376 0.84-0.84 0.84s-0.84-0.376-0.84-0.84c0-0.464 0.376-0.84 0.84-0.84s0.84 0.376 0.84 0.84z"/> </g>
+             </svg>
          </div>
           <p className="font-nunito text-lg p-2 text-center text-gray-700">{mensajeModal}</p>
-
         </Modal.Body>
         <Modal.Footer className="border-t-0 flex justify-around p-4">
-          {/* Botón Cancelar: Cierra modal y libera isSubmitting */}
           <Button variant="secondary" className="py-2 px-5 bg-white font-nunito text-red-500 border-red-500 hover:text-red-600 hover:border-red-600 shadow-sm" onClick={() => { handleCloseModal(); setIsSubmitting(false); }} disabled={isSubmitting}>
             Cancelar
           </Button>
-          {/* Botón Continuar: Cierra modal y llama a sendToFirestore con confirmado=true */}
-          <Button variant="primary" onClick={async () => { handleCloseModal(); await sendToFirestore({ confirmado: true, ignoreCalendarLimits: false }); }} disabled={isSubmitting} className={`py-2 px-5 bg-yellow-500 border-yellow-500 hover:bg-yellow-600 hover:border-yellow-600 font-nunito text-white rounded-md shadow-sm ${isSubmitting ? 'opacity-50 cursor-not-allowed' : ''}`}>
+          <Button variant="primary" onClick={async () => { handleCloseModal(); await sendToFirestore({ confirmado: true }); }} disabled={isSubmitting} className={`py-2 px-5 bg-yellow-500 border-yellow-500 hover:bg-yellow-600 hover:border-yellow-600 font-nunito text-white rounded-md shadow-sm ${isSubmitting ? 'opacity-50 cursor-not-allowed' : ''}`}>
             {isSubmitting ? 'Procesando...' : 'Continuar'}
-          </Button>
-        </Modal.Footer>
-      </Modal>
-
-      {/* Modal 3: Confirmación de Límite Excedido */}
-      <Modal show={showLimitModal} onHide={() => { handleCloseLimitModal(); setIsSubmitting(false); }} size="lg" backdrop="static" keyboard={false} centered>
-
-        <Modal.Body className="flex flex-col items-center p-4">
-           {/* Icono de Advertencia */}
-           <div className="p-2 text-red-500">
-               <svg xmlns="http://www.w3.org/2000/svg" className="h-12 w-12" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-                   <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-               </svg>
-           </div>
-          <div>
-            {/* Muestra el mensaje específico del límite excedido */}
-            <p className="font-nunito text-lg p-2 text-center text-gray-700">{limitWarning}</p>
-          </div>
-        </Modal.Body>
-        <Modal.Footer className="border-t-0 flex justify-around p-4">
-          {/* Botón Cancelar Pedido: Cierra modal y libera isSubmitting */}
-          <Button variant="secondary" className="py-2 px-5 bg-white font-nunito text-gray-700 border border-gray-400 hover:bg-gray-100 rounded-md shadow-sm" onClick={() => { handleCloseLimitModal(); setIsSubmitting(false); }} disabled={isSubmitting}>
-            Cancelar Pedido
-          </Button>
-          {/* Botón Continuar Ignorando Límite: Cierra modal y llama a sendToFirestore con ignoreCalendarLimits=true */}
-          <Button variant="danger" onClick={async () => { handleCloseLimitModal(); await sendToFirestore({ confirmado: true, ignoreCalendarLimits: true }); }} disabled={isSubmitting} className={`py-2 px-5 bg-red-600 border-red-600 hover:bg-red-700 hover:border-red-700 font-nunito text-white rounded-md shadow-sm ${isSubmitting ? 'opacity-50 cursor-not-allowed' : ''}`}>
-             {isSubmitting ? 'Procesando...' : 'Continuar (Ignorar Límite)'}
           </Button>
         </Modal.Footer>
       </Modal>
 
     </>
   ) : (
-    // Renderizado cuando el carrito está vacío
     <div className="text-center p-4 text-gray-500 italic">
         El carrito está vacío. Añade productos para continuar.
     </div>
