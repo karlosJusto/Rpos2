@@ -14,6 +14,7 @@ const CartElements = () => {
   };
 
   const handleClose = () => setShow(false);
+  const isTrueValue = (value) => value === 1 || value === true;
 
   return (
     <>
@@ -33,11 +34,11 @@ const CartElements = () => {
                   {product.name} <br />
                   {/* extras */}
                   <span className="text-[0.60vw] font-nunito text-gray-400">
-                    {product.extrasalsa && <span>Extra Salsa, </span>}
-                    {product.sinsalsa && <span>Sin salsa, </span>}
-                    {product.tostado && <span>Tostado, </span>}
-                    {product.troceado && <span>Troceado, </span>}
-                    {product.celiaco && <span>Celiaco</span>}
+                  { isTrueValue(product.extrasalsa) && <span>Extra Salsa, </span>}
+                    { isTrueValue(product.sinsalsa) && <span>Sin salsa, </span>}
+                    { isTrueValue(product.tostado) && <span>Tostado, </span>}
+                    { isTrueValue(product.troceado) && <span>Troceado, </span>}
+                    { isTrueValue(product.celiaco) && <span>Celiaco</span>}
                   </span>
                 </span>
                 <span className="inline-flex items-center justify-center px-[0.5vw] py-[0.125vw] ms-[0.75vw] text-md font-medium text-gray-500 bg-gray-200 rounded dark:bg-gray-700 dark:text-gray-400">
