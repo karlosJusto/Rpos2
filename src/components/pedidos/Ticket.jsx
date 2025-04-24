@@ -9,6 +9,7 @@ import avatar from "../../assets/avatar.png";
 import dinero from "../../assets/dinero.png";
 import singluten from "../../assets/singluten.png";
 import ModalClientes from "./ModalClientes";
+import fondo from "../../assets/fondo.jpg";
 
 
 const Ticket = (props) => {
@@ -108,72 +109,74 @@ const Ticket = (props) => {
 
   return (
     <>
-  <div className="flex justify-end gap-[1vw] p-[0.5vw] mt-[0.7vw]">
-
-         
-          
-
-      <Link className='border-2 p-[0.55vh] rounded-lg bg-white shadow-md'>
-
-      
-
-      <svg width="1.5vw" height="1.5vw" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <g id="SVGRepo_bgCarrier" strokeWidth="0"></g>
-        <g id="SVGRepo_tracerCarrier" strokeLinecap="round" strokeLinejoin="round"></g>
-        <g id="SVGRepo_iconCarrier"> <path d="M14 19.2857L15.8 21L20 17M4 21C4 17.134 7.13401 14 11 14C12.4872 14 13.8662 14.4638 15 15.2547M15 7C15 9.20914 13.2091 11 11 11C8.79086 11 7 9.20914 7 7C7 4.79086 8.79086 3 11 3C13.2091 3 15 4.79086 15 7Z" stroke="#000000" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"></path> </g>
-        </svg>
-
-        </Link>
-
-              <div className="me-4">
-                <h1 className="flex items-center justify-start text-sm text-gray-400 font-nunito ">Empleado</h1>
-                <h1 className="text-gray-800 font-bold font-nunito text-sm text-center">{empleadoNombre}</h1>
-
-                </div>
 
 
+        <div className="flex justify-end gap-[1vw] p-[0.5vw] mt-[1vh]"  >
 
-            <Link className='border-2  p-[0.55vh] rounded-lg bg-white shadow-md'>
+              
+                
+
+            <Link className='border-2 p-[0.55vh] rounded-lg bg-white'>
+
+            
+
+            <svg width="1.5vw" height="1.5vw" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <g id="SVGRepo_bgCarrier" strokeWidth="0"></g>
+              <g id="SVGRepo_tracerCarrier" strokeLinecap="round" strokeLinejoin="round"></g>
+              <g id="SVGRepo_iconCarrier"> <path d="M14 19.2857L15.8 21L20 17M4 21C4 17.134 7.13401 14 11 14C12.4872 14 13.8662 14.4638 15 15.2547M15 7C15 9.20914 13.2091 11 11 11C8.79086 11 7 9.20914 7 7C7 4.79086 8.79086 3 11 3C13.2091 3 15 4.79086 15 7Z" stroke="#000000" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"></path> </g>
+              </svg>
+
+              </Link>
+
+                    <div className="me-4">
+                      <h1 className="flex items-center justify-start text-sm text-gray-400 font-nunito ">Empleado</h1>
+                      <h1 className="text-gray-800 font-bold font-nunito text-sm text-center">{empleadoNombre}</h1>
+
+                      </div>
 
 
-                <svg width="1.5vw" height="1.5vw" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg">
 
-                <g id="SVGRepo_bgCarrier" strokeWidth="0"/>
+                  <Link className='border-2  p-[0.55vh] rounded-lg bg-white '>
 
-                <g id="SVGRepo_tracerCarrier" strokeLinecap="round" strokeLinejoin="round"/>
 
-                <g id="SVGRepo_iconCarrier">
+                      <svg width="1.5vw" height="1.5vw" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg">
 
-                <path clipRule="evenodd" d="M11 4.54125C8.11878 5.68927 6.0772 8.44184 6.07706 11.6767V17.9802L3.31773 20.658C3.12222 20.8387 3 21.0961 3 21.3818V21.5114C3 22.6045 3.89543 23.4906 5 23.4906H10.0255C10.2508 25.4654 11.9443 27 14 27C16.0557 27 17.7492 25.4654 17.9745 23.4906H23C24.1046 23.4906 25 22.6045 25 21.5114V21.382C25.0001 21.0963 24.8779 20.8388 24.6823 20.658L21.9232 17.9805V11.677C21.9231 8.44206 19.8814 5.6891 17 4.54114V3.47401C17 2.18459 15.9963 1.54919 15.6019 1.354C15.0885 1.09988 14.5194 1 14 1C13.4806 1 12.9115 1.09988 12.3981 1.354C12.0037 1.54919 11 2.18459 11 3.47401V4.54125ZM14.927 3.96881C14.9218 3.98589 14.9164 4.00272 14.9108 4.0193C14.6118 3.98595 14.308 3.96881 14.0001 3.96881C13.6922 3.96881 13.3883 3.98596 13.0893 4.01933C13.0836 4.00274 13.0782 3.9859 13.073 3.96881H13V3.47401C13 3.20076 13.4473 2.97921 14 2.97921C14.5527 2.97921 15 3.20076 15 3.47401V3.96881H14.927ZM15.9483 23.4906H12.0517C12.2572 24.3674 13.0515 25.0208 14 25.0208C14.9485 25.0208 15.7428 24.3674 15.9483 23.4906ZM8.07706 11.6767C8.07722 8.53096 10.7105 5.94802 14.0001 5.94802C17.2898 5.94802 19.9231 8.53096 19.9232 11.6767H8.07706ZM8.07706 11.6767H19.9232V17.9805C19.9232 18.5121 20.1393 19.0214 20.5229 19.3936L22.7052 21.5114H5.29484L7.77028 19.1091C7.95901 18.9296 8.07706 18.6772 8.07706 18.3958V11.6767Z" fill="#000000" fillRule="evenodd"/>
+                      <g id="SVGRepo_bgCarrier" strokeWidth="0"/>
 
-                </g>
+                      <g id="SVGRepo_tracerCarrier" strokeLinecap="round" strokeLinejoin="round"/>
 
-                </svg>
-            </Link>
+                      <g id="SVGRepo_iconCarrier">
 
-            <Link className='border-2 p-[0.55vh]  rounded-lg bg-white shadow-md'>
-            <svg width="1.5vw" height="1.5vw" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg">
+                      <path clipRule="evenodd" d="M11 4.54125C8.11878 5.68927 6.0772 8.44184 6.07706 11.6767V17.9802L3.31773 20.658C3.12222 20.8387 3 21.0961 3 21.3818V21.5114C3 22.6045 3.89543 23.4906 5 23.4906H10.0255C10.2508 25.4654 11.9443 27 14 27C16.0557 27 17.7492 25.4654 17.9745 23.4906H23C24.1046 23.4906 25 22.6045 25 21.5114V21.382C25.0001 21.0963 24.8779 20.8388 24.6823 20.658L21.9232 17.9805V11.677C21.9231 8.44206 19.8814 5.6891 17 4.54114V3.47401C17 2.18459 15.9963 1.54919 15.6019 1.354C15.0885 1.09988 14.5194 1 14 1C13.4806 1 12.9115 1.09988 12.3981 1.354C12.0037 1.54919 11 2.18459 11 3.47401V4.54125ZM14.927 3.96881C14.9218 3.98589 14.9164 4.00272 14.9108 4.0193C14.6118 3.98595 14.308 3.96881 14.0001 3.96881C13.6922 3.96881 13.3883 3.98596 13.0893 4.01933C13.0836 4.00274 13.0782 3.9859 13.073 3.96881H13V3.47401C13 3.20076 13.4473 2.97921 14 2.97921C14.5527 2.97921 15 3.20076 15 3.47401V3.96881H14.927ZM15.9483 23.4906H12.0517C12.2572 24.3674 13.0515 25.0208 14 25.0208C14.9485 25.0208 15.7428 24.3674 15.9483 23.4906ZM8.07706 11.6767C8.07722 8.53096 10.7105 5.94802 14.0001 5.94802C17.2898 5.94802 19.9231 8.53096 19.9232 11.6767H8.07706ZM8.07706 11.6767H19.9232V17.9805C19.9232 18.5121 20.1393 19.0214 20.5229 19.3936L22.7052 21.5114H5.29484L7.77028 19.1091C7.95901 18.9296 8.07706 18.6772 8.07706 18.3958V11.6767Z" fill="#000000" fillRule="evenodd"/>
 
-                <g id="SVGRepo_bgCarrier" strokeWidth="0"/>
+                      </g>
 
-                <g id="SVGRepo_tracerCarrier" strokeLinecap="round" strokeLinejoin="round"/>
+                      </svg>
+                  </Link>
 
-                <g id="SVGRepo_iconCarrier">
+                  <Link className='border-2 p-[0.55vh]  rounded-lg bg-white '>
+                  <svg width="1.5vw" height="1.5vw" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg">
 
-                <path clipRule="evenodd" d="M1.82047 1C1.36734 1 1 1.35728 1 1.79801V2.39948C1 2.84021 1.36734 3.19749 1.82047 3.19749H3.72716C4.03867 3.19749 4.3233 3.36906 4.46192 3.64038L5.4947 5.93251C5.53326 6.00798 5.56364 6.09443 5.62081 6.15194L10.057 16.4429C10.0129 16.4634 9.97056 16.4883 9.93075 16.5176C8.70163 17.4226 7.87009 18.5878 7.87001 19.7604C7.86996 20.4429 8.16289 21.0807 8.75002 21.5212C9.30752 21.9394 10.0364 22.1118 10.8189 22.1118H10.8446C10.336 22.6308 10.0238 23.3336 10.0238 24.1072C10.0238 25.7049 11.3554 27 12.998 27C14.6406 27 15.9722 25.7049 15.9722 24.1072C15.9722 23.3336 15.66 22.6308 15.1513 22.1118H19.0494C18.5408 22.6308 18.2285 23.3336 18.2285 24.1072C18.2285 25.7049 19.5601 27 21.2027 27C22.8454 27 24.177 25.7049 24.177 24.1072C24.177 23.3336 23.8647 22.6308 23.3561 22.1118H23.9718C24.425 22.1118 24.7923 21.7545 24.7923 21.3138V20.9148C24.7923 20.474 24.425 20.1167 23.9718 20.1167H10.8189C10.3192 20.1167 10.0864 20.0041 10.0028 19.9414C9.94878 19.9009 9.92119 19.8618 9.9212 19.7606C9.92122 19.4917 10.1711 18.8708 11.069 18.1827C11.1084 18.1524 11.1453 18.1194 11.1792 18.084C11.2692 18.1089 11.3635 18.1221 11.4601 18.1221H23.9235C24.4248 18.1221 24.8527 17.7696 24.9351 17.2885L26.9858 5.31837C27.09 4.71036 26.6079 4.1569 25.9742 4.1569H7.35431C7.1981 4.1569 7.05618 4.06597 6.9909 3.92405L5.84968 1.44289C5.71106 1.17157 5.42642 1 5.11492 1H1.82047ZM8.47667 6.15194C8.18952 6.15194 7.99591 6.44552 8.10899 6.70946L12.04 15.8846C12.103 16.0317 12.2476 16.1271 12.4076 16.1271H22.7173C22.9122 16.1271 23.0787 15.9867 23.1116 15.7946L24.6834 6.61948C24.7253 6.37513 24.5371 6.15194 24.2892 6.15194H8.47667ZM11.8698 24.1072C11.8698 23.5012 12.3749 23.0099 12.998 23.0099C13.621 23.0099 14.1261 23.5012 14.1261 24.1072C14.1261 24.7132 13.621 25.2045 12.998 25.2045C12.3749 25.2045 11.8698 24.7132 11.8698 24.1072ZM21.2027 23.0099C20.5797 23.0099 20.0746 23.5012 20.0746 24.1072C20.0746 24.7132 20.5797 25.2045 21.2027 25.2045C21.8258 25.2045 22.3309 24.7132 22.3309 24.1072C22.3309 23.5012 21.8258 23.0099 21.2027 23.0099Z" fill="#000000" fillRule="evenodd"/>
+                      <g id="SVGRepo_bgCarrier" strokeWidth="0"/>
 
-                </g>
+                      <g id="SVGRepo_tracerCarrier" strokeLinecap="round" strokeLinejoin="round"/>
 
-            </svg>
+                      <g id="SVGRepo_iconCarrier">
 
-            </Link>
+                      <path clipRule="evenodd" d="M1.82047 1C1.36734 1 1 1.35728 1 1.79801V2.39948C1 2.84021 1.36734 3.19749 1.82047 3.19749H3.72716C4.03867 3.19749 4.3233 3.36906 4.46192 3.64038L5.4947 5.93251C5.53326 6.00798 5.56364 6.09443 5.62081 6.15194L10.057 16.4429C10.0129 16.4634 9.97056 16.4883 9.93075 16.5176C8.70163 17.4226 7.87009 18.5878 7.87001 19.7604C7.86996 20.4429 8.16289 21.0807 8.75002 21.5212C9.30752 21.9394 10.0364 22.1118 10.8189 22.1118H10.8446C10.336 22.6308 10.0238 23.3336 10.0238 24.1072C10.0238 25.7049 11.3554 27 12.998 27C14.6406 27 15.9722 25.7049 15.9722 24.1072C15.9722 23.3336 15.66 22.6308 15.1513 22.1118H19.0494C18.5408 22.6308 18.2285 23.3336 18.2285 24.1072C18.2285 25.7049 19.5601 27 21.2027 27C22.8454 27 24.177 25.7049 24.177 24.1072C24.177 23.3336 23.8647 22.6308 23.3561 22.1118H23.9718C24.425 22.1118 24.7923 21.7545 24.7923 21.3138V20.9148C24.7923 20.474 24.425 20.1167 23.9718 20.1167H10.8189C10.3192 20.1167 10.0864 20.0041 10.0028 19.9414C9.94878 19.9009 9.92119 19.8618 9.9212 19.7606C9.92122 19.4917 10.1711 18.8708 11.069 18.1827C11.1084 18.1524 11.1453 18.1194 11.1792 18.084C11.2692 18.1089 11.3635 18.1221 11.4601 18.1221H23.9235C24.4248 18.1221 24.8527 17.7696 24.9351 17.2885L26.9858 5.31837C27.09 4.71036 26.6079 4.1569 25.9742 4.1569H7.35431C7.1981 4.1569 7.05618 4.06597 6.9909 3.92405L5.84968 1.44289C5.71106 1.17157 5.42642 1 5.11492 1H1.82047ZM8.47667 6.15194C8.18952 6.15194 7.99591 6.44552 8.10899 6.70946L12.04 15.8846C12.103 16.0317 12.2476 16.1271 12.4076 16.1271H22.7173C22.9122 16.1271 23.0787 15.9867 23.1116 15.7946L24.6834 6.61948C24.7253 6.37513 24.5371 6.15194 24.2892 6.15194H8.47667ZM11.8698 24.1072C11.8698 23.5012 12.3749 23.0099 12.998 23.0099C13.621 23.0099 14.1261 23.5012 14.1261 24.1072C14.1261 24.7132 13.621 25.2045 12.998 25.2045C12.3749 25.2045 11.8698 24.7132 11.8698 24.1072ZM21.2027 23.0099C20.5797 23.0099 20.0746 23.5012 20.0746 24.1072C20.0746 24.7132 20.5797 25.2045 21.2027 25.2045C21.8258 25.2045 22.3309 24.7132 22.3309 24.1072C22.3309 23.5012 21.8258 23.0099 21.2027 23.0099Z" fill="#000000" fillRule="evenodd"/>
 
-              <Link className=' p-[0.30vw] rounded-lg   bg-green-700 '>
-                <h1 className='p-[0.40vw]   font-nunito text-white'>{pedidosConOrigenUno}</h1>
-            </Link>
-          </div>
+                      </g>
 
-      <div className="p-[1.3vh] mt-[1vh]">
+                  </svg>
+
+                  </Link>
+
+                    <Link className=' p-[0.30vw] rounded-lg   bg-green-700 w-11 text-center '>
+                      <h1 className='p-[0.40vw]   font-nunito text-white'>{pedidosConOrigenUno}</h1>
+                  </Link>
+        </div>
+
+      <div className="p-[1.3vh] mt-[1.8vh]">
         <h1 className="font-nunito border-b-2 text-gray-600 font-bold border-gray-600 text-[1vw]">
           Cliente
         </h1>
@@ -187,16 +190,48 @@ const Ticket = (props) => {
         />
 
 
-          <div className="ms-[1vw] font-nunito border-1 rounded-md p-2 border-gray-300">
-            <h3 className="text-gray-600 font-bold">{datosCliente.cliente}</h3>
+            <div
+              className={`ms-[1vw] font-nunito rounded-md py-1 px-4 text-sm ${
+                datosCliente.cliente && datosCliente.cliente.length > 0
+                  ? '' // Clases si hay cliente
+                  : '' // Sin clases de borde si no hay cliente
+              }`}
+              >
+                {datosCliente.cliente && datosCliente.cliente.length > 0 && (
+                <button
+                    onClick={() =>
+                      setDatosCliente({
+                        cliente: '',
+                        telefono: '',
+                        fechahora: '',
+                        observaciones: '',
+                        pagado: false,
+                        celiaco: false,
+                        img_perfil: '',
+                      })
+                    }
+                    className="absolute top-[5.8vw] right-[0.8vw] rounded-full p-[0.2vw]  transition"
+                    title="Borrar datos del cliente"
+                  >
+                    <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        viewBox="0 0 24 24"
+                        fill="#4B5563"
+                        className="w-[1.5vw] h-[1.5vw] text-white"
+                      >
+                        <path d="M6 19a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V7H6v12Zm3-9h2v7H9v-7Zm4 0h2v7h-2v-7ZM15.5 4l-1-1h-5l-1 1H5v2h14V4h-3.5Z" />
+                      </svg>
+                  </button>
+                  )}
+            <h3 className="text-gray-900 font-bold">{datosCliente.cliente}</h3>
             <h3 className="text-gray-600">{datosCliente.telefono}</h3>
-            <h3 className="text-gray-600">{datosCliente.fechahora}</h3>
+            <h3 className="text-gray-900 font-bold">{datosCliente.fechahora}</h3>
             <div className="flex justify-around">
               {datosCliente.pagado && (
-                <img src={dinero} alt="dinero pagado" className="w-7" />
+                <img src={dinero} alt="dinero pagado" className="w-5" />
               )}
               {datosCliente.celiaco && (
-                <img src={singluten} alt="sin gluten" className="w-7" />
+                <img src={singluten} alt="sin gluten" className="w-5" />
               )}
             </div>
         
