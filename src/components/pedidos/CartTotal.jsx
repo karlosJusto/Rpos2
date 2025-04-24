@@ -476,6 +476,7 @@ const CartTotal = ({ datosCliente, setDatosCliente, orderToEdit }) => {
                       telefono: clienteId,
                       localidad: clienteData.localidad || "",
                       celiaco: clienteData.celiaco || false,
+                      observaciones: clienteData.observaciones || "",
                       fechahora: serverTimestamp(), // Fecha de registro
                       lastOrderDate: serverTimestamp() // Fecha del último pedido
                   };
@@ -497,6 +498,10 @@ const CartTotal = ({ datosCliente, setDatosCliente, orderToEdit }) => {
                   if (clienteData.localidad !== undefined && existingClientData.localidad !== clienteData.localidad) {
                       clientUpdates.localidad = clienteData.localidad;
                   }
+                   // Actualizar 'observaciones' si cambió
+                   if (clienteData.observaciones !== undefined && existingClientData.observaciones !== clienteData.observaciones) {
+                    clientUpdates.observaciones = clienteData.observaciones;
+                }
                   // Actualizar 'celiaco' si cambió
                   const currentCeliaco = clienteData.celiaco || false;
                   if (existingClientData.celiaco !== currentCeliaco) {
@@ -584,6 +589,8 @@ const CartTotal = ({ datosCliente, setDatosCliente, orderToEdit }) => {
           localidad: clienteData.localidad,
           celiaco: clienteData.celiaco, // Celiaco general del pedido/cliente
           idCliente: clienteId, // ID del cliente (teléfono)
+         // observaciones: clienteData.observaciones,
+          
 
           // Datos del pedido
           fechahora: horaPedido, // Hora de recogida/entrega

@@ -58,7 +58,7 @@ function CalendarioDropdown({ onDateChange }) {
           onChange={(date) => setFecha(date)}
           locale="es"
           dateFormat="dd/MM/yyyy"
-          placeholderText={fechaActual}
+          placeholderText="Selecciona una fecha"
           showPopperArrow={false}
           dropdownMode="select"
           minDate={new Date()} // 👉 Evita seleccionar fechas anteriores a hoy

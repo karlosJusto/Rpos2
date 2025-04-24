@@ -135,7 +135,7 @@ const ProductCard = memo(({ product }) => {
                                 const horaFormateada = dayjs(order.hora, "DD/MM/YYYY HH:mm").format("HH:mm");
 
                                 // Renderizar fila
-                                return ( <tr key={order.orderLineId} className={`${rowClasses.join(" ")} ${textColor}`} onClick={() => handleOrderClick(order)} > <td className="py-1 px-2 text-center text-lg font-nunito">{horaFormateada !== 'Invalid Date' ? horaFormateada : '-'}</td> <td className="py-1 px-2 text-center text-lg font-nunito font-bold">{order.idPedido.slice(-4)}</td> <td className="py-1 px-2 font-medium text-center text-lg font-nunito">{order.nombre}</td> <td className="py-1 px-2 text-center text-lg font-nunito">{order.cantidad}</td> <td className="py-1 px-2 text-center text-lg font-nunito truncate" title={order.descripcion}>{order.descripcion || "-"}</td> </tr> );
+                                return ( <tr key={order.orderLineId} className={`${rowClasses.join(" ")} ${textColor}`} onClick={() => handleOrderClick(order)} > <td className="py-1 px-2 text-center text-lg font-nunito">{horaFormateada !== 'Invalid Date' ? horaFormateada : '-'}</td> <td className="py-1 px-2 text-center text-lg font-nunito font-bold">{order.idPedido.slice(-4)}</td> <td className="py-1 px-2 font-medium text-center text-lg font-nunito">{order.nombre}</td> <td className="py-1 px-2 text-center text-lg font-nunito">{order.cantidad}</td> <td className="py-1 px-2 text-center text-sm font-nunito truncate" title={order.descripcion}>{order.descripcion || "-"}</td> </tr> );
                             }) // Fin map
                         )}
                     </tbody>

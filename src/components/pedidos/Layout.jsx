@@ -28,7 +28,9 @@ const Layout = () => {
   const [calendarData, setCalendarData] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  console.log(calendarData);
+  //console.log(calendarData);
+
+
 
   const today = new Date();
   const formattedDate = today.toISOString().split("T")[0];
@@ -129,10 +131,10 @@ const Layout = () => {
               </div>
         </div>
 
-        <div className="bg-[#F3F3F3] w-[23%]">
-          {/* Se pasa orderToEdit para indicar que se trata de un pedido a editar */}
-          <Ticket orderToEdit={orderToEdit} />
-        </div>
+        <div className={`${orderToEdit ? 'bg-red-400' : 'bg-[#F3F3F3]'} w-[23%]`}>
+        {/* Se pasa orderToEdit para indicar que se trata de un pedido a editar */}
+        <Ticket orderToEdit={orderToEdit} />
+      </div>
       </div>
     </>
   );

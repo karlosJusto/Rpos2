@@ -122,7 +122,7 @@ const ModalClientes = ({ show, handleClose, onSave }) => {
                 className="form-control border-2 border-gray-200 font-nunito font-extrabold focus:border-yellow-500 focus:ring-0"
                 id="nombre"
                 placeholder="Nombre"
-                value={formData.cliente}
+                value={formData.cliente.toLocaleLowerCase()}
                 onChange={handleInputChange}
                 name="cliente"
               />

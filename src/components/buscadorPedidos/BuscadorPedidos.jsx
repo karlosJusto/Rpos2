@@ -259,18 +259,19 @@ const BuscadorPedidos = () => {
       {error && <p className="mt-4 text-red-600 text-center">{error}</p>}
 
       <div className="mt-6 text-center font-nunito">
-        {pedidos.length > 0 ? (
-          <div className="space-y-4">
-            {pedidos.map((pedido) => (
-              <div key={pedido.id} className="border p-4 rounded-md shadow-md hover:shadow-xl transition mt-4 relative">
-                {/* Mostrar la imagen "Paid" solo si el pedido está pagado */}
-                {pedido.pagado && (
-                  <img
-                    src={pagado} // Ruta a tu imagen
-                    alt="Pago Realizado"
-                    className="absolute top-80 right-10 w-60 h-60 transform rotate-90"
-                  />
-                )}
+  {pedidos.length > 0 ? (
+    <div className="space-y-4">
+      {[...pedidos]
+        .sort((a, b) => b.NumeroPedido - a.NumeroPedido) // <-- Aquí se ordena de mayor a menor
+        .map((pedido) => (
+          <div key={pedido.id} className="border p-4 rounded-md shadow-md hover:shadow-xl transition mt-4 relative">
+            {pedido.pagado && (
+              <img
+                src={pagado}
+                alt="Pago Realizado"
+                className="absolute top-60 right-10 w-60 h-60 transform rotate-90"
+              />
+            )}
 
                 {/* Información del Pedido */}
                 <table className="table table-striped table-bordered shadow-sm rounded-lg mb-4 font-nunito">

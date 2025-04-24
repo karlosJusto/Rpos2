@@ -127,7 +127,7 @@ const Ticket = (props) => {
 
               <div className="me-4">
                 <h1 className="flex items-center justify-start text-sm text-gray-400 font-nunito ">Empleado</h1>
-                <h1 className="text-gray-800 font-nunito text-center">{empleadoNombre}</h1>
+                <h1 className="text-gray-800 font-bold font-nunito text-sm text-center">{empleadoNombre}</h1>
 
                 </div>
 
@@ -179,32 +179,37 @@ const Ticket = (props) => {
         </h1>
       </div>
 
-      <div className="flex items-center text-center justify-center" onClick={handleShow}>
-      <img
+      <div className="flex items-center text-center justify-center" >
+      <img onClick={handleShow}
           src={datosCliente.img_perfil ? datosCliente.img_perfil : avatar}
           alt="avatar"
           className="w-[3.5vw] mt-2 rounded-lg border-2 border-yellow-500 object-cover"
         />
 
 
-        <div className="ms-[1vw] font-nunito">
-          <h3 className="text-gray-600 font-bold">{datosCliente.cliente}</h3>
-          <h3 className="text-gray-600">{datosCliente.telefono}</h3>
-          <h3 className="text-gray-600">{datosCliente.fechahora}</h3>
-          <div className="flex justify-around">
-            {datosCliente.pagado && (
-              <img src={dinero} alt="dinero pagado" className="w-7" />
-            )}
-            {datosCliente.celiaco && (
-              <img src={singluten} alt="sin gluten" className="w-7" />
-            )}
+          <div className="ms-[1vw] font-nunito border-1 rounded-md p-2 border-gray-300">
+            <h3 className="text-gray-600 font-bold">{datosCliente.cliente}</h3>
+            <h3 className="text-gray-600">{datosCliente.telefono}</h3>
+            <h3 className="text-gray-600">{datosCliente.fechahora}</h3>
+            <div className="flex justify-around">
+              {datosCliente.pagado && (
+                <img src={dinero} alt="dinero pagado" className="w-7" />
+              )}
+              {datosCliente.celiaco && (
+                <img src={singluten} alt="sin gluten" className="w-7" />
+              )}
+            </div>
+        
           </div>
+       
         </div>
-      </div>
 
-      <div className="p-[1vw]">
-        <p className="font-nunito text-xs">{datosCliente.observaciones}</p>
-      </div>
+        <div className="p-[1vw]">
+        <p className="font-nunito text-left text-gray-600 text-sm ">{datosCliente.observaciones}</p>
+        </div>
+
+
+      
 
       {cart.length === 0 ? (
         <div className="flex justify-center items-center mt-52">
