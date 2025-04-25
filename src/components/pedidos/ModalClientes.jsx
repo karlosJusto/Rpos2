@@ -2,29 +2,56 @@ import React, { useState, useEffect } from 'react';
 import { Modal, Button } from 'react-bootstrap';
 import { collection, getDocs } from 'firebase/firestore';
 import { db } from '../firebase/firebase';
-import Calendario from './Calendario';
-import Ticket from './Ticket';
-import Layout from './Layout';
-import CalendarioDropdown from './CalendarioDropdown';
+import CalendarioDropdown from './CalendarioDropdown'; // Assuming CalendarioDropdown is preferred over Calendario
 
-const ModalClientes = ({ show, handleClose, onSave }) => {
+// Added initialData prop to receive customer data when editing
+const ModalClientes = ({ show, handleClose, onSave, initialData }) => {
   const [formData, setFormData] = useState({
     cliente: '',
     telefono: '',
     fechahora: '',
     observaciones: '',
     pagado: false,
-    celiaco: false,
-    img_perfil: '', // <-- agregar esto campo
-    
+    celiaco: false, // Note: celiaco might be order-specific, not client-specific
+    img_perfil: '',
   });
+
+  // Effect to load initial data when the modal is shown for editing
+  useEffect(() => {
+    if (show && initialData) {
+      // Populate formData with the data passed from Ticket.jsx
+      setFormData({
+        cliente: initialData.cliente || '',
+        telefono: initialData.telefono || '',
+        fechahora: initialData.fechahora || '', // Use the date/time from the order being edited
+        observaciones: initialData.observaciones || '',
+        pagado: initialData.pagado || false,
+        celiaco: initialData.celiaco || false, // Keep celiaco status from the order
+        img_perfil: initialData.img_perfil || '',
+      });
+    } else if (!show) {
+       // Optional: Reset form when modal is hidden (already handled by handleSubmitClose)
+       // If you want it to reset *every time* it's hidden, uncomment below
+       /*
+       setFormData({
+         cliente: '',
+         telefono: '',
+         fechahora: '',
+         observaciones: '',
+         pagado: false,
+         celiaco: false,
+         img_perfil: '',
+       });
+       */
+    }
+  }, [show, initialData]); // Re-run when show status or initialData changes
 
   // Manejar la fecha seleccionada
   const handleDateChange = (fecha) => {
-    setFormData({
-      ...formData,
-      fechahora: fecha,  // Actualizamos la fecha seleccionada
-    });
+    setFormData((prevFormData) => ({ // Use functional update to preserve other fields
+      ...prevFormData,
+      fechahora: fecha,  // Update only the date/time
+    }));
   };
 
 
@@ -35,10 +62,10 @@ const ModalClientes = ({ show, handleClose, onSave }) => {
   useEffect(() => {
     const fetchClientes = async () => {
       const clientesSnapshot = await getDocs(collection(db, 'clientes'));
-      const clientesList = clientesSnapshot.docs.map((doc) => doc.data());
-     // console.log('<<<<<<<<<<<'+JSON.stringify(clientesList));
-      setClientes(clientesList); // Guardamos todos los clientes
-      setFilteredClientes(clientesList); // Inicialmente mostramos todos los clientes
+      // Assuming 'clientes' collection has fields: cliente, telefono, img_perfil, maybe observaciones?
+      const clientesList = clientesSnapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+      setClientes(clientesList);
+      setFilteredClientes(clientesList);
     };
 
     fetchClientes();
@@ -47,25 +74,20 @@ const ModalClientes = ({ show, handleClose, onSave }) => {
   // Función para filtrar los clientes
   const filtrarClientes = (term) => {
     if (!term) {
-      setFilteredClientes(clientes); // Si no hay término de búsqueda, mostramos todos los clientes
+      setFilteredClientes(clientes);
     } else {
-      const termLower = term.toLowerCase(); // Convertir el término a minúsculas
-
-      // Filtrar los clientes con una validación para evitar "undefined"
+      const termLower = term.toLowerCase();
       const clientesFiltrados = clientes.filter((cliente) => {
-        const nombre = cliente.nombre ? cliente.nombre.toLowerCase() : ''; // Si no hay nombre, usamos una cadena vacía
-        const telefono = cliente.telefono ? cliente.telefono : ''; // Si no hay teléfono, usamos una cadena vacía
-        //const foto= cliente.img_perfil ? cliente.img_perfil :'';
-
-        // Compara tanto nombre como teléfono
+        // Use 'cliente' field for name search based on your data structure
+        const nombre = cliente.cliente ? cliente.cliente.toLowerCase() : '';
+        const telefono = cliente.telefono ? cliente.telefono.toString() : ''; // Ensure telefono is string for includes
         return nombre.includes(termLower) || telefono.includes(termLower);
       });
-
-      setFilteredClientes(clientesFiltrados); // Actualizamos los resultados filtrados
+      setFilteredClientes(clientesFiltrados);
     }
   };
 
-  // Manejador para actualizar el estado de los inputs
+  // Manejador para actualizar el estado de los inputs (cliente y telefono)
   const handleInputChange = (e) => {
     const { name, value } = e.target;
     setFormData((prevState) => ({
@@ -73,8 +95,10 @@ const ModalClientes = ({ show, handleClose, onSave }) => {
       [name]: value,
     }));
 
-    // Filtrar clientes cuando se escriba en el campo de búsqueda
-    filtrarClientes(value);
+    // Filtrar clientes solo si el input es 'cliente' o 'telefono'
+    if (name === 'cliente' || name === 'telefono') {
+      filtrarClientes(value);
+    }
   };
 
   // Manejador para actualizar el estado de los checkboxes
@@ -82,60 +106,61 @@ const ModalClientes = ({ show, handleClose, onSave }) => {
     const { name, checked } = e.target;
     setFormData((prevState) => ({
       ...prevState,
-      [name]: checked, // Actualiza el estado del checkbox
+      [name]: checked,
     }));
   };
 
-  // Manejador para enviar los datos al formulario y cerrar el modal
+  // Manejador para enviar los datos al formulario (Ticket) y cerrar el modal
   const handleSubmitData = () => {
-    onSave(formData);
+    onSave(formData); // Send the current formData back to Ticket
     handleClose();
   };
 
-
+  // Manejador para cancelar y resetear el formulario
   const handleSubmitClose = () => {
+    // Reset to a blank state, not initialData
     setFormData({
-      cliente: '',  // Asumiendo que "cliente" es uno de los campos
+      cliente: '',
       telefono: '',
       fechahora: '',
       observaciones: '',
-      pagado: false,  // Si el estado tiene esta propiedad
-      celiaco: false,  // Si el estado tiene esta propiedad
-      img_perfil: "", // acá está bien
-
+      pagado: false,
+      celiaco: false,
+      img_perfil: "",
     });
-    handleClose(); 
+    setFilteredClientes(clientes); // Reset filtered list
+    handleClose();
   };
 
   return (
     <>
-      <Modal show={show} onHide={handleClose} size="lg" backdrop="static" keyboard={false} centered>
-        
-          <Modal.Title className='text-center pt-2  font-nunito text-gray-600'>Datos Pedido</Modal.Title>
-       
+      <Modal show={show} onHide={handleSubmitClose} size="lg" backdrop="static" keyboard={false} centered> {/* Changed onHide to ensure reset */}
+
+          <Modal.Title className='text-center pt-2 font-nunito text-gray-600'>Datos Pedido</Modal.Title>
 
         <Modal.Body>
           <div className="bg-white rounded-lg flex justify-around gap-3 appearance-none px-[3vw]">
-            <div className="form-floating  w-[25vw]">
+            {/* Input Cliente */}
+            <div className="form-floating w-[25vw]">
               <input
                 type="text"
                 className="form-control border-2 border-gray-200 font-nunito font-extrabold focus:border-yellow-500 focus:ring-0"
-                id="nombre"
+                id="cliente" // Changed id to match name
                 placeholder="Nombre"
-                value={formData.cliente.toLocaleLowerCase()}
+                value={formData.cliente} // Removed toLocaleLowerCase here, handle case in filtering/saving if needed
                 onChange={handleInputChange}
                 name="cliente"
               />
-              <label className="text-gray-500 font-extrabold" htmlFor="floatingInput">
+              <label className="text-gray-500 font-extrabold" htmlFor="cliente"> {/* Changed htmlFor */}
                 Nombre
               </label>
             </div>
+            {/* Input Telefono */}
             <div className="form-floating w-[25vw]">
               <input
                 type="text"
                 pattern="[0-9]*"
                 inputMode='numeric'
-
                 className="form-control border-2 border-gray-200 font-nunito font-extrabold focus:border-yellow-500 focus:ring-0"
                 id="telefono"
                 placeholder="Teléfono"
@@ -144,7 +169,7 @@ const ModalClientes = ({ show, handleClose, onSave }) => {
                 onChange={handleInputChange}
                 name="telefono"
               />
-              <label className="text-gray-500 font-extrabold " htmlFor="floatingPhone">
+              <label className="text-gray-500 font-extrabold" htmlFor="telefono"> {/* Changed htmlFor */}
                 Teléfono
               </label>
             </div>
@@ -154,51 +179,53 @@ const ModalClientes = ({ show, handleClose, onSave }) => {
           <div className="max-h-40 overflow-y-auto mt-2">
             {filteredClientes.length > 0 ? (
               filteredClientes.map((cliente, index) => (
-                <div key={index} className="py-2 px-4 cursor-pointer" onClick={() => {
-                  setFormData({
-                    cliente: cliente.cliente || '',
-                    telefono: cliente.telefono || '',
-                    fechahora: formData.fechahora,  // Mantiene la fecha actual
-                    observaciones: cliente.observaciones || '',  // Asigna las observaciones del cliente a formData
-                    pagado: formData.pagado,
-                    celiaco: formData.celiaco,
-                    img_perfil: cliente.img_perfil || '', // <-- importante
-                    
-                  });
-                  // handleClose(); // Cierra el modal cuando seleccionas un cliente
-                }}>
-                  {/* Otros campos del formulario */}
-                  <div className="px-[3.5vw] mt-[2vh]">
-                    <div className="grid grid-cols-2 text-center h-[2vh]">
-                      <h1 className="text-lg font-nunito text-gray-500 ">{cliente.cliente}</h1>
-                      <h1 className="text-lg font-nunito text-gray-500 ">{cliente.telefono}</h1>
+                <div
+                  key={index} // Consider using cliente.id if available and unique
+                  className="py-2 px-4 cursor-pointer hover:bg-gray-100" // Kept hover effect as it was likely intended
+                  onClick={() => {
+                    // Update only client-specific fields, keep order-specific fields from formData
+                    setFormData(prevFormData => ({
+                      ...prevFormData, // Keep existing fechahora, observaciones, pagado, celiaco
+                      cliente: cliente.cliente || '', // Use 'cliente' field for name
+                      telefono: cliente.telefono || '',
+                      img_perfil: cliente.img_perfil || '',
+                      // Optionally update observations if they should come from client profile:
+                      // observaciones: cliente.observaciones || prevFormData.observaciones,
+                    }));
+                    setFilteredClientes(clientes); // Hide list after selection
+                  }}>
+                  <div className="px-[3.5vw] mt-[1vh]"> {/* Adjusted margin */}
+                    <div className="grid grid-cols-2 text-center h-auto"> {/* Adjusted height */}
+                      {/* Display client name and phone */}
+                      <h1 className="text-lg font-nunito text-gray-500">{cliente.cliente}</h1>
+                      <h1 className="text-lg font-nunito text-gray-500">{cliente.telefono}</h1>
                     </div>
                   </div>
                 </div>
               ))
             ) : (
-              <p className='text-center mt-4 font-nunito text-red-500'>No hay coincidencias</p>
+              // Show message only if a search term exists and yields no results
+              (formData.cliente || formData.telefono) && <p className='text-center mt-4 font-nunito text-red-500'>No hay coincidencias</p>
             )}
           </div>
 
-          {/* Calendario */}
+          {/* Calendario Dropdown */}
           <div className='p-[4.5vh]'>
-            {/*<Calendario onDateChange={handleDateChange} />*/}
-            <CalendarioDropdown onDateChange={handleDateChange}  />
+            {/* Pass current fechahora to potentially pre-select date */}
+            <CalendarioDropdown onDateChange={handleDateChange} initialDate={formData.fechahora} />
           </div>
-
-          
 
           {/* Observaciones */}
           <div className='px-[4.5vh]'>
-            <label htmlFor="textarea" className="form-label text-gray-500 text-lg font-nunito font-extrabold "></label>
+            <label htmlFor="observaciones" className="form-label text-gray-500 text-lg font-nunito font-extrabold "></label>
             <textarea
-              className="form-control text-lg font-nunito border-2 border-gray-200 "
-              value={formData.observaciones || ""}  // Usamos formData.observaciones aquí
-              onChange={(e) => setFormData({ ...formData, observaciones: e.target.value })}  // Actualiza formData.observaciones
+              className="form-control text-lg font-nunito border-2 border-gray-200"
+              value={formData.observaciones} // Bind directly to formData
+              onChange={(e) => setFormData({ ...formData, observaciones: e.target.value })}
               id="observaciones"
               rows="2"
               placeholder="Observaciones al pedido"
+              name="observaciones" // Added name attribute
             />
           </div>
 
@@ -210,29 +237,31 @@ const ModalClientes = ({ show, handleClose, onSave }) => {
                 type="checkbox"
                 id="pagado"
                 name="pagado"
-                value="option1"
+                // value="option1" // Value is not needed for boolean checkbox
                 checked={formData.pagado}
                 onChange={handleCheckboxChange}
               />
-              <label className="form-check-label text-lg font-nunito text-gray-900" htmlFor="inlineCheckbox1">
+              <label className="form-check-label text-lg font-nunito text-gray-900" htmlFor="pagado"> {/* Changed htmlFor */}
                 Pagado
               </label>
             </div>
 
-             {/*<div className="form-check form-check-inline border-2 p-[1vw] border-gray-200 rounded-xl">
+             {/* Celiaco Checkbox - Uncomment if needed */}
+             {/*
+             <div className="form-check form-check-inline border-2 p-[1vw] border-gray-200 rounded-xl">
               <input
                 className="form-check-input m-1"
                 type="checkbox"
                 id="celiaco"
                 name="celiaco"
-                value="option2"
                 checked={formData.celiaco}
                 onChange={handleCheckboxChange}
               />
-              <label className="form-check-label text-lg font-nunito text-gray-900" htmlFor="inlineCheckbox2">
+              <label className="form-check-label text-lg font-nunito text-gray-900" htmlFor="celiaco">
                 Celiaco
               </label>
-            </div>  */}
+            </div>
+            */}
           </div>
         </Modal.Body>
 
@@ -240,7 +269,7 @@ const ModalClientes = ({ show, handleClose, onSave }) => {
           <Button
             variant="secondary"
             className="p-3 bg-white font-nunito text-gray-500 border-gray-300 hover:text-yellow-600 hover:border-yellow-600"
-            onClick={handleSubmitClose}
+            onClick={handleSubmitClose} // Use the reset handler
           >
             Cancelar
           </Button>
@@ -248,8 +277,10 @@ const ModalClientes = ({ show, handleClose, onSave }) => {
             variant="primary"
             onClick={handleSubmitData}
             className="bg-yellow-500 border-yellow-500 hover:bg-yellow-600 hover:border-yellow-600 p-3 font-nunito"
+            // Disable button if essential fields like date/time are missing?
+            // disabled={!formData.fechahora}
           >
-            Agregar
+            {initialData ? 'Actualizar' : 'Agregar'} {/* Change button text based on context */}
           </Button>
         </Modal.Footer>
       </Modal>

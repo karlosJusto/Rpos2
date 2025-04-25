@@ -1,4 +1,3 @@
-
 import dinero from '../../assets/dinero.png';
 import singluten from '../../assets/singluten.png';
 import fire_new from '../../assets/fire_new.png';
@@ -56,28 +55,29 @@ const Ordenes = () => {
 
   // Función para editar pedido
   const handleEditOrder = (pedido) => {
+    // Asegúrate de que 'pedido' es el objeto completo que quieres pasar
     navigate('/layout/comida', { state: { orderToEdit: pedido } });
   };
   //ajustamos la hora
   const obtenerHoraRedondeada = () => {
     const now = dayjs(); // Hora actual
-    
+
     // Obtener los minutos actuales
     const minutos = now.minute();
-  
+
     // Redondeamos los minutos al múltiplo más cercano de 15 (xx:00, xx:15, xx:30, xx:45)
     const siguienteBloque = Math.floor(minutos / 15) * 15; // Redondea hacia abajo al múltiplo más cercano de 15 minutos
-    
+
     // Ajustar la hora a 00, 15, 30, 45 minutos
     const nuevaHora = now
       .minute(siguienteBloque) // Ajustamos a los minutos correspondientes (xx:00, xx:15, etc.)
       .second(0)
       .millisecond(0);
-  
+
     // Si la hora ajustada es antes de la hora actual, avanzamos al siguiente bloque (añadimos 15 minutos)
     return nuevaHora.isBefore(now) ? nuevaHora.add(15, 'minute') : nuevaHora;
   };
-  
+
   const fechahora = obtenerHoraRedondeada().format('DD/MM/YYYY HH:mm');
 
   // Usamos los plugins
@@ -104,14 +104,13 @@ const handlePedidoRapido = (idProduct) => {
    dayjs.locale('es');
 
 
-  
+
   const [show, setShow] = useState(false);
   /*const [numeroBarra, setNumeroBarra]=useState(0);*/
   const [isColorChanged, setIsColorChanged] = useState(false); // Estado para controlar si el color del div cambió
   const [vm, setVm] = useState(0); // Estado para 'VM'
 
 
- 
   // Datos del cliente para pasar a PedidoRapido
   const [datosCliente, setDatosCliente] = useState({
     cliente: 'AAgenerico',
@@ -123,7 +122,7 @@ const handlePedidoRapido = (idProduct) => {
     localidad: 'Mungia',
   });
 
-  
+
 
   const [selectedDate, setSelectedDate] = useState(dayjs('DD/MM/YYYY'));
 
@@ -156,8 +155,8 @@ const handlePedidoRapido = (idProduct) => {
   const [showModal, setShowModal] = useState(false);
   const handleCloseModal = () => setShowModal(false);
   const handleShowModal= () => setShowModal(true);
-  
- 
+
+
 
   //cierre turno fuerza recarga pagina
 
@@ -207,12 +206,13 @@ const handlePedidoRapido = (idProduct) => {
 
    //selecciona el pedido para pasar al modal
    const [pedidoSeleccionado, setPedidoSeleccionado] = useState(null);
-  
+
   // Función para abrir el modal y pasar el número de pedido
-  const handleShowModal1 = (numeroPedido) => {
-    setPedidoSeleccionado(numeroPedido);
+  const handleShowModal1 = (pedido) => { // Recibe el objeto pedido completo
+    setPedidoSeleccionado(pedido); // Guarda el objeto pedido completo
     setShowModal1(true);  // Abre el modal
   };
+
 
   // Función para borrar el pedido
   const borrarOrden = async (numeroPedido) => {
@@ -228,8 +228,6 @@ const handlePedidoRapido = (idProduct) => {
   };
 
 
- 
-  
 
 
 
@@ -250,7 +248,6 @@ const handlePedidoRapido = (idProduct) => {
   });
 
 
-          
            // Función para manejar los cambios en el input
                 const handleInputChange = (e) => {
                   const value = e.target.value;  // Obtener el valor del input
@@ -258,7 +255,7 @@ const handlePedidoRapido = (idProduct) => {
                   const aux=value === "" ? "" : parseFloat(value) + pollosEntregados;
 
                   // Verificar si el valor es un número válido
-                  if (value === "" || !isNaN(value)) { 
+                  if (value === "" || !isNaN(value)) {
                     setNumeroBarra(aux);  // Actualizar el estado solo si es un número o está vacío
                   }
                 };
@@ -267,17 +264,17 @@ const handlePedidoRapido = (idProduct) => {
               const sumarCinco = () => {
                 setNumeroBarra((prevNumero) => parseFloat(prevNumero) + 5); // Sumamos la cantidad al valor actual
               };
-            
+
             // Función para sumar 4 a la variable 'numero'
             const sumarCuatro = () => {
               setNumeroBarra((prevNumero) => parseFloat(prevNumero) + 4); // Usamos el valor previo
             };
-            
+
             // Función para restar 5 a la variable 'numero'
             const restarCinco = () => {
               setNumeroBarra((prevNumero) => parseFloat(prevNumero) - 5); // Usamos el valor previo
             };
-            
+
             // Función para restar 4 a la variable 'numero'
             const restarCuatro = () => {
               setNumeroBarra((prevNumero) => parseFloat(prevNumero) - 4); // Usamos el valor previo
@@ -303,104 +300,103 @@ const handlePedidoRapido = (idProduct) => {
               setNumeroBarra((prevNumero) => parseFloat(prevNumero) - 0.5);  // Usamos el valor previo
             };
 
-          
+
             //Clicks para entregados
             const handleClick = async (numeroPedido, productoId, maxCantidad) => {
               // console.log('------------->>>>', numeroPedido);
-            
+
               // Encontramos el pedido que contiene el producto
               const pedido = pedidos.find(pedido => pedido.NumeroPedido === numeroPedido); // Comparamos directamente como números
               if (!pedido) {
                 console.error('No se encontró el pedido con NumeroPedido:', numeroPedido);
                 return;
               }
-            
+
               // Buscamos el producto dentro de ese pedido
               const producto = pedido.productos.find(producto => producto.id === productoId); // Comparamos directamente como números
               if (!producto) {
                 console.error('No se encontró el producto con id:', productoId);
                 return;
               }
-            
+
               console.log('+++++++++++++++++' + productoId);
-            
+
               // Ahora obtenemos el valor actual de 'entregado' directamente desde Firestore
               const numeroPedidoStr = numeroPedido.toString();
               const pedidoRef = doc(db, 'pedidos', numeroPedidoStr); // Referencia al pedido
               try {
                 const pedidoDoc = await getDoc(pedidoRef);
-            
+
                 if (!pedidoDoc.exists()) {
                   console.error('No se encontró el pedido en Firestore:', numeroPedidoStr);
                   return;
                 }
-            
+
                 const productosFirestore = pedidoDoc.data().productos;
-            
+
                 // Buscamos el producto en Firestore
                 const productoFirestore = productosFirestore.find(p => p.id === productoId);
                 if (!productoFirestore) {
                   console.error('No se encontró el producto en Firestore:', productoId);
                   return;
                 }
-            
+
                 // Recuperamos el valor actual de 'entregado' desde Firestore
                 const entregadoActual = productoFirestore.entregado || 0;
-            
+
                 // Verificar si ya se alcanzó la cantidad máxima
                 let nuevoEntregado = entregadoActual + 1;
-            
+
                 // Si el contador llega al máximo, reiniciamos a 0
                 if (nuevoEntregado > maxCantidad) {
                   nuevoEntregado = 0;
                 }
-            
+
                 // Actualizamos el producto correspondiente en Firestore
                 const productosActualizados = productosFirestore.map(p =>
                   p.id === productoId
                     ? { ...p, entregado: nuevoEntregado } // Actualizamos solo el producto afectado
                     : p
                 );
-            
+
                 // Guardamos los cambios en Firestore
                 await updateDoc(pedidoRef, {
                   productos: productosActualizados,
                 });
-            
+
                 console.log('Producto actualizado en Firestore con éxito');
               } catch (error) {
                 console.error('Error al actualizar el pedido en Firestore:', error);
               }
             };
-            
-            
-            
-            
-            
-    
+
+
+
+
+
             /*useEffect(() => {
 
               // Si se pasa una fecha específica, usamos esa fecha; de lo contrario, usamos la fecha actual
               const fechaAUsar = dateToPass ? dayjs(dateToPass).locale('es').tz('Europe/Madrid') : dayjs().locale('es').tz('Europe/Madrid');
-            
+
               // Obtener la hora actual en la zona horaria de Madrid
               const currentTime = dayjs().locale('es').tz('Europe/Madrid');
               const esHoy = currentTime.isSame(fechaAUsar, 'day'); // Comprobamos si la fecha es hoy
-            
+
               // Turno completo (dia entero)
               let fechaIncio = fechaAUsar.hour(0).minute(0).second(0);  // Desde las 18:01
               let fechaFin = fechaAUsar.hour(23).minute(59).second(59);  // Desde las 18:01
-            
+
               // Creamos la referencia a la colección de pedidos
               const pedidosRef = collection(db, 'pedidos');
-            
+
               // Creamos la consulta para filtrar pedidos por fecha y hora
               const pedidosQuery = query(
                 pedidosRef,
                 where("fechahora", ">=", fechaIncio.format('DD/MM/YYYY HH:mm')), // Desde el inicio del día
                 where("fechahora", "<=", fechaFin.format('DD/MM/YYYY HH:mm')) // Hasta las 18:00 o desde las 18:01
               );
-            
+
               // Usamos `onSnapshot` para escuchar los cambios en la colección
               const unsubscribe = onSnapshot(pedidosQuery, (querySnapshot) => {
                 // Mapear los documentos que llegan a la consulta
@@ -428,49 +424,48 @@ const handlePedidoRapido = (idProduct) => {
                     origen: pedido.origen,
                   };
                 });
-            
+
                 // Actualizamos el estado de los pedidos
                 setPedidos(pedidosArray);
-            
+
                 // Filtramos los nombres de los clientes directamente desde los pedidos obtenidos
                 const nombresClientes = pedidosArray.map(pedido => pedido.cliente).filter(cliente => cliente); // Filtra solo los valores válidos
                 setClientes(nombresClientes);
-            
+
                 // Filtrar los pedidos con origen = 1
                 const pedidosConOrigenUno = pedidosArray.filter(pedido => pedido.origen === 1);
-                
-            
+
+
                 // Contamos la cantidad de pedidos con origen = 1
                 let cantidadPedidosOrigenUno = pedidosConOrigenUno.length;
-            
+
                 // Comprobar si hay algún pedido con origen 1 que tenga productos con 'cantidad' === 'entregado'
                 pedidosConOrigenUno.forEach(pedido => {
                   const productosConEntregadoIgualACantidad = pedido.productos.some(producto => producto.entregado === producto.cantidad);
-                  
+
                   // Si encontramos algún producto con 'entregado' igual a 'cantidad', restamos 1 a la cantidad de pedidos con origen 1
                   if (productosConEntregadoIgualACantidad) {
                     cantidadPedidosOrigenUno -= 1; // Restamos 1
                   }
                 });
-            
+
                 // Actualizamos el estado de los pedidos con origen 1
                 setPedidosConOrigenUno(cantidadPedidosOrigenUno);
-            
+
                 // Mostrar la cantidad de pedidos que quedan (puedes usar esta variable para mostrarla en la UI)
                // console.log(`Cantidad de pedidos con origen 1 restantes: ${cantidadPedidosOrigenUno}`);
-            
+
               }, (error) => {
                 console.error("Error al obtener los pedidos: ", error);
               });
-            
+
               // Limpiar la suscripción cuando el componente se desmonta
               return () => unsubscribe();
-            
+
             }, [dateToPass]); // Solo se ejecuta cuando `dateToPass` cambia*/
-            
 
 
-           
+
 
             // Función para obtener la fecha en formato DD-MM-YYYY
                 const obtenerFechaFormateada = () => {
@@ -480,17 +475,17 @@ const handlePedidoRapido = (idProduct) => {
                   // Obtener la fecha actual y formatearla en el formato DD-MM-YYYY
                   const fechaFormateada = dayjs().format('DD-MM-YYYY');
 
-                  
+
 
                   return fechaFormateada;
                 };
-          
+
 
 
       // Función para agrupar los pedidos por franjas horarias de 15 minutos y contar la cantidad de productos por franja
       const agruparPorBloques15Minutos = (pedidos) => {
         const bloques = {};
-        
+
 
         pedidos.forEach((pedido) => {
           const fechaHora = dayjs(pedido.fechahora, 'DD/MM/YYYY HH:mm');
@@ -531,10 +526,10 @@ const handlePedidoRapido = (idProduct) => {
                  productoExistente.cantidad += producto.cantidad;
                  productoExistente.entregado += producto.entregado;
              } else {
-            
+
                 bloques[hora].productos.push({nombre: producto.alias, cantidad: producto.cantidad, categoria: producto.categoria, entregado:producto.entregado});
              }
-                
+
                 // Si el producto tiene id_product=1, sumamos su cantidad
                 if (producto.id === 1) {
                   bloques[hora].cantidadProductosId1 += producto.cantidad;
@@ -555,7 +550,7 @@ const handlePedidoRapido = (idProduct) => {
                 if (producto.id === 48) {
                   bloques[hora].cantidadProductosId48 += producto.cantidad;
                 }
-               
+
               });
             });
 
@@ -585,7 +580,7 @@ const handlePedidoRapido = (idProduct) => {
         .reduce((total, bloque) => {
           // Sumar productos con id = 1 y id = 2 (con ajuste para id = 2)
           return total + bloquesPedidos[bloque].cantidadProductosId1 + bloquesPedidos[bloque].cantidadProductosId2 / 2;
-         
+
         }, 0 );
 
         console.log("Bloque pedidos");
@@ -597,24 +592,23 @@ const handlePedidoRapido = (idProduct) => {
         console.log("bloquesDespueselas18 pedidos");
         console.log(bloquesDespuesDeLas18);
 
-        
 
-        
+
+
 
         //console.log("Total productos antes de las 18:00 (VM):", bloquesAntesdelas18);
 
         // Guardar el resultado en una variable
         setTotalbloquesAntesdelas18(bloquesAntesdelas18);
 
-        
+
 
         // Sumar los totales antes y después de las 18:00
        const totalProductos = totalProductosDespuesDeLas18 + totalbloquesAntesdelas18;
 
-       
 
 
-       
+
        useEffect(() => {
         // Función para obtener el valor de numeroBarra desde la base de datos
         const cargarNumeroBarra = async () => {
@@ -622,14 +616,14 @@ const handlePedidoRapido = (idProduct) => {
             const fecha = obtenerFechaFormateada();  // Asegúrate de tener esta función definida
             const docRef = doc(db, "estadisticas_diarias", fecha);
             const docSnap = await getDoc(docRef);
-    
+
             if (docSnap.exists()) {
               const data = docSnap.data();
               setNumeroBarra(data.enbarra);  // Asignamos el valor de 'enbarra' a estado
-              setVm(data.vm); 
+              setVm(data.vm);
             } else {
               //console.log("No hay datos para la fecha:", fecha);
-              
+
               // Si no existe, puedes dejar el valor en 0 o asignar un valor predeterminado
               setNumeroBarra(0);
             }
@@ -637,19 +631,19 @@ const handlePedidoRapido = (idProduct) => {
             console.error("Error al cargar los datos de numeroBarra: ", e);
           }
         };
-    
+
         cargarNumeroBarra();  // Llamamos a la función cuando el componente se monta
       }, []);  // Solo se ejecuta una vez cuando el componente se monta
 
       //console.log("Pedidos mañana:", vm);
 
-    
+
       // Función para guardar los datos de estadisticas_diarias
      /* const guardarEstadisticasDiarias = async () => {
         try {
           const fecha = obtenerFechaFormateada();
           const docRef = doc(db, "estadisticas_diarias", fecha);
-          
+
           await updateDoc(docRef, {
             enbarra: numeroBarra,
             libresManana:numeroBarra-totalbloquesAntesdelas18,
@@ -658,7 +652,7 @@ const handlePedidoRapido = (idProduct) => {
             vt: totalProductosDespuesDeLas18,
             vd: totalProductos,
           });
-    
+
           console.log("Datos guardados exitosamente para el día", fecha);
         } catch (e) {
           console.error("Error al guardar los datos: ", e);
@@ -676,30 +670,29 @@ const handlePedidoRapido = (idProduct) => {
 
         //const [libres, setLibres] = useState(0);  // Estado para 'libres'
 
-        
-       
 
-  
+
+
         // Cuando el numeroBarra o totalProductosDespuesDeLas18 cambien, recalculamos 'libres'
        /* useEffect(() => {
             const calcularLibres = () => {
               setLoading(true);  // Activamos el spinner
               const currentTime = dayjs().locale('es').tz('Europe/Madrid');
               const antesDelas6pm = currentTime.hour() < 18;
-        
+
               // Realizamos el cálculo de 'libres' según el turno (mañana o tarde)
               if (antesDelas6pm) {
                 setLibres(numeroBarra - totalbloquesAntesdelas18);
               } else {
                 setLibres(numeroBarra - totalProductosDespuesDeLas18);
               }
-        
+
               // Mantener el spinner visible durante 3 segundos
               setTimeout(() => {
                 setLoading(false);  // Desactivamos el spinner después de 3 segundos
-              }, 0); // 
+              }, 0); //
             };
-        
+
             calcularLibres();  // Llamamos a la función de cálculo de 'libres'
             if (numeroBarra !== 0)
             {
@@ -710,12 +703,12 @@ const handlePedidoRapido = (idProduct) => {
 
            */
 
-          //search clientes 
+          //search clientes
           const [clientes, setClientes] = useState([]);
           // Estado para el término de búsqueda
           const [searchTerm, setSearchTerm] = useState('');
 
-          
+
 
           // Función para manejar el cambio en el input de búsqueda
           const handleSearchChange = (e) => {
@@ -735,7 +728,7 @@ const handlePedidoRapido = (idProduct) => {
           useEffect(() => {
             const horaActual = dayjs().locale('es').tz('Europe/Madrid');
             const horaFin = horaActual.add(45, 'minutes');
-        
+
             // Calculamos los totales de productos
             const nuevosTotales = Object.keys(bloquesPedidos).reduce(
               (acc, bloque) => {
@@ -757,7 +750,7 @@ const handlePedidoRapido = (idProduct) => {
                 totalProductosId48: 0,
               }
             );
-        
+
             // Solo actualizamos el estado si los totales han cambiado
             if (
               nuevosTotales.totalProductosId1 !== totales.totalProductosId1 ||
@@ -778,7 +771,7 @@ const handlePedidoRapido = (idProduct) => {
 
     let bloquesFiltrados = bloquesPedidos;
 
-    if (!dateToPass) { 
+    if (!dateToPass) {
       const currentTime = dayjs().locale('es').tz('Europe/Madrid'); // Obtener la hora actual en España
       const isBefore6PM = currentTime.hour() < 18; // Verificar si es antes de las 18:00
 
@@ -817,7 +810,7 @@ const handlePedidoRapido = (idProduct) => {
     console.log(bloquesFiltrados);
 
 
-    
+
 
 
     const pollosEntregados = Object.values(bloquesFiltrados).reduce((total, bloque) => {
@@ -825,7 +818,7 @@ const handlePedidoRapido = (idProduct) => {
       const entregadosPorBloque = bloque.pedidos.reduce((sumaEntregados, pedido) => {
         // Filtrar los productos con id_product 1
         const productosDePollo = pedido.productos.filter(producto => producto.id === 1 || producto.id === 2);
-        
+
         // Sumar la cantidad entregada de los productos de pollo (id_product === 1)
         const entregados = productosDePollo.reduce((totalEntregado, producto) => {
           if (producto.id === 1) {  // Si es id_product 1, sumamos el valor de 'entregado' directamente
@@ -835,33 +828,27 @@ const handlePedidoRapido = (idProduct) => {
           }
           return totalEntregado;
         }, 0);
-        
-        
+
+
         // Sumar los entregados de este pedido a la suma total
         return sumaEntregados + entregados;
       }, 0);
-    
+
       // Sumar la cantidad de entregados del bloque
       return total + entregadosPorBloque;
     }, 0); // Empezamos con 0 como valor inicial de la suma
-    
-    
+
+
     console.log("pollosEntregados: "+pollosEntregados);
 
-  
+
     setMostrarBarra(numeroBarra-pollosEntregados);
 
-          
-          
-          
 
 
-          
 
-         
-          
-          
-        
+
+
 
 
 
@@ -871,7 +858,7 @@ const handlePedidoRapido = (idProduct) => {
     <div className="flex justify-center items-center w-full p-[0.5vh] mt-[6vh] mb-1" >
           {/* Contenedor principal con un grid de 12 columnas */}
           <div className="grid grid-cols-12 gap-2 w-full fixed top-0 bg-white p-2">
-            
+
                     <div className="flex w-full gap-2" >
                         <div className="w-1/2 h-[10vh] bg-[#f2ac02] flex justify-center items-center rounded-xl shadow-md" onClick={toggleOffcanvas}>
                           <svg width="2.3vw" height="2.3vw" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -884,8 +871,8 @@ const handlePedidoRapido = (idProduct) => {
 
                           </svg>
                          </div>
-                    
-                      
+
+
                       <div className="w-1/2 h-[10vh] bg-[#f2ac02] flex flex-col justify-center items-center rounded-xl shadow-md">
                           {/* Icono en la parte superior */}
                           <svg fill="#FFFFFF" height="2vw" width="2vw" version="1.1" id="Layer_1" xmlns="http://www.w3.org/2000/svg" xmlnsXlink="http://www.w3.org/1999/xlink" viewBox="0 0 512 512" xmlSpace="preserve">
@@ -897,7 +884,7 @@ const handlePedidoRapido = (idProduct) => {
                           <g id="SVGRepo_iconCarrier"> <g> <g> <path d="M499.2,409.6H12.8c-7.074,0-12.8,5.726-12.8,12.8s5.726,12.8,12.8,12.8h486.4c7.074,0,12.8-5.726,12.8-12.8 S506.274,409.6,499.2,409.6z"/> </g> </g> <g> <g> <path d="M460.8,76.8H51.2c-14.14,0-25.6,11.46-25.6,25.6v256c0,14.14,11.46,25.6,25.6,25.6h409.6c14.14,0,25.6-11.46,25.6-25.6 v-256C486.4,88.26,474.94,76.8,460.8,76.8z M460.8,358.4H51.2v-256h409.6V358.4z"/> </g> </g> <g> <g> <path d="M353.57,164.233c-4.813-6.673-12.544-10.633-20.77-10.633H194.441l-61.688-24.678c-6.528-2.654-14.012,0.546-16.64,7.125 c-2.628,6.554,0.572,14.003,7.134,16.623l55.953,22.383V256c0,14.14,11.46,25.6,25.6,25.6h102.4 c11.017,0,20.804-7.049,24.286-17.502l25.6-76.8C359.689,179.49,358.383,170.906,353.57,164.233z M307.2,256H204.8v-76.8h128 L307.2,256z"/> </g> </g> <g> <g> <circle cx="204.8" cy="307.2" r="25.6"/> </g> </g> <g> <g> <circle cx="307.2" cy="307.2" r="25.6"/> </g> </g> </g>
 
                           </svg>
-                          
+
                           {/* Texto debajo del ícono */}
                           <p className="text-white text-[0.90vw] text-center bg-green-700 rounded-md py-1 px-3 mt-2">{pedidosConOrigenUno}</p>
                        </div>
@@ -911,15 +898,15 @@ const handlePedidoRapido = (idProduct) => {
             <div className="flex justify-center items-center h-1/2" onClick={() => handlePedidoRapido(1)}>
             <button type='button' className="text-white text-center text-[1.8vw] font-nunito border-b-4">1P</button>
             </div>
-            
-            
+
+
             <div className="flex justify-center items-center h-1/2" onClick={() => handlePedidoRapido(2)}>
             <button type='button' className="text-white text-center text-[1.8vw] font-nunito ">1/2P</button>
             </div>
-        
+
          </div>
 
-         
+
 
 
         <div className='w-[8vw] h-[10vh] bg-gray-700 rounded-xl shadow-md'>
@@ -927,8 +914,8 @@ const handlePedidoRapido = (idProduct) => {
          <div className="flex justify-center items-center h-1/2" onClick={restarCinco}>
          <button type='button' className="text-white text-center text-[1.8vw] font-nunito border-b-4">-5</button>
          </div>
-        
-        
+
+
          <div className="flex justify-center items-center h-1/2" onClick={restarCuatro}>
          <button type='button' className="text-white text-center text-[1.8vw] font-nunito">-4</button>
          </div>
@@ -936,12 +923,12 @@ const handlePedidoRapido = (idProduct) => {
 
 
             <div className='w-[8vw] h-[10vh]  bg-gray-700 rounded-xl shadow-md'>
-              
+
                 <div className="flex justify-center items-center h-1/2" onClick={sumarCinco} >
                 <button type='button' className="text-white text-center text-[1.8vw] font-nunito border-b-4"  >+5</button>
                 </div>
-                
-                
+
+
                 <div className="flex justify-center items-center h-1/2" onClick={sumarCuatro}>
                 <button type='number' className="text-white text-center text-[1.8vw] font-nunito">+4</button>
                 </div>
@@ -957,39 +944,39 @@ const handlePedidoRapido = (idProduct) => {
               type="text"
               value={mostrarBarra}
               onChange={handleInputChange}
-              className="text-white text-center font-nunito bg-transparent border-none focus:outline-none w-full h-full text-[2.5vw] max-w-full max-h-[7.4vh]" 
+              className="text-white text-center font-nunito bg-transparent border-none focus:outline-none w-full h-full text-[2.5vw] max-w-full max-h-[7.4vh]"
             />
             <p className="text-white text-center text-[2w] font-nunito pb-[1vh] ">En barra</p>
           </div>
 
 
-     
+
 
 
       <div className='w-[8vw] h-[10vh]  bg-gray-700 rounded-xl shadow-md'>
          <div className="flex justify-center items-center h-1/2" onClick={sumarUno}>
          <button type='button' className="text-white text-center text-[1.8vw] font-nunito border-b-4">+1</button>
          </div>
-        
-        
+
+
          <div className="flex justify-center items-center h-1/2" onClick={sumaMedio}>
          <button type='button' className="text-white text-center text-[1.8vw] font-nunito">+1/2</button>
-         </div> 
+         </div>
       </div>
 
 
 
       <div className='w-[8vw] h-[10vh]  bg-gray-700 rounded-xl shadow-md'>
-        
+
       <div className="flex justify-center items-center h-1/2"  onClick={restarUno}>
       <button type='button' className="text-white text-center text-[1.8vw] font-nunito border-b-4">-1</button>
          </div>
-        
-        
+
+
          <div className="flex justify-center items-center h-1/2" onClick={restaMedio}>
          <button type='button' className="text-white text-center text-[1.8vw] font-nunito">-1/2</button>
          </div>
-        
+
       </div>
 
 
@@ -1022,7 +1009,7 @@ const handlePedidoRapido = (idProduct) => {
       )}
     </div>
 
-   
+
 
 
 
@@ -1052,7 +1039,6 @@ const handlePedidoRapido = (idProduct) => {
 
 
 
-      
         <div className={`${divStyle} flex flex-col justify-center items-center rounded-xl shadow-md`} onClick={handleShowModal}>
             <RelojDistinto fecha={dateToPass} />
           </div>
@@ -1111,9 +1097,9 @@ const handlePedidoRapido = (idProduct) => {
     <div className="text-white text-[1.5vh]">
       {/* Proximos 45 minutos */}
       {(() => {
-       
 
-          
+
+
            return (
           <div>
             {dateToPass && (
@@ -1131,7 +1117,7 @@ const handlePedidoRapido = (idProduct) => {
               </button>
             </span>
             )}
-        
+
             <div
               className={`text-gray-400 font-nunito text-xl flex space-x-1 -ms-[8vw] ${
                 dateToPass ? 'bg-gray-300' : 'bg-transparent'
@@ -1152,7 +1138,7 @@ const handlePedidoRapido = (idProduct) => {
                           <span>|</span>
                           <span className="text-gray-400 font-nunito">Codillo:</span>
                           <span className="text-white font-nunito font-extrabold">{totales.totalProductosId20}</span>
-                         
+
                         </>
                       )
                     }
@@ -1162,7 +1148,7 @@ const handlePedidoRapido = (idProduct) => {
                           <span>|</span>
                           <span className="text-gray-400 font-nunito">Costilla:</span>
                           <span className="text-white font-nunito font-extrabold">{totales.totalProductosId41}</span>
-                         
+
                         </>
                       )
                     }
@@ -1175,17 +1161,17 @@ const handlePedidoRapido = (idProduct) => {
                         </>
                       )
                     }
-                  
 
-                 
-                 
+
+
+
                 </>
               )}
             </div>
           </div>
         );
-        
-        
+
+
       })()}
     </div>
   </div>
@@ -1196,7 +1182,7 @@ const handlePedidoRapido = (idProduct) => {
 
 
 
-          <div className="w-full bg-gray-100 flex flex-col justify-center items-center mt-[5.4rem] mb-2 pl-1 pr-1 ">  
+          <div className="w-full bg-gray-100 flex flex-col justify-center items-center mt-[5.4rem] mb-2 pl-1 pr-1 ">
         {Object.keys(bloquesFiltrados).map((bloque) => (
           <div key={bloque} className="w-full ">
             {/* Título con la franja horaria */}
@@ -1214,14 +1200,14 @@ const handlePedidoRapido = (idProduct) => {
                         // Verificar si todos los productos del pedido están completos
                         const todosCompletados = pedido.productos.every(producto => producto.entregado === producto.cantidad);
                         return todosCompletados;  // Solo contar los pedidos donde todos los productos están completos
-                      }).length || 0} 
+                      }).length || 0}
                     </p>
              </div>
-          
-         
-         
+
+
+
         </div>
-        
+
         {/* Mostrar los alias de los productos en la franja horaria */}
         {Object.keys(bloquesFiltrados[bloque].productos).length > 0 && (
       <div className="">
@@ -1236,7 +1222,7 @@ const handlePedidoRapido = (idProduct) => {
           postres: 4,
           extras: 5,
         };
-        
+
         // Comparamos las categorías para ordenarlas
         return categoriaPrioridad[a.categoria] - categoriaPrioridad[b.categoria];
       })
@@ -1259,7 +1245,7 @@ const handlePedidoRapido = (idProduct) => {
         if (producto.categoria === "comida" || producto.categoria === "complementos") {
           return (
             <span key={index} className={`mr-2 font-extrabold font-nunito text-lg ${categoriaColor}`}>
-              {producto.nombre}: {producto.cantidad} ({producto.entregado}) 
+              {producto.nombre}: {producto.cantidad} ({producto.entregado})
             </span>
           );
         }
@@ -1280,7 +1266,7 @@ const handlePedidoRapido = (idProduct) => {
       }).map((pedido) => {
         // Comprobamos si todos los productos del pedido tienen "entregado" igual a "cantidad"
         const todosCompletados = pedido.productos.every(producto => producto.entregado === producto.cantidad);
-        
+
         // Si todos los productos están completos, el color de fondo cambia a verde
         const containerColor = todosCompletados ? 'bg-[#52be80]' : 'bg-gray-200';
 
@@ -1289,7 +1275,7 @@ const handlePedidoRapido = (idProduct) => {
             <div className="flex items-center">
               <h3
                 className={`text-[0.75vw] font-semibold mr-4 text-center
-                  ${pedido.origen === 1 ? 'text-green-700' : 
+                  ${pedido.origen === 1 ? 'text-green-700' :
                   pedido.origen === 0 ? 'text-gray-600' : 'text-gray-700'}`}
               >
                 {pedido.NumeroPedido}
@@ -1300,7 +1286,7 @@ const handlePedidoRapido = (idProduct) => {
               <div className="ms-[-0.5vw]">
                 <button
                   className="p-1 rounded-md hover:bg-[#f2ac02] transition-all border-1 border-gray-300"
-                  onClick={() => handleShowModal1(pedido.NumeroPedido)}
+                  onClick={() => handleShowModal1(pedido)} // Pasa el objeto pedido completo
                 >
                   <svg fill="#808b96" width="25px" height="25px" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                     <path d="M12,7a2,2,0,1,0-2-2A2,2,0,0,0,12,7Zm0,10a2,2,0,1,0,2,2A2,2,0,0,0,12,17Zm0-7a2,2,0,1,0,2,2A2,2,0,0,0,12,10Z"/>
@@ -1361,12 +1347,12 @@ const handlePedidoRapido = (idProduct) => {
                 // Si entregado es igual a cantidad, cambia el color de fondo
                 if (entregadoActual === cantidadTotal) {
                   backgroundColor = 'bg-[#52be80]';
-    
+
                     }
 
                 return (
                   <div
-                    key={producto.id}
+                    key={producto.id_cart || index} // Use id_cart if available, fallback to index
                     className={`border-2 ${borderColor} ${backgroundColor} p-2 rounded-md w-auto flex items-center text-md `}
                     onClick={() => handleClick(pedido.NumeroPedido, producto.id, producto.cantidad)}
                   >
@@ -1380,7 +1366,7 @@ const handlePedidoRapido = (idProduct) => {
                     {producto.salsa && <p className="ms-2 font-extrabold font-nunito"> | S.S</p>}
                     {producto.extrasalsa && <p className="ms-2 font-extrabold font-nunito"> | E.S</p>}
 
-                    
+
                   </div>
                 );
               })}
@@ -1500,7 +1486,7 @@ const handlePedidoRapido = (idProduct) => {
       <g id="SVGRepo_iconCarrier"> <g> <g> <g> <path d="M85.432,411.629H40.162c-4.466,0-8.084,3.618-8.084,8.084c0,4.466,3.618,8.084,8.084,8.084h45.269 c4.466,0,8.084-3.618,8.084-8.084C93.516,415.247,89.896,411.629,85.432,411.629z"/> <path d="M471.838,411.629h-45.269c-4.466,0-8.084,3.618-8.084,8.084c0,4.466,3.618,8.084,8.084,8.084h45.269 c4.466,0,8.084-3.618,8.084-8.084C479.922,415.247,476.303,411.629,471.838,411.629z"/> <path d="M490.981,115.637h-21.435h-5.392c-4.466,0-8.084,3.619-8.084,8.084c0,4.466,3.618,8.084,8.084,8.084h5.392h21.435 c2.674,0,4.851,2.176,4.851,4.851v205.151H264.084V131.805h83.659h89.466c4.466,0,8.084-3.619,8.084-8.084 c0-4.466-3.618-8.084-8.084-8.084h-89.466H256H21.019C9.429,115.637,0,125.066,0,136.656v213.236v21.492 c0,11.59,9.429,21.019,21.019,21.019H256h234.981c11.59,0,21.019-9.429,21.019-21.019v-21.492V136.656 C512,125.066,502.571,115.637,490.981,115.637z M247.916,341.807h-27.365c-4.466,0-8.084,3.619-8.084,8.084 s3.618,8.084,8.084,8.084h27.365v18.258H21.019c-2.674,0.001-4.851-2.175-4.851-4.849v-13.408h177.795 c4.466,0,8.084-3.618,8.084-8.084c0-4.466-3.618-8.084-8.084-8.084H16.168V136.656c0-2.674,2.176-4.851,4.851-4.851h226.897 V341.807z M495.832,371.384c0,2.674-2.176,4.851-4.851,4.851H264.084v-18.258h231.747V371.384z"/> <path d="M286.181,209.934v53.787c0,4.466,3.619,8.084,8.084,8.084c4.466,0,8.084-3.618,8.084-8.084v-53.787 c0-4.466-3.618-8.084-8.084-8.084C289.8,201.85,286.181,205.468,286.181,209.934z"/> <path d="M217.735,271.805c4.466,0,8.084-3.618,8.084-8.084v-53.787c0-4.466-3.619-8.084-8.084-8.084s-8.084,3.619-8.084,8.084 v53.787C209.65,268.187,213.269,271.805,217.735,271.805z"/> <path d="M8.084,100.371h495.832c4.466,0,8.084-3.618,8.084-8.084c0-4.466-3.618-8.084-8.084-8.084H8.084 C3.619,84.203,0,87.821,0,92.287C0,96.753,3.619,100.371,8.084,100.371z"/> <path d="M43.32,200.086c2.068,0,4.137-0.789,5.716-2.368l29.048-29.049c3.157-3.157,3.157-8.276-0.001-11.432 c-3.156-3.156-8.275-3.157-11.432,0.001l-29.048,29.049c-3.157,3.157-3.157,8.276,0.001,11.432 C39.182,199.297,41.251,200.086,43.32,200.086z"/> <path d="M64.557,225.374c1.579,1.578,3.649,2.367,5.717,2.367s4.138-0.789,5.717-2.367l52.958-52.958 c3.157-3.158,3.157-8.276,0-11.433c-3.158-3.156-8.276-3.156-11.434,0l-52.958,52.958C61.4,217.099,61.4,222.217,64.557,225.374z "/> <path d="M46.664,231.834l-2.877,2.877c-3.157,3.158-3.157,8.276,0,11.433c1.579,1.578,3.649,2.367,5.717,2.367 c2.068,0,4.138-0.789,5.717-2.367l2.877-2.877c3.157-3.158,3.157-8.276,0-11.433C54.94,228.678,49.822,228.678,46.664,231.834z"/> </g> </g> </g> </g>
 
       </svg>
-      
+
       </Link>
 
       <Link className='p-3  hover:bg-gray-100 hover:rounded-2xl ' to={"/buscadorPedidos"}>
@@ -1516,7 +1502,7 @@ const handlePedidoRapido = (idProduct) => {
       </svg>
       </Link>
 
-      <Link className='p-3  hover:bg-gray-100 hover:rounded-2xl ' to={"/stock"}> 
+      <Link className='p-3  hover:bg-gray-100 hover:rounded-2xl ' to={"/stock"}>
 
       <svg width="40px" height="40px" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
 
@@ -1551,16 +1537,16 @@ const handlePedidoRapido = (idProduct) => {
 
     {/* Modal fecha */}
     <Modal show={showModal} onHide={handleCloseModal} size="md" backdrop="static" keyboard={false} centered>
-       
+
         <Modal.Body >
 
-        
+
                 <ThemeProvider theme={theme}> {/* Aplicar el tema personalizado */}
                 <LocalizationProvider dateAdapter={AdapterDayjs} adapterLocale="es">
                 <DemoContainer components={['StaticDatePicker']}>
                       <DemoItem>
                         <StaticDatePicker
-                          displayStaticWrapperAs="desktop"  // 
+                          displayStaticWrapperAs="desktop"  //
                           value={selectedDate}
                           defaultValue={dayjs('DD/MM/YYYY')}
                           onChange={handleDateChange}  // Actualiza el estado de la fecha
@@ -1585,7 +1571,7 @@ const handlePedidoRapido = (idProduct) => {
                </LocalizationProvider>
               </ThemeProvider>
 
-   
+
 
 
         </Modal.Body>
@@ -1599,30 +1585,30 @@ const handlePedidoRapido = (idProduct) => {
           </Button>
           <Button
             variant="primary"
-           
+
             className="bg-yellow-500 border-yellow-500 hover:bg-yellow-600 hover:border-yellow-600 p-3 font-nunito"
             onClick={handleAccept}
           >
             Aceptar
           </Button>
         </Modal.Footer>
-        
+
     </Modal>
 
      {/* Modal iconos */}
      <Modal show={showModal1} onHide={handleCloseModal1} size="md" backdrop="static" keyboard={false} centered>
-       
-  
 
-       
+
+
+
        <Modal.Body className="flex flex-col items-center ">
-          
+
 
           {/* Tres íconos centrados con sus respectivos onClick */}
           <div className="flex space-x-4">
             <div
-              className="p-3 cursor-pointer hover:bg-yellow-500 rounded-md" onClick={() => borrarOrden(pedidoSeleccionado)} 
-             
+              className="p-3 cursor-pointer hover:bg-yellow-500 rounded-md" onClick={() => borrarOrden(pedidoSeleccionado.NumeroPedido)} // Usa NumeroPedido del objeto
+
             >
              <svg width="4vw" height="4vw" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
 
@@ -1635,9 +1621,9 @@ const handlePedidoRapido = (idProduct) => {
               </svg>
               <p className='text-center p-1 font-nunito text-[#f10707]'>Borrar</p>
             </div>
-                         
+
                         <div className="p-3 cursor-pointer hover:bg-yellow-500 rounded-lg"   onClick={() => handleEditOrder(pedidoSeleccionado)}>
-                    
+
                       <svg width="4vw" height="4vw" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
 
                         <g id="SVGRepo_bgCarrier" strokeWidth="0"/>
@@ -1667,36 +1653,36 @@ const handlePedidoRapido = (idProduct) => {
           </div>
         </Modal.Body>
 
-  
 
 
-       
+
+
        <Modal.Footer className='no-border'>
          <Button
            variant="primary"
-          
+
            className="bg-yellow-500 border-yellow-500 hover:bg-yellow-600 hover:border-yellow-600 p-2 font-nunito"
            onClick={handleCloseModal1}
          >
            Cerrar
          </Button>
        </Modal.Footer>
-       
+
    </Modal>
 
      {/* Modal cierre turno */}
      <Modal show={showModal2} onHide={handleCloseModal2} size="md" backdrop="static" keyboard={false} centered>
-       
-  
 
-       
+
+
+
        <Modal.Body className="flex flex-col items-center ">
-          
+
           <div>
 
           <h1 className='font-nunito text-2xl font-[2vw] text-[#808b96]'>El Turno actual ha finalizado!</h1>
           </div>
-         
+
          <div className='p-2'>
          <svg fill="#808b96 " width="100px" height="100px" viewBox="-5.5 0 32 32" version="1.1" xmlns="http://www.w3.org/2000/svg">
 
@@ -1711,40 +1697,38 @@ const handlePedidoRapido = (idProduct) => {
 
 
          </div>
-       
+
         </Modal.Body>
 
-  
 
 
-       
+
        <Modal.Footer className='no-border'>
          <Button
            variant="primary"
-          
+
            className="bg-yellow-500 border-yellow-500 hover:bg-yellow-600 hover:border-yellow-600 p-2 font-nunito"
            onClick={handleCloseModal2}
          >
            Aceptar
          </Button>
        </Modal.Footer>
-       
+
    </Modal>
 
-   
+
      <PedidoRapido ref={pedidoRapidoRef} datosCliente={datosCliente} />
 
-   
-    
-   
-                        
+
+
+
+
    </>
 
 
-   
-   
+
+
   );
 };
 
 export default Ordenes;
-
