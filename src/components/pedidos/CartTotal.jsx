@@ -164,7 +164,16 @@ const CartTotal = ({ datosCliente, setDatosCliente, orderToEdit }) => {
     }
     return nuevaHora;
   };
-
+  const handleCancelEdit = () => {
+    if (window.confirm("¿Estás seguro de que quieres cancelar la edición? Se perderán los cambios no guardados.")) {
+      setCart([]); // Clear cart from context
+      setDatosCliente({ // Reset client data in context
+        cliente: "", telefono: "", fechahora: "", observaciones: "",
+        pagado: false, celiaco: false, localidad: "", img_perfil: ""
+      });
+      navigate('/ordenes', { replace: true }); // Navigate back and replace history entry
+    }
+  };
   // Determina la hora final del pedido
   const fechahora = datosCliente.fechahora || obtenerHoraRedondeada().format("DD/MM/YYYY HH:mm");
 
@@ -869,6 +878,15 @@ const CartTotal = ({ datosCliente, setDatosCliente, orderToEdit }) => {
             {isSubmitting ? 'Procesando...' : (orderToEdit ? "Actualizar Pedido" : "Generar Pedido")}
           </span>
         </button>
+        {orderToEdit && (
+          <button
+            onClick={handleCancelEdit}
+            disabled={isSubmitting} // Also disable if submitting main action
+            className={`w-full sm:w-auto min-w-[10px] px-6 py-2 tracking-wide bg-red-500 hover:bg-red-600 text-white font-semibold rounded-lg shadow-md focus:outline-none focus:ring-2 focus:ring-red-400 focus:ring-opacity-75 transition-all duration-300 ease-in-out ${isSubmitting ? 'opacity-50 cursor-not-allowed' : 'hover:scale-105'}`}
+          >
+            Cancelar Edición
+          </button>
+        )}
       </div>
 
       {/* --- Modales --- */}
