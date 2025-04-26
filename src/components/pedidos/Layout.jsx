@@ -131,7 +131,7 @@ const Layout = () => {
               </div>
         </div>
 
-        <div className={`${orderToEdit ? 'bg-red-400' : 'bg-[#F3F3F3]'} w-[23%]  `}>
+        <div className={`${orderToEdit ? 'bg-[#b2b9ab]' : 'bg-[#F3F3F3]'} w-[23%]  `}>
         {/* Se pasa orderToEdit para indicar que se trata de un pedido a editar */}
         <Ticket orderToEdit={orderToEdit} />
       </div>

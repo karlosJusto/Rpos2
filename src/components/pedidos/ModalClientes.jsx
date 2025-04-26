@@ -147,7 +147,7 @@ const ModalClientes = ({ show, handleClose, onSave, initialData }) => {
                 className="form-control border-2 border-gray-200 font-nunito font-extrabold focus:border-yellow-500 focus:ring-0"
                 id="cliente" // Changed id to match name
                 placeholder="Nombre"
-                value={formData.cliente} // Removed toLocaleLowerCase here, handle case in filtering/saving if needed
+                value={formData.cliente.toLocaleLowerCase()} // Removed toLocaleLowerCase here, handle case in filtering/saving if needed
                 onChange={handleInputChange}
                 name="cliente"
               />

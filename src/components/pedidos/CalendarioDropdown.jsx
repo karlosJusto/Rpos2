@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import DatePicker, { registerLocale } from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
 import { es } from "date-fns/locale";
-import { format } from "date-fns";
+import { format, addMinutes, addHours, startOfHour } from "date-fns";
 
 registerLocale("es", es);
 
@@ -11,19 +11,63 @@ function CalendarioDropdown({ onDateChange }) {
   const [hora, setHora] = useState("");
   const [minuto, setMinuto] = useState("");
   const [dropdownOpen, setDropdownOpen] = useState(false);
+  const [horaSeleccionada, setHoraSeleccionada] = useState(false);
+  const [minutoSeleccionado, setMinutoSeleccionado] = useState(false);
 
   const horasDisponibles = ["11", "12", "13", "14", "15", "18", "19", "20", "21", "22"];
   const minutosDisponibles = ["00", "15", "30", "45"];
 
   const fechaActual = format(new Date(), "dd/MM/yyyy");
 
-  const toggleDropdown = () => {
-    setDropdownOpen((prev) => !prev);
+  const ajustarHoraYMinutos = () => {
+    const now = new Date();
+    const minutes = now.getMinutes();
+    let nuevoBloque = startOfHour(now);
+
+    if (minutes >= 5 && minutes <= 15) {
+      nuevoBloque = addMinutes(nuevoBloque, 15);
+    } else if (minutes >= 16 && minutes <= 30) {
+      nuevoBloque = addMinutes(nuevoBloque, 30);
+    } else if (minutes >= 31 && minutes <= 45) {
+      nuevoBloque = addMinutes(nuevoBloque, 45);
+    } else if (minutes >= 46 && minutes <= 59) {
+      nuevoBloque = startOfHour(addHours(now, 1));
+    }
+
+    const horaAjustada = format(nuevoBloque, "HH");
+    const minutoAjustado = format(nuevoBloque, "mm");
+
+    const horaFinal = horasDisponibles.includes(horaAjustada) ? horaAjustada : horasDisponibles[0];
+    const minutoFinal = minutosDisponibles.includes(minutoAjustado) ? minutoAjustado : minutosDisponibles[0];
+
+    setHora(horaFinal);
+    setMinuto(minutoFinal);
+    setFecha(new Date());
   };
 
+  useEffect(() => {
+    ajustarHoraYMinutos();
+  }, []);
+
+  useEffect(() => {
+    if (horaSeleccionada && minutoSeleccionado) {
+      const fechaHoraFinal = getFechaHoraRealizado();
+      onDateChange(fechaHoraFinal);
+      setDropdownOpen(false);
+      setHoraSeleccionada(false);
+      setMinutoSeleccionado(false);
+    }
+  }, [horaSeleccionada, minutoSeleccionado]);
+
   const handleSelect = (tipo, valor) => {
-    if (tipo === "hora") setHora(valor);
-    if (tipo === "minuto") setMinuto(valor);
+    if (tipo === "hora") {
+      setHora(valor);
+      setHoraSeleccionada(true);
+    }
+    if (tipo === "minuto") {
+      setMinuto(valor);
+      setMinutoSeleccionado(true);
+    }
   };
 
   const getFechaHoraRealizado = () => {
@@ -36,13 +80,9 @@ function CalendarioDropdown({ onDateChange }) {
     return "";
   };
 
-  useEffect(() => {
-    if (hora && minuto) {
-      const fechaHoraFinal = getFechaHoraRealizado();
-      onDateChange(fechaHoraFinal);
-      setDropdownOpen(false); // cerrar dropdown una vez todo esté seleccionado
-    }
-  }, [hora, minuto]);
+  const toggleDropdown = () => {
+    setDropdownOpen((prev) => !prev);
+  };
 
   const handleFocus = (e) => {
     e.target.blur();
@@ -58,14 +98,12 @@ function CalendarioDropdown({ onDateChange }) {
           onChange={(date) => setFecha(date)}
           locale="es"
           dateFormat="dd/MM/yyyy"
-          placeholderText="Selecciona una fecha"
+          placeholderText={fechaActual}
           showPopperArrow={false}
           dropdownMode="select"
-          minDate={new Date()} // 👉 Evita seleccionar fechas anteriores a hoy
-          className="w-full text-sm px-5 py-3 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-yellow-500 text-center "
+          minDate={new Date()}
+          className="w-full text-sm px-5 py-3 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-yellow-500 text-center"
           onFocus={handleFocus}
-
-      
         />
       </div>
 
@@ -85,7 +123,6 @@ function CalendarioDropdown({ onDateChange }) {
           </span>
         </div>
 
-        {/* Dropdown con columnas */}
         {dropdownOpen && (
           <div className="absolute bg-white border border-gray-300 rounded shadow-lg w-full mt-2 z-10">
             <div className="flex">

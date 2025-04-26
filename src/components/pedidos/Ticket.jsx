@@ -122,13 +122,33 @@ const Ticket = (props) => {
   const handleDataFromModal = (data) => {
     setDatosCliente(data);
   };
+  
+  /*const handleCancelEdit = () => {
+    if (window.confirm("¿Estás seguro de que quieres cancelar la edición? Se perderán los cambios no guardados.")) {
+      setCart([]); // Clear cart from context
+      setDatosCliente({ // Reset client data in context
+        cliente: "", telefono: "", fechahora: "", observaciones: "",
+        pagado: false, celiaco: false, localidad: "", img_perfil: ""
+      });
+      navigate('/ordenes', { replace: true }); // Navigate back and replace history entry
+    }
+  };*/
+
+
 
   // --- FUNCIÓN clearClientData CORREGIDA ---
   // Restaura la lógica para preservar campos del pedido
-  const clearClientData = () => {
+  /*const clearClientData = () => {
       setDatosCliente(prevDatos => ({ // Usa el estado previo para mantener campos
         cliente: '',
         telefono: '',
+        cliente: '',
+        //     telefono: '',
+        //     fechahora: '',
+        //     observaciones: '',
+        //     pagado: false,
+        //     celiaco: false,
+        //     img_perfil: '',
         // Mantiene estos campos porque son del pedido, no solo del cliente buscado
         fechahora: prevDatos.fechahora,
         observaciones: prevDatos.observaciones,
@@ -136,7 +156,23 @@ const Ticket = (props) => {
         celiaco: prevDatos.celiaco, // Mantiene estado celiaco
         img_perfil: '',
       }));
-  };
+  };*/
+
+          const clearClientData = () => {
+            setDatosCliente(prevDatos => ({ // Usa el estado previo para mantener campos
+              cliente: '',
+              telefono: '',
+              fechahora: '',
+              observaciones: '',
+              pagado: false,
+              celiaco: false,
+              img_perfil: '',
+              
+            }));
+        };
+
+
+
 
 
   const empleadoNombre=sessionStorage.getItem('empleadoNombre');
@@ -182,6 +218,29 @@ const Ticket = (props) => {
                   </Link>
         </div>
 
+        {orderToEditId && (
+  <div className="relative bg-red-500 p-3 mt-2 text-white font-nunito shadow-lg ">
+    <h1 className="font-bold text-center">Modificando pedido: {orderToEditId}</h1>
+    <button
+      
+      className="absolute right-3 top-3 hover:text-yellow-300 transition-colors"
+      aria-label="Cancelar edición"
+    >
+      <svg
+        xmlns="http://www.w3.org/2000/svg"
+        className="h-5 w-5"
+        fill="none"
+        viewBox="0 0 24 24"
+        stroke="currentColor"
+        strokeWidth={3}
+      >
+        <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+      </svg>
+    </button>
+  </div>
+)}
+
+
       <div className="p-[1.3vh] mt-[1.8vh]">
         <h1 className="font-nunito border-b-2 text-gray-600 font-bold border-gray-600 text-[1vw]">
           Cliente
@@ -200,7 +259,7 @@ const Ticket = (props) => {
             <div
               className={`ms-[1vw] font-nunito rounded-md py-1 px-4 text-sm`}
               >
-                {/* Button logic updated */}
+                {/* Button logic updated 
                 {datosCliente.cliente && datosCliente.cliente.length > 0 && (
                 <button
                     // onClick={() => // Original inline function removed
@@ -227,11 +286,11 @@ const Ticket = (props) => {
                         <path d="M6 19a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V7H6v12Zm3-9h2v7H9v-7Zm4 0h2v7h-2v-7ZM15.5 4l-1-1h-5l-1 1H5v2h14V4h-3.5Z" />
                       </svg>
                   </button>
-                  )}
+                  )}*/}
             {/* Added placeholders */}
-            <h3 className="text-gray-900 font-bold">{datosCliente.cliente || 'Cliente...'}</h3>
-            <h3 className="text-gray-600">{datosCliente.telefono || 'Teléfono...'}</h3>
-            <h3 className="text-gray-900 font-bold">{datosCliente.fechahora || 'Fecha/Hora...'}</h3>
+            <h3 className="text-gray-900 font-bold">{datosCliente.cliente }</h3>
+            <h3 className="text-gray-600">{datosCliente.telefono }</h3>
+            <h3 className="text-gray-900 font-bold">{datosCliente.fechahora }</h3>
             {/* Added gap and titles */}
             <div className="flex justify-around"> {/* Kept original justify-around */}
               {datosCliente.pagado && (
@@ -248,9 +307,9 @@ const Ticket = (props) => {
 
         {/* Conditional rendering for observations */}
         {datosCliente.observaciones && (
-            <div className="p-[1vw]">
+            <div className="p-[0.5vw]">
                 <p className="font-nunito text-left text-gray-600 text-sm ">
-                    <span className="font-bold">Obs:</span> {datosCliente.observaciones}
+                    <span className="font-bold"></span> - {datosCliente.observaciones}
                 </p>
             </div>
         )}
@@ -267,9 +326,9 @@ const Ticket = (props) => {
         </div>
       ) : (
         // Updated heading to include order ID if editing
-        <div className="p-[1.3vh]">
+        <div className="p-[1.3vh] mt-2">
           <h1 className="font-nunito border-b-2 font-bold text-gray-600 border-gray-600 text-[1vw]">
-            Pedido {orderToEditId ? `(Editando #${orderToEditId})` : ''}
+            Pedido 
           </h1>
         </div>
       )}

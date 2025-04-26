@@ -53,7 +53,7 @@ const CartElements = () => {
 
               {/* Botón eliminar producto */}
               <button
-                className="absolute top-[-8px] right-[-8px] bg-red-600 text-white rounded-full w-4 h-4 text-xs flex items-center justify-center hover:bg-red-600 z-10"
+                className="absolute top-[-8px] right-[-8px] bg-red-500 text-white rounded-full w-4 h-4 text-xs flex items-center justify-center hover:bg-red-600 z-10"
                 onClick={(e) => {
                   e.stopPropagation(); // Prevenir que se abra el modal
                   eliminarProducto(product.id_cart);
