@@ -5,7 +5,7 @@ import { db } from '../firebase/firebase';
 import CalendarioDropdown from './CalendarioDropdown'; // Assuming CalendarioDropdown is preferred over Calendario
 
 // Added initialData prop to receive customer data when editing
-const ModalClientes = ({ show, handleClose, onSave, initialData }) => {
+const ModalClientes = ({ show, handleClose, onSave, initialData,clearClientData }) => {
   const [formData, setFormData] = useState({
     cliente: '',
     telefono: '',
@@ -132,11 +132,21 @@ const ModalClientes = ({ show, handleClose, onSave, initialData }) => {
     handleClose();
   };
 
+  const clienteYaSeleccionado = formData.cliente.trim() !== '' || formData.telefono.trim() !== '';
+
+
+
   return (
     <>
-      <Modal show={show} onHide={handleSubmitClose} size="lg" backdrop="static" keyboard={false} centered> {/* Changed onHide to ensure reset */}
+      <Modal show={show} onHide={handleSubmitClose} size="lg" backdrop="static"  keyboard={false} centered> {/* Changed onHide to ensure reset */}
 
-          <Modal.Title className='text-center pt-2 font-nunito text-gray-600'>Datos Pedido</Modal.Title>
+      <Modal.Header closeButton className='border-none text-center justify-center items-center flex' onClick={handleClose}>
+          <Modal.Title className='text-center pt-2 font-nunito text-gray-600 w-full'>
+            Datos Pedido
+          </Modal.Title>
+      </Modal.Header>
+
+          
 
         <Modal.Body>
           <div className="bg-white rounded-lg flex justify-around gap-3 appearance-none px-[3vw]">
@@ -176,7 +186,7 @@ const ModalClientes = ({ show, handleClose, onSave, initialData }) => {
           </div>
 
           {/* Lista de clientes con scroll */}
-          <div className="max-h-40 overflow-y-auto mt-2">
+          <div className="max-h-40 overflow-y-auto mt-1">
             {filteredClientes.length > 0 ? (
               filteredClientes.map((cliente, index) => (
                 <div
@@ -190,11 +200,11 @@ const ModalClientes = ({ show, handleClose, onSave, initialData }) => {
                       telefono: cliente.telefono || '',
                       img_perfil: cliente.img_perfil || '',
                       // Optionally update observations if they should come from client profile:
-                      // observaciones: cliente.observaciones || prevFormData.observaciones,
+                      observaciones: cliente.observaciones || prevFormData.observaciones,
                     }));
                     setFilteredClientes(clientes); // Hide list after selection
                   }}>
-                  <div className="px-[3.5vw] mt-[1vh]"> {/* Adjusted margin */}
+                  <div className="px-[3vw]  mt-[1vh]"> {/* Adjusted margin */}
                     <div className="grid grid-cols-2 text-center h-auto"> {/* Adjusted height */}
                       {/* Display client name and phone */}
                       <h1 className="text-lg font-nunito text-gray-500">{cliente.cliente}</h1>
@@ -210,16 +220,16 @@ const ModalClientes = ({ show, handleClose, onSave, initialData }) => {
           </div>
 
           {/* Calendario Dropdown */}
-          <div className='p-[4.5vh]'>
+          <div className='px-[4.5vh] mt-4'>
             {/* Pass current fechahora to potentially pre-select date */}
             <CalendarioDropdown onDateChange={handleDateChange} initialDate={formData.fechahora} />
           </div>
 
           {/* Observaciones */}
           <div className='px-[4.5vh]'>
-            <label htmlFor="observaciones" className="form-label text-gray-500 text-lg font-nunito font-extrabold "></label>
+            <label htmlFor="observaciones" className="form-label text-gray-100 text-lg font-nunito  "></label>
             <textarea
-              className="form-control text-lg font-nunito border-2 border-gray-200"
+              className="form-control text-md font-nunito text-gray-900 font-extrabold  border-2 border-gray-200"
               value={formData.observaciones} // Bind directly to formData
               onChange={(e) => setFormData({ ...formData, observaciones: e.target.value })}
               id="observaciones"
@@ -230,7 +240,7 @@ const ModalClientes = ({ show, handleClose, onSave, initialData }) => {
           </div>
 
           {/* Checkboxes */}
-          <div className='pt-[4.5vh] text-center'>
+          <div className='pt-[3vh] text-center'>
             <div className="form-check form-check-inline border-2 p-[1vw] border-gray-200 rounded-xl">
               <input
                 className="form-check-input m-1"
@@ -266,22 +276,31 @@ const ModalClientes = ({ show, handleClose, onSave, initialData }) => {
         </Modal.Body>
 
         <Modal.Footer className="border-none">
-          <Button
-            variant="secondary"
-            className="p-3 bg-white font-nunito text-gray-500 border-gray-300 hover:text-yellow-600 hover:border-yellow-600"
-            onClick={handleSubmitClose} // Use the reset handler
-          >
-            Cancelar
-          </Button>
-          <Button
-            variant="primary"
-            onClick={handleSubmitData}
-            className="bg-yellow-500 border-yellow-500 hover:bg-yellow-600 hover:border-yellow-600 p-3 font-nunito"
-            // Disable button if essential fields like date/time are missing?
-            // disabled={!formData.fechahora}
-          >
-            {initialData ? 'Actualizar' : 'Agregar'} {/* Change button text based on context */}
-          </Button>
+        <div className="flex justify-end space-x-3 mt-2">
+  <Button
+     variant="danger"
+    className="p-2 bg-white font-nunito text-red-600 border-red-600 hover:text-red-900 hover:border-red-900 shadow-sm"
+    onClick={() => {
+      if (formData.cliente) {
+        clearClientData(); // ✅ Limpia los datos del ticket
+        handleSubmitClose(); // ✅ Cierra el modal
+      } else {
+        handleSubmitClose(); // Solo cerrar si no había datos
+      }
+    }}
+  >
+    {initialData.cliente ? "Eliminar" : "Cancelar"}
+  </Button>
+
+  <Button
+    variant="primary"
+    onClick={handleSubmitData}
+    className="bg-white text-yellow-500 border-yellow-500 hover:bg-yellow-900 hover:border-yellow-900 p-2 font-nunito shadow-sm"
+  >
+    {initialData.cliente ? "Actualizar" : "Agregar"}
+  </Button>
+</div>
+
         </Modal.Footer>
       </Modal>
     </>

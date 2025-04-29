@@ -19,6 +19,8 @@ export const dataContext = createContext();
 const DataProvider = ({ children }) => {
 
 
+  const [orderBeingEdited, setOrderBeingEdited] = useState(null);
+  const isEditingOrder = orderBeingEdited !== null;
 
 
   const [pedidosConOrigenUno, setPedidosConOrigenUno] = useState(null);
@@ -348,6 +350,11 @@ const obtenerFechaFormateada = () => {
         setTotalbloquesAntesdelas18, // Pasar la función para actualizar totalbloquesAntesdelas18
         loading,
         setLoading,
+
+        orderBeingEdited,
+        setOrderBeingEdited,
+        isEditingOrder, 
+
         
       }}
     >

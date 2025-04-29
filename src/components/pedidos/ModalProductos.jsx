@@ -15,7 +15,6 @@ import {  dataContext } from '../Context/DataContext';
 
 const ModalProductos = ({show, handleClose, product,isNuevoProducto}) => {
 
-  
 
   const {data, cart, setCart}=useContext(dataContext);
 
@@ -311,7 +310,7 @@ const ModalProductos = ({show, handleClose, product,isNuevoProducto}) => {
     <Button
       variant="danger"
       onClick={() => deleteProduct(product)}
-      className="bg-white border-red-500 hover:bg-red-600 hover:border-red-900 p-3 font-nunito text-red-500 hover:text-red-900"
+      className="shadow-md bg-white border-red-500 hover:bg-red-600 hover:border-red-900 p-2 font-nunito text-red-500 hover:text-red-900"
     >
       Eliminar
     </Button>
@@ -322,7 +321,7 @@ const ModalProductos = ({show, handleClose, product,isNuevoProducto}) => {
     <Button
       variant="secondary"
       onClick={handleClose}
-      className="p-3 bg-white font-nunito text-gray-500 border-gray-500 hover:text-yellow-500  hover:border-yellow-500"
+      className=" shadow-md bg-white border-red-500 hover:bg-red-600 hover:border-red-900 p-2 font-nunito text-red-500 hover:text-red-900"
     >
       Cancelar
     </Button>
@@ -333,8 +332,8 @@ const ModalProductos = ({show, handleClose, product,isNuevoProducto}) => {
     variant={isNuevoProducto ? 'primary' : 'warning'}
     onClick={() => buyProducts(product)}
     className={`
-      ${isNuevoProducto ? 'bg-yellow-500 border-yellow-500 hover:bg-yellow-600 hover:border-yellow-600 p-3 font-nunito' : 'bg-yellow-500 border-yellow-500 hover:bg-yellow-600 hover:border-yellow-600 p-3 font-nunito'}
-      text-white
+      ${isNuevoProducto ? 'shadow-md bg-white text-yellow-500 border-yellow-500 hover:bg-yellow-600 hover:border-yellow-600 p-2 font-nunito' : 'shadow-md bg-white text-yellow-500 border-yellow-500 hover:bg-yellow-900 hover:border-yellow-900 p-2 font-nunito'}
+     
     `}
   >
     {isNuevoProducto ? 'Agregar' : 'Modificar'}
