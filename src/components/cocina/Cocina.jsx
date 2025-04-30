@@ -254,17 +254,29 @@ const handleCloseSupervision = () => {
       pedidosDelTurno.forEach((pedido) => {
         if (pedido.productos && Array.isArray(pedido.productos)) {
           pedido.productos.forEach((prod, index) => {
-            // Validate product ID
-            if (prod.id === undefined || typeof prod.id !== 'number' || !validProductIds.has(prod.id)) {
-              return; // Skip invalid or non-cocina products
+            const originalProdId = prod.id;
+            let targetProdId = originalProdId; // ID under which this item will be aggregated
+            let quantityForHeader = prod.cantidad || 1; // Quantity for the row display
+            let quantityFactorForTotal = 1.0; // Factor for the header PEDIDOS count
+
+            // --- Special Handling for 1/2 Costilla (ID 48) ---
+            if (originalProdId === 48) {
+              targetProdId = 41; // Aggregate under Costilla BBQ (ID 41)
+              quantityFactorForTotal = 0.5; // Count as 0.5 towards the total
             }
-            // Ensure structure exists (should always exist)
-            if (!aggregatedProducts[prod.id]) {
-               console.error(`[Effect A] Aggregated structure missing for ID ${prod.id}, Order ${pedido.id}. Skipping.`);
+
+            // Validate the *target* product ID exists in cocina products
+            if (typeof targetProdId !== 'number' || !validProductIds.has(targetProdId)) {
+               console.warn(`[Effect A] Target product ID ${targetProdId} (for original ID ${originalProdId}) not in 'cocina'. Skipping order line.`);
+               return;
+            }
+            // Ensure the aggregation structure for the target ID exists
+            if (!aggregatedProducts[targetProdId]) {
+               console.error(`[Effect A] Aggregated structure missing for target ID ${targetProdId}. Skipping order line.`);
                return;
             }
             // Create a unique ID for this order line
-            const orderLineId = `${pedido.id}-${prod.id}-${prod.uniqueId || index}`;
+            const orderLineId = `${pedido.id}-${originalProdId}-${prod.uniqueId || index}`; // Use original ID for uniqueness
             // Determine if this line is new compared to the previous snapshot
             const isNew = !currentPedidosMap.has(orderLineId);
             incomingPedidosMap.set(orderLineId, true); // Mark this line as present in the current snapshot
@@ -272,27 +284,30 @@ const handleCloseSupervision = () => {
             // Create data object for the order line
             const orderData = {
               idPedido: pedido.id,
-              idProducto: prod.id,
+              idProducto: originalProdId, // Store the ORIGINAL product ID in the order line data
               orderLineId: orderLineId,
-              producto: { ...prod }, // Copy product details from order
+              // Copy product details from order, ensuring 'listo' defaults to false
+              producto: { ...prod, listo: prod.listo ?? false },
               hora: pedido.fechahora,
-              nombre: pedido.cliente || 'Sin nombre',
-              cantidad: prod.cantidad || 1,
+              nombre: pedido.cliente || 'Sin nombre', // Customer name
+              // Adjust quantity displayed in the row for 1/2 costilla
+              cantidad: (originalProdId === 48) ? ((prod.cantidad || 1) * 0.5) : (prod.cantidad || 1),
               descripcion: pedido.observaciones || "",
               isNew: isNew, // Flag for UI highlighting
               needsCookingAlert: false, // Initial state, calculated in Effect C
               isOverdue: false, // Initial state, calculated in Effect C
             };
             // Add order line to the product's list
-            aggregatedProducts[prod.id].orders.push(orderData);
+            aggregatedProducts[targetProdId].orders.push(orderData);
             // Add quantity to the product's total ordered count
-            aggregatedProducts[prod.id].pedidos += (prod.cantidad || 1);
+            aggregatedProducts[targetProdId].pedidos += (quantityForHeader * quantityFactorForTotal);
           });
         }
       });
 
       // Create the final array for ProductCards, maintaining the order from cocinaProducts
       const finalBaseData = cocinaProducts
+        .filter(product => product.id !== 48) // <<< Ensure we don't create a card for ID 48 itself
         .map(product => aggregatedProducts[product.id]) // Map to aggregated data
         .filter(Boolean); // Remove any potential undefined entries
 
@@ -381,10 +396,16 @@ const handleCloseSupervision = () => {
             // --- Recalculate needsCookingAlert ---
             let newNeedsCookingAlert = false;
             const nombreProdLower = order.producto?.nombre ? order.producto.nombre.toLowerCase() : '';
+            const productId = order.idProducto; // Get the product ID (will be 41 or 48 etc.)
             let alertTimeWindowMins = 0;
-            // Define alert windows based on product name
-            if (nombreProdLower.includes('codillo') || nombreProdLower.includes('costilla')) alertTimeWindowMins = 30;
-            else if (nombreProdLower.includes('chorizo') || nombreProdLower.includes('morcilla')) alertTimeWindowMins = 15;
+
+            // Define alert windows based on product name OR ID
+            // Check for Codillo or Costilla by name, OR check for ID 48 (1/2 Costilla)
+            if (nombreProdLower.includes('codillo') || nombreProdLower.includes('costilla') || productId === 48) {
+                alertTimeWindowMins = 30;
+            } else if (nombreProdLower.includes('chorizo') || nombreProdLower.includes('morcilla')) {
+                alertTimeWindowMins = 15;
+            }
             // Check if alert should be active
             if (alertTimeWindowMins > 0 && orderTimeDayjs.isValid() && !order.producto.listo) {
                 const alertStartTime = orderTimeDayjs.subtract(alertTimeWindowMins, 'minute');
