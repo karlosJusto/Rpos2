@@ -147,6 +147,16 @@ swiper-slide:nth-child(5) {
   top: 1.2rem;
 }
 
+.react-datepicker__day--selected,
+.react-datepicker__day--keyboard-selected {
+  background-color: #eab308 !important; /* amarillo Tailwind (yellow-400) */
+  color: white !important;
+}
+
+.separator-row{
+  height: 35px;
+ }
+
 
 
  

@@ -309,10 +309,10 @@ const Ticket = (props) => {
           <p className="text-center text-gray-500 font-nunito">¿Estás seguro de que quieres cancelar la edición? Se perderán los cambios no guardados.</p>
         </Modal.Body>
         <Modal.Footer style={{ borderTop: 'none' }}>
-          <Button variant="secondary" onClick={handleCloseConfirmCancelModal} className="shadow-md bg-white border-red-500 hover:bg-red-600 hover:border-red-900 p-2 font-nunito text-red-500 hover:text-red-900">
+          <Button variant="secondary" onClick={handleCloseConfirmCancelModal} className="shadow-md bg-white border-red-500 hover:bg-red-700 hover:border-red-700 p-2 font-nunito text-red-500 hover:text-red-700">
             Cancelar
           </Button>
-          <Button variant="danger" onClick={confirmCancelAction} className="shadow-md p-2 bg-white font-nunito text-yellow-500 border-yellow-500 hover:text-yellow-900 hover:border-yellow-900">
+          <Button variant="danger" onClick={confirmCancelAction} className="shadow-md p-2 bg-white font-nunito text-yellow-500 border-yellow-500 hover:text-yellow-600 hover:border-yellow-600">
             Aceptar
           </Button>
         </Modal.Footer>
@@ -337,10 +337,10 @@ const Ticket = (props) => {
           <p className=" p-2 text-center text-gray-400">¿Estás seguro de que quieres vaciar el ticket actual? Se borrarán los datos cliente y todos los productos de este pedido.</p>
         </Modal.Body>
         <Modal.Footer style={{ borderTop: 'none' }}>
-          <Button variant="secondary" onClick={handleCloseConfirmClearModal} className=" shadow-md bg-white border-red-500 hover:bg-red-600 hover:border-red-900 p-2 font-nunito text-red-500 hover:text-red-900">
+          <Button variant="secondary" onClick={handleCloseConfirmClearModal} className=" shadow-md bg-white border-red-500 hover:bg-red-600 hover:border-red-700 p-2 font-nunito text-red-500 hover:text-red-700">
             Cancelar
           </Button>
-          <Button variant="danger" onClick={confirmClearAction} className="shadow-md p-2 bg-white font-nunito text-yellow-500 border-yellow-500 hover:text-yellow-900 hover:border-yellow-900">
+          <Button variant="danger" onClick={confirmClearAction} className="shadow-md p-2 bg-white font-nunito text-yellow-500 border-yellow-500 hover:text-yellow-600 hover:border-yellow-600">
             Aceptar
           </Button>
         </Modal.Footer>

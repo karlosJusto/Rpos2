@@ -115,7 +115,7 @@ const StockDia = () => {
 
   return (
     <div className="max-w-full mx-auto">
-      <h1 className="text-center mb-4 font-nunito text-gray-500 text-2xl">Productos ya vendidos - {fechaHoy}</h1>
+      <h1 className="text-center mb-4 font-nunito text-gray-500 text-2xl -mt-5">Productos ya vendidos - {fechaHoy}</h1>
     {error && <p className="mt-4 text-red-600 text-center">{error}</p>}
     {loading ? (
       <div className="flex justify-center items-cente">

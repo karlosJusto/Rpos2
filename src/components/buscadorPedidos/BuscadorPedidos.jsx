@@ -71,7 +71,7 @@ const BuscadorPedidos = () => {
 
         case 'confirmacionTarjeta':
           if (confirmacionTarjeta) {
-            q = query(pedidosRef, where('confirmacionTarjeta', '==', confirmacionTarjeta));
+            q = query(pedidosRef, where('idTransaction', '==', confirmacionTarjeta));
           }
           break;
 
@@ -223,7 +223,7 @@ const BuscadorPedidos = () => {
         id="confirmacionTarjeta"
         value={confirmacionTarjeta}
         onChange={(e) => setConfirmacionTarjeta(e.target.value)}
-        className="w-full sm:w-auto p-3 pl-10 pr-10 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-yellow-500"
+        className="w-full sm:w-[300px] p-3 pl-10 pr-10 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-yellow-500"
         placeholder="Ingresa la confirmación de tarjeta"
       />
       {confirmacionTarjeta && (
@@ -243,18 +243,32 @@ const BuscadorPedidos = () => {
       </div>
 
       <button
-        onClick={buscarPedidos}
-        className="w-full bg-yellow-500 text-white py-3 rounded-md shadow-md hover:bg-yellow-600 disabled:bg-gray-300"
-        disabled={loading}
-      >
-        {loading ? (
-          <div className="flex justify-center items-center">
-            <div className="spinner-border animate-spin border-t-2 border-b-2 border-yellow-500 w-6 h-6 rounded-full"></div>
-          </div>
-        ) : (
-          'Buscar Pedidos'
-        )}
-      </button>
+  onClick={buscarPedidos}
+  className="w-full bg-yellow-500 text-white py-3 rounded-md shadow-md hover:bg-yellow-600 disabled:bg-gray-300"
+  disabled={loading}
+>
+  {loading ? (
+    <div className="flex justify-center items-center">
+      <div className="spinner-border animate-spin border-t-2 border-b-2 border-yellow-500 w-6 h-6 rounded-full"></div>
+    </div>
+  ) : (
+    <div className="flex items-center justify-center gap-2">
+              <svg
+          xmlns="http://www.w3.org/2000/svg"
+          className="h-5 w-5 text-white"
+          viewBox="0 0 24 24"
+          fill="currentColor"
+        >
+          <path
+            fillRule="evenodd"
+            d="M10 2a8 8 0 015.292 13.708l4.147 4.147a1 1 0 01-1.414 1.414l-4.147-4.147A8 8 0 1110 2zm0 2a6 6 0 100 12 6 6 0 000-12z"
+            clipRule="evenodd"
+          />
+        </svg>
+              Buscar Pedidos
+            </div>
+          )}
+        </button>
 
       {error && <p className="mt-4 text-red-600 text-center">{error}</p>}
 
@@ -296,7 +310,7 @@ const BuscadorPedidos = () => {
                       <td>{pedido.fechahora}</td>
                       <td>{pedido.empleado}</td>
                       <td>{pedido.origen === 1 ? 'Online' : 'Tienda'}</td>
-                      <td>12345ABCD</td>
+                      <td className='text-[0.9vw] '>{pedido.idTransaction}</td>
                     </tr>
                   </tbody>
                 </table>

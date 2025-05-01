@@ -310,7 +310,7 @@ const ModalProductos = ({show, handleClose, product,isNuevoProducto}) => {
     <Button
       variant="danger"
       onClick={() => deleteProduct(product)}
-      className="shadow-md bg-white border-red-500 hover:bg-red-600 hover:border-red-900 p-2 font-nunito text-red-500 hover:text-red-900"
+      className="shadow-md bg-white border-red-500 hover:bg-red-700 hover:border-red-700 p-2 font-nunito text-red-500 hover:text-red-700"
     >
       Eliminar
     </Button>
@@ -321,7 +321,7 @@ const ModalProductos = ({show, handleClose, product,isNuevoProducto}) => {
     <Button
       variant="secondary"
       onClick={handleClose}
-      className=" shadow-md bg-white border-red-500 hover:bg-red-600 hover:border-red-900 p-2 font-nunito text-red-500 hover:text-red-900"
+      className=" shadow-md bg-white border-red-500 hover:bg-red-700 hover:border-red-700 p-2 font-nunito text-red-500 hover:text-red-700"
     >
       Cancelar
     </Button>
@@ -329,10 +329,10 @@ const ModalProductos = ({show, handleClose, product,isNuevoProducto}) => {
 
   {/* Botón para agregar o modificar el producto */}
   <Button
-    variant={isNuevoProducto ? 'primary' : 'warning'}
+    variant={isNuevoProducto ? 'warning' : 'warning'}
     onClick={() => buyProducts(product)}
     className={`
-      ${isNuevoProducto ? 'shadow-md bg-white text-yellow-500 border-yellow-500 hover:bg-yellow-600 hover:border-yellow-600 p-2 font-nunito' : 'shadow-md bg-white text-yellow-500 border-yellow-500 hover:bg-yellow-900 hover:border-yellow-900 p-2 font-nunito'}
+      ${isNuevoProducto ? 'shadow-md bg-white text-yellow-500 border-yellow-500 hover:bg-yellow-600 hover:text-yellow-600 hover:border-yellow-600 p-2 font-nunito' : 'shadow-md bg-white text-yellow-500 border-yellow-500 hover:bg-yellow-600 hover:text-yellow-600 hover:border-yellow-600 p-2 font-nunito'}
      
     `}
   >

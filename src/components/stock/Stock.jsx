@@ -129,16 +129,15 @@ const Stock = () => {
                           className="w-15 h-10 object-cover rounded-md mx-auto"
                         />
                       </td>
-                      <td className="px-4 py-2 font-nunito text-lg">{producto.name}</td>
+                      <td className="px-4 py-2 font-nunito text-lg truncate max-w-[150px]">{producto.name}</td>
                       <td className="px-4 py-2">
-                        <input
-                          type="number"
-                          value={stockActual[producto.id_product] || ""}
-                          onChange={(e) => handleStockActualChange(producto.id_product, e)}
-                          min="0"
-                          placeholder="Nuevo stock"
-                          className="px-2 py-1 border border-gray-300 rounded-md w-20 text-center focus:ring-yellow-500 focus:border-yellow-500"
-                        />
+                      <span
+                        className={`px-2 py-1 w-20 text-center inline-block font-nunito font-extrabold ${
+                          stockActual[producto.id_product] ? 'text-green-700  bg-white' : 'text-gray-900 font-nunito bg-red-500 rounded-md '
+                        }`}
+                      >
+                        {stockActual[producto.id_product] || "0"}
+                      </span>
                       </td>
                       <td className="px-4 py-2">
                         <input
@@ -147,7 +146,7 @@ const Stock = () => {
                           onChange={(e) => handleStockChange(producto.id_product, e)}
                           min="0"
                           step="any"
-                          placeholder="Nuevo stock"
+                          placeholder=""
                           className="px-2 py-1 border border-gray-300 rounded-md w-20 text-center focus:ring-yellow-500 focus:border-yellow-500"
                         />
                       </td>

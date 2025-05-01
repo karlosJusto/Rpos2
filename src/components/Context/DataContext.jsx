@@ -288,9 +288,12 @@ const obtenerFechaFormateada = () => {
     try {
       const productoRef = doc(db, "productos", idString);
       await updateDoc(productoRef, { stock: nuevoStock });
+
+
     } catch (error) {
       console.error("Error al actualizar el stock:", error);
     }
+
   };
 
   const categoria = useParams().categoria;

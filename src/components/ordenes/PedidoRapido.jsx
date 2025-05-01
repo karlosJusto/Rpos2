@@ -189,7 +189,7 @@ const PedidoRapido = forwardRef(({ datosCliente }, ref) => {
         
         <Modal.Body className="flex flex-col items-center p-4">
           {/* Puedes añadir un icono de error aquí */}
-          <div className='p-1'>
+          <div className='-mt-3 '>
          <svg fill="#c81d0c" width="100px" height="100px" viewBox="0 0 22 22" version="1.1" xmlns="http://www.w3.org/2000/svg">
 
               <g id="SVGRepo_bgCarrier" strokeWidth="0"/>
@@ -207,11 +207,11 @@ const PedidoRapido = forwardRef(({ datosCliente }, ref) => {
 
 
          </div>
-          <p className="font-nunito text-xl p-2 text-center text-gray-700">No hay suficiente stock de Pollo para pedido Rápido.</p>
+          <p className="font-nunito text-lg  text-center text-gray-700">No hay suficiente stock de Pollo para pedido Rápido.</p>
         </Modal.Body>
         <Modal.Footer className='no-border'>
           {/* Botón Aceptar: Cierra el modal y asegura que isSubmitting es false */}
-          <Button variant="primary" className="mt-1 bg-yellow-500 border-yellow-500 hover:bg-yellow-600 hover:border-yellow-600 py-2 px-5 font-nunito text-white rounded-md shadow-sm" onClick={() => { handleCloseModal2(); }}>
+          <Button variant="primary" className="mt-3 bg-white  border-yellow-500 hover:border-yellow-600 hover:text-yellow-600 font-nunito text-yellow-500 rounded-md shadow-sm" onClick={() => { handleCloseModal2(); }}>
             Aceptar
           </Button>
         </Modal.Footer>

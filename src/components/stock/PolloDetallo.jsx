@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { db } from '../firebase/firebase'; // Importa la instancia de Firebase
-import { collection, getDocs, doc, setDoc, updateDoc } from 'firebase/firestore'; // Importa las funciones necesarias 
+import { collection, getDocs, doc, setDoc, updateDoc, onSnapshot } from 'firebase/firestore'; // Importa las funciones necesarias 
 import Table from 'react-bootstrap/Table';
 import dayjs from 'dayjs';
 
@@ -60,27 +60,51 @@ const PolloDetallo = () => {
 
   // Función para actualizar todos los campos en Firebase
   const handleActualizar = async () => {
+
     try {
+
+      const hoy = dayjs();
+      const fechasPermitidas = [
+        hoy.format('DD-MM-YYYY'),
+        hoy.subtract(1, 'day').format('DD-MM-YYYY'),
+        hoy.subtract(2, 'day').format('DD-MM-YYYY')
+      ];
+
+
       let stockFinal=0;
+      let stock_anterior=-1000000000000;
       for (const item of estadisticas) {
+        if (!fechasPermitidas.includes(item.dia)) {
+          continue;
+        }
+
+        console.log("****DIA: "+item.dia);
         const docRef = doc(db, 'estadisticas_diarias', item.dia); // Referencia al documento en Firestore
 
          // Realizamos los cálculos antes de actualizar el documento
-         const stockActualizado = (item.entran || 0) + (item.stock_anterior || 0);
-          stockFinal = stockActualizado - (item.vd || 0) - (item.baja || 0) - (item.devueltos || 0);
+         if (stock_anterior==-1000000000000)
+           stock_anterior=  (item.stock_anterior || 0);
+        
+        const stockActualizado = (item.entran || 0) + stock_anterior;
+        stockFinal = stockActualizado - (item.vd || 0) - (item.baja || 0) - (item.devueltos || 0);
 
          console.log("Stock_final:"+stockFinal);
+         console.log("Stock_anterior:"+stock_anterior);
+
 
         // Aquí actualizamos todos los campos para ese día
         await updateDoc(docRef, {
           entran: item.entran,
           baja: item.baja,
           devueltos: item.devueltos,
+          stock_anterior: stock_anterior,
           stock: stockFinal,
           //stockactualizado: stockActualizado,
           //stockfinal: stockFinal,
            // Calculo de total
         });
+
+        stock_anterior=stockFinal;
 
        //console.log(`Datos del día ${item.dia} actualizados correctamente.`);
        //alert(`Datos del día ${item.dia} actualizados correctamente.`);
@@ -89,8 +113,11 @@ const PolloDetallo = () => {
       const docRef = doc(db, 'productos', '1'); // Referencia al documento en Firestore
       await updateDoc(docRef, {
         stock: stockFinal
-      });
+      }
+    );
 
+
+      window.location.reload();
 
       
     } catch (error) {
@@ -108,7 +135,7 @@ const PolloDetallo = () => {
 
   return (
     <div className="container my-4">
-      <h2 className="text-center mb-4 font-nunito text-gray-500 text-2xl">Gestion Stock Pollos</h2>
+      <h2 className="text-center mb-4 font-nunito text-gray-500 text-2xl -mt-8">Gestion Stock Pollos</h2>
       <Table striped bordered hover size="sm" className='font-nunito'>
         <thead>
           <tr className='text-center'>
@@ -119,7 +146,7 @@ const PolloDetallo = () => {
             <th>Salen</th>
             <th>Baja</th>
             <th>Devueltos</th>
-            <th className='text-blue-500'>Stock</th>
+            <th>Stock</th>
           </tr>
         </thead>
         <tbody className='text-center'>
@@ -140,7 +167,7 @@ const PolloDetallo = () => {
                 isMonday && (
                   <tr key={`separator-${item.dia}`} className="separator-row">
                     <td colSpan="8" className="text-center py-2">
-                      <span className="text-yellow-500">Siguiente Semana</span>
+                      <span className="text-yellow-500 "></span>
                     </td>
                   </tr>
                 ),
@@ -152,7 +179,7 @@ const PolloDetallo = () => {
                   <td className="table-cell-width text-center w-32">
                     <input 
                       type="number" 
-                      value={item.entran === 0 ? '0' : item.entran || ''} 
+                      value={item.entran === 0 ? '' : item.entran || ''} 
                       onChange={(e) => handleInputChange(e, item.dia, 'entran')} 
                       className="form-control w-24 mx-auto text-center"
                       min="0" // Aseguramos que no pueda ser negativo
@@ -165,7 +192,7 @@ const PolloDetallo = () => {
                   <td className="table-cell-width w-32">
                     <input 
                       type="number" 
-                      value={item.baja === 0 ? '0' : item.baja || ''} 
+                      value={item.baja === 0 ? '' : item.baja || ''} 
                       onChange={(e) => handleInputChange(e, item.dia, 'baja')} 
                       className="form-control w-24 mx-auto text-center"
                       min="0" // Aseguramos que no pueda ser negativo
@@ -175,7 +202,7 @@ const PolloDetallo = () => {
                   <td className="table-cell-width w-40 ">
                     <input 
                       type="number" 
-                      value={item.devueltos === 0 ? '0' : item.devueltos || ''} 
+                      value={item.devueltos === 0 ? '' : item.devueltos || ''} 
                       onChange={(e) => handleInputChange(e, item.dia, 'devueltos')} 
                       className="form-control w-24 mx-auto text-center"
                       min="0" // Aseguramos que no pueda ser negativo

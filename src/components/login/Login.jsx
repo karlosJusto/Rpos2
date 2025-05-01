@@ -65,6 +65,8 @@ dayjs.locale('es');
        // Función para obtener el stock de un producto
 
  const [stock, setStock] = useState(null);  
+
+ //console.log(stock);
  
  const obtenerStockProducto = async (productId) => {
   try {
@@ -117,6 +119,16 @@ const generarEstadisticasDiarias = async () => {
     const docSnapshot = await getDoc(docRef);
 
     if (!docSnapshot.exists()) {
+      const fechaAyer = dayjs().tz('Europe/Madrid').subtract(1, 'day');
+      const fechaAyerStr = fechaAyer.format('DD-MM-YYYY');
+      const docAnteriorRef = doc(db, "estadisticas_diarias", fechaAyerStr);
+      const docAnteriorSnapshot = await getDoc(docAnteriorRef);
+
+      const stockAnterior = docAnteriorSnapshot.exists()
+      ? docAnteriorSnapshot.data().stock || 0
+      : 0;
+
+
       await setDoc(docRef, {
         diasemana: diaSemana,
         enbarra: 0,
@@ -125,8 +137,8 @@ const generarEstadisticasDiarias = async () => {
         vm: 0,
         vt: 0,
         vd: 0,
-        stock: stock, // Usamos el valor de stock
-        stock_anterior: stock,
+        stock: stockAnterior, // Usamos el valor de stock
+        stock_anterior: stockAnterior,
         //stockactualizado:0,
         //stockfinal:0,
         entran: 0,
@@ -152,7 +164,7 @@ const generarEstadisticasDiarias = async () => {
     setIsLoading(true);
     setErrorMessage('');
 
-    console.log(valorInput);
+    //console.log(valorInput);
 
     try {
       // Creamos la consulta para buscar al empleado con el PIN ingresado

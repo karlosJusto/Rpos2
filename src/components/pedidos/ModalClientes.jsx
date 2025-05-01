@@ -241,7 +241,7 @@ const ModalClientes = ({ show, handleClose, onSave, initialData,clearClientData 
 
           {/* Checkboxes */}
           <div className='pt-[3vh] text-center'>
-            <div className="form-check form-check-inline border-2 p-[1vw] border-gray-200 rounded-xl">
+            <div className="form-check form-check-inline border-2 p-[0.8vw] border-gray-200 rounded-xl">
               <input
                 className="form-check-input m-1"
                 type="checkbox"
@@ -279,7 +279,7 @@ const ModalClientes = ({ show, handleClose, onSave, initialData,clearClientData 
         <div className="flex justify-end space-x-3 mt-2">
   <Button
      variant="danger"
-    className="p-2 bg-white font-nunito text-red-600 border-red-600 hover:text-red-900 hover:border-red-900 shadow-sm"
+    className="p-2 bg-white font-nunito text-red-500 border-red-500 hover:text-red-700 hover:border-red-700 shadow-sm"
     onClick={() => {
       if (formData.cliente) {
         clearClientData(); // ✅ Limpia los datos del ticket
@@ -295,7 +295,7 @@ const ModalClientes = ({ show, handleClose, onSave, initialData,clearClientData 
   <Button
     variant="primary"
     onClick={handleSubmitData}
-    className="bg-white text-yellow-500 border-yellow-500 hover:bg-yellow-900 hover:border-yellow-900 p-2 font-nunito shadow-sm"
+    className="bg-white text-yellow-500 border-yellow-500 hover:bg-yellow-600  hover:text-yellow-600 hover:border-yellow-600 p-2 font-nunito shadow-sm"
   >
     {initialData.cliente ? "Actualizar" : "Agregar"}
   </Button>

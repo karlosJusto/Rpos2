@@ -678,7 +678,7 @@ const CartTotal = ({ datosCliente, setDatosCliente, orderToEdit }) => {
          <p className="font-nunito text-lg  text-center text-gray-700 whitespace-pre-line">{mensajeModal}</p>
          </Modal.Body>
         <Modal.Footer className='no-border'>
-          <Button variant="primary" className="mt-5 bg-white  border-yellow-500 hover:text-yellow-900 hover:border-yellow-900 py-2 px-5 font-nunito text-yellow-500 rounded-md shadow-sm" onClick={() => { handleCloseModal2(); setIsSubmitting(false); }}>
+          <Button variant="primary" className="mt-5 bg-white  border-yellow-500 hover:text-yellow-600 hover:border-yellow-600 py-2  font-nunito text-yellow-500 rounded-md shadow-sm" onClick={() => { handleCloseModal2(); setIsSubmitting(false); }}>
             Aceptar
           </Button>
         </Modal.Footer>
@@ -697,17 +697,17 @@ const CartTotal = ({ datosCliente, setDatosCliente, orderToEdit }) => {
           <p className="font-nunito text-lg p-2 text-center text-gray-700 whitespace-pre-line">{mensajeModal}</p>
         </Modal.Body>
         <Modal.Footer className="border-t-0 flex justify-around p-4">
-          <Button variant="secondary" className="py-2 px-5 bg-white font-nunito text-red-500 border-red-500 hover:text-red-600 hover:border-red-600 shadow-sm" onClick={() => { handleCloseModal(); setIsSubmitting(false); }} disabled={isSubmitting}>
+          <Button variant="secondary" className=" bg-white font-nunito text-red-500 border-red-500 hover:text-red-700 hover:border-red-700 shadow-sm" onClick={() => { handleCloseModal(); setIsSubmitting(false); }} disabled={isSubmitting}>
             Cancelar
           </Button>
           <Button
              variant="primary"
              onClick={async () => { await sendToFirestore({ confirmado: true }); }}
              disabled={isSubmitting}
-             className={`py-2 px-5 font-nunito  rounded-md shadow-sm transition-colors duration-200 ${
+             className={` font-nunito  rounded-md shadow-sm transition-colors duration-200 ${
                  isSubmitting
                  ? 'bg-gray-400 border-gray-400 cursor-not-allowed'
-                 : 'bg-white text-yellow-500 border-yellow-500 hover:text-yellow-900 hover:border-yellow-900'
+                 : 'bg-white text-yellow-500 border-yellow-500 hover:text-yellow-600 hover:border-yellow-600'
              }`}
             >
             {isSubmitting ? 'Procesando...' : 'Continuar'}

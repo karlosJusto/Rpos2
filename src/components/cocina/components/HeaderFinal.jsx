@@ -196,39 +196,51 @@ const HeaderFinal = ({ mostrarBarra, onDateAccept, currentSelectedDate, showSupe
           </ThemeProvider>
         </Modal.Body>
         <Modal.Footer className='no-border'>
-          <Button variant="secondary"className="shadow-md bg-white border-red-500 hover:bg-red-600 hover:border-red-900 p-2 font-nunito text-red-500 hover:text-red-900" onClick={handleCloseDateModal}> Cancelar </Button>
-          <Button variant="primary" className="shadow-md p-2 bg-white font-nunito text-yellow-500 border-yellow-500 hover:text-yellow-900  hover:border-yellow-900"onClick={handleAcceptDate}> Aceptar </Button>
+          <Button variant="secondary"className="shadow-md bg-white border-red-500  hover:border-red-700 p-2 font-nunito text-red-500 hover:text-red-700" onClick={handleCloseDateModal}> Cancelar </Button>
+          <Button variant="primary" className="shadow-md p-2 bg-white font-nunito text-yellow-500 border-yellow-500 hover:text-yellow-600  hover:border-yellow-600"onClick={handleAcceptDate}> Aceptar </Button>
         </Modal.Footer>
       </Modal>
 
       {/* --- NUEVO: Modal para Sumar Número --- */}
-      <Modal show={showSumarModal} onHide={handleCloseSumarModal} size="md" backdrop="static" keyboard={false} top>
-        <Modal.Body>
-          <h1 className='text-center font-nnunito text-xl text-gray-500 p-2'>SUMAR EN BARRA</h1>
-          <Form.Group controlId="numeroParaSumarHeader"> {/* Changed ID slightly */}
-            <Form.Label className="font-nunito text-center text-gray-300 p-2">Introduce el número a sumar (puede ser negativo):</Form.Label>
-            <Form.Control
-              className='p-[1vw] text-center font-nunito text-lg text-gray-700'
-              type="number"
-              placeholder=""
-              value={numeroASumar}
-              onChange={handleNumeroASumarChange}
-              autoFocus
-              style={{
-                outlineColor: '#facc15',
-                outlineStyle: 'auto',
-              }}
-            />
-          </Form.Group>
-        </Modal.Body>
-        <Modal.Footer style={{ borderTop: 'none' }}>
-          <Button variant="secondary" onClick={handleCloseSumarModal} className="shadow-md bg-white border-red-500 hover:bg-red-600 hover:border-red-900 p-2 font-nunito text-red-500 hover:text-red-900">
-            Cancelar
-          </Button>
-          <Button variant="primary" onClick={handleConfirmarSuma} className="shadow-md p-2 bg-white font-nunito text-yellow-500 border-yellow-500 hover:text-yellow-900  hover:border-yellow-900">
-            Actualizar
-          </Button>
-        </Modal.Footer>
+      <Modal show={showSumarModal} onHide={handleCloseSumarModal} size="md" backdrop="static" keyboard={false} centered>
+  <Modal.Body className="bg-white  p-4">
+    <h1 className="text-center font-nunito text-2xl text-gray-700 mb-4">Sumar en barra</h1>
+    <Form.Group controlId="numeroParaSumar">
+      <Form.Label className="block text-center text-gray-300 font-nunito mb-4">
+        Introduce la cantidad a sumar (admite negativos):
+      </Form.Label>
+      <div className="flex justify-center ">
+        <input
+          type="number"
+          value={numeroASumar}
+          onChange={(e) => {
+            const val = e.target.value;
+            if (val.length <= 3) {
+              handleNumeroASumarChange(e);
+            }
+          }}
+          maxLength={3}
+          autoFocus
+          className="text-center w-[40%]  text-3xl font-nunito text-gray-700 bg-transparent border-b-2 border-yellow-400 focus:outline-none focus:border-yellow-500 transition duration-300"
+          placeholder="0"
+        />
+      </div>
+    </Form.Group>
+  </Modal.Body>
+  <Modal.Footer className="flex justify-end gap-2" style={{ borderTop: 'none' }}>
+          <Button
+          variant="secondary"
+          onClick={handleCloseSumarModal}
+          className=" shadow-md bg-white border-red-500  hover:border-red-700 p-2 font-nunito text-red-500 hover:text-red-700">
+          Cancelar
+        </Button>
+    <Button
+      variant="primary"
+      onClick={handleConfirmarSuma}
+      className="shadow-md p-2 bg-white font-nunito text-yellow-500 border-yellow-500 hover:text-yellow-600 hover:border-yellow-600">
+      Actualizar
+    </Button>
+  </Modal.Footer>
       </Modal>
       {/* --- FIN NUEVO MODAL --- */}
 
