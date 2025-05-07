@@ -1,10 +1,6 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { db } from '../firebase/firebase';
-import { collection, query, where, onSnapshot,getDocs } from 'firebase/firestore'; // Importa onSnapshot
-import patata from '../../assets/freidora/patata.png';
-import pimiento from '../../assets/freidora/pimiento.png';
-import croquetas from '../../assets/freidora/croquetas.png';
-import doble from '../../assets/freidora/doble.png';
+import { collection, query, where, onSnapshot, getDocs, orderBy } from 'firebase/firestore'; // Importa onSnapshot, getDocs, orderBy
 import singluten from '../../assets/singluten.png'; // Imagen sin gluten
 import dayjs from 'dayjs';
 import timezone from 'dayjs/plugin/timezone'; // Plugin para zona horaria
@@ -15,6 +11,8 @@ import utc from 'dayjs/plugin/utc'; // Plugin para trabajar con fechas en UTC
 dayjs.extend(utc);
 dayjs.extend(timezone);
 
+// Images will be loaded directly from Firebase Storage URLs provided in Firestore documents
+
 const Freidora = () => {
   const [pedidos, setPedidos] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -24,18 +22,7 @@ const Freidora = () => {
   const [anteriores, setAnteriores] = useState('');
   const [posteriores, setPosteriores] = useState('');
   const [pedidosTotales, setPedidosTotales] = useState({}); // Inicializado como objeto para consistencia
-
-  // Define los productos a mostrar en la sección de freidora
-  // Si añades más de 3 productos aquí, el diseño cambiará automáticamente.
-  const productosFreidoraMostrados = [
-    { id: 'patatas', nombreDisplay: 'Patatas', imagenSrc: patata, filtroKey: 'patatas' },
-    { id: 'pimientos', nombreDisplay: 'Pimientos', imagenSrc: pimiento, filtroKey: 'pimientos' },
-    { id: 'croquetas', nombreDisplay: 'Croquetas', imagenSrc: croquetas, filtroKey: 'croquetas' },
-    // Ejemplo: Si añades un cuarto producto, el layout cambiará:
-    //{ id: 'alitas', nombreDisplay: 'Alitas', imagenSrc: '', filtroKey: 'alitas' },
-   
-  ];
-
+  const [productosFreidoraConfig, setProductosFreidoraConfig] = useState([]); // State for freidora products
 
   useEffect(() => {
     // Función para actualizar la hora y los bloques
@@ -78,17 +65,58 @@ const Freidora = () => {
     return () => clearInterval(interval);
   }, []);
 
+  // useEffect to load freidora products configuration from Firebase
+  useEffect(() => {
+    const fetchFreidoraProducts = async () => {
+      try {
+        const freidoraCollectionRef = collection(db, 'freidora');
+        // You can order by a specific field, e.g., 'orden' or 'nombreDisplay'
+        // If you add an 'orden' field to your Firebase documents, use orderBy('orden')
+        const q = query(freidoraCollectionRef, orderBy('nombreDisplay')); 
+        const querySnapshot = await getDocs(q);
+        const loadedProducts = [];
+        querySnapshot.forEach((doc) => {
+          const data = doc.data();
+          loadedProducts.push({
+            id: doc.id, // Use Firestore document ID as the product id
+            nombreDisplay: data.nombreDisplay,
+            imagenSrc: data.imagenUrl || null, // Use the image URL from Firebase
+            filtroKey: data.filtroKey,
+          });
+        });
+        setProductosFreidoraConfig(loadedProducts);
+      } catch (err) {
+        console.error("Error fetching freidora products:", err);
+        // Optionally, set an error state here to display to the user
+      }
+    };
+    fetchFreidoraProducts();
+  }, []); // Runs once on mount
+
+  // Use useMemo to create a list of freidora products with unique filtroKey
+  const uniqueProductosFreidoraMostrados = useMemo(() => {
+    const uniqueKeys = new Set();
+    const result = [];
+    productosFreidoraConfig.forEach(producto => {
+      if (!uniqueKeys.has(producto.filtroKey)) {
+        uniqueKeys.add(producto.filtroKey);
+        result.push(producto);
+      }
+    });
+    return result;
+  }, [productosFreidoraConfig]);
+
 
 useEffect(() => {
   const hoy = new Date();
   const dia = String(hoy.getDate()).padStart(2, '0');
   const mes = String(hoy.getMonth() + 1).padStart(2, '0');
   const anio = hoy.getFullYear();
-  const horaActual = hoy.getHours();
+  const horaActualDate = hoy.getHours(); // Renamed to avoid conflict with 'hora' state
 
   let fechaInicio, fechaFin;
 
-  if (horaActual < 18) {
+  if (horaActualDate < 18) {
     fechaInicio = `${dia}/${mes}/${anio} 00:00`;
     fechaFin = `${dia}/${mes}/${anio} 17:59`;
   } else {
@@ -217,7 +245,7 @@ useEffect(() => {
   return () => unsubscribe();
 }, []);
 
-  const numProductosFreidora = productosFreidoraMostrados.length;
+  const numProductosFreidora = uniqueProductosFreidoraMostrados.length;
 
   const contenedorProductosClases = numProductosFreidora > 3
     ? "flex items-stretch space-x-4 overflow-x-auto py-2 mx-auto w-full px-2 sm:px-4 font-nunito mt-2"
@@ -231,13 +259,13 @@ useEffect(() => {
   return (
     <>
       <div className={contenedorProductosClases}>
-        {productosFreidoraMostrados.map((productoInfo) => (
+        {uniqueProductosFreidoraMostrados.map((productoInfo) => (
           <div key={productoInfo.id} className={tarjetaProductoClases}>
             <div className="flex justify-center p-2">
               <img
                 src={productoInfo.imagenSrc}
                 alt={productoInfo.nombreDisplay}
-                className="w-[15%] h-[15%] p-2 bg-white border-3 border-gray-700 rounded-full object-contain" // Añadido object-contain
+                className="w-20 h-20 p-1 bg-white border-2 border-gray-700 rounded-full object-contain"
               />
             </div>
             {/* Opcional: Título dentro de la tarjeta si lo deseas */}

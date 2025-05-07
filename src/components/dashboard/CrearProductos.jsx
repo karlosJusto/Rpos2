@@ -1,10 +1,14 @@
 import React, { useState, useEffect } from "react";
 import { storage, db } from "../firebase/firebase";
 import { ref, uploadBytesResumable, getDownloadURL } from "firebase/storage"; // prettier-ignore
-import { collection, getDocs, doc, setDoc, query, where } from "firebase/firestore"; // prettier-ignore
+import { collection, getDocs, doc, setDoc, query, where, deleteDoc } from "firebase/firestore"; // prettier-ignore
 // import { useLocation } from "react-router-dom"; // Ya no se usa
 import ImageCropper from "./ImageCropper";
 import productosIcon from '../../assets/productos.png'; // Renombrado para evitar conflicto
+
+// Constante para los nombres clave de la freidora
+const FREIDORA_KEY_WORDS = ["patatas", "croquetas", "pimientos"];
+
 
 // Props: productoEditarProp, modoEdicionProp, onSave, onClose
 const CrearProductos = ({ productoEditarProp, modoEdicionProp, onSave, onClose }) => {
@@ -235,6 +239,31 @@ const CrearProductos = ({ productoEditarProp, modoEdicionProp, onSave, onClose }
       await setDoc(doc(db, "productos", idDocYProd.toString()), productoFinal);
       if (producto.cocina) {
         await setDoc(doc(db, "cocina", idDocYProd.toString()), { nombre: producto.nombre, id_producto: idDocYProd });
+      }
+
+      // Handle 'freidora' collection
+      const freidoraDocRef = doc(db, "freidora", idDocYProd.toString());
+      if (producto.freidora) {
+        let filtroKeyValue = producto.nombre.toLowerCase(); // Valor por defecto
+        const nombreProductoLower = producto.nombre.toLowerCase();
+
+        for (const keyword of FREIDORA_KEY_WORDS) {
+          if (nombreProductoLower.includes(keyword)) {
+            filtroKeyValue = keyword;
+            break; // Usar la primera coincidencia
+          }
+        }
+
+        const freidoraData = {
+          nombreDisplay: producto.nombre,
+          filtroKey: filtroKeyValue,
+          imagenUrl: imagenUrl, // This is productoFinal.imagen (image without background)
+          // id_producto: idDocYProd, // Optional: if you need a direct reference back
+        };
+        await setDoc(freidoraDocRef, freidoraData);
+      } else {
+        // If not a freidora product, ensure it's removed from the 'freidora' collection
+        await deleteDoc(freidoraDocRef);
       }
       // No setMensaje aquí, se maneja en ListaProductos a través de onSave
       onSave(); // Notificar al padre
