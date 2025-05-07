@@ -9,6 +9,12 @@ const Sidebar = () => {
 
   const empleadoNombre=sessionStorage.getItem('empleadoNombre');
 
+  const handleLogout = () => {
+    sessionStorage.removeItem('empleadoNombre');
+    // Limpia cualquier otro estado relacionado si es necesario
+    navigate('/login');
+  };
+
 
   return (
     <div className="flex justify-center items-center h-screen"> 
@@ -121,7 +127,7 @@ const Sidebar = () => {
 
            
 
-             <Link className='p-3 mb-2 hover:bg-gray-100 hover:rounded-2xl' to={"/"}>
+             <Link className='p-3 mb-2 hover:bg-gray-100 hover:rounded-2xl' to={"/"} onClick={handleLogout}>
              
              <svg width="40px" height="40px" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
 

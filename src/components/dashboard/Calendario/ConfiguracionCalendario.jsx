@@ -186,7 +186,7 @@ function ConfiguracionCalendario() {
 
   // --- RENDERIZADO ---
   return (
-    <div className="w-full max-w-7xl bg-white rounded-xl shadow-md overflow-hidden mb-8">
+    <div className="w-full  bg-white rounded-xl shadow-md -mt-8 mb-8">
       {/* Header */}
       <div className="text-center py-6 border-b border-gray-100">
         <h1 className="text-3xl font-bold text-gray-800">Configuración Semanal General</h1>
@@ -310,7 +310,7 @@ function ConfiguracionCalendario() {
                        title="Permitir Venta en Negativo"
                        checked={day.negativeStock || false}
                        onChange={(e) => handleCheckboxChange(day.id, 'negativeStock', e.target.checked)}
-                       className="w-4 h-4 text-blue-600 focus:ring-blue-500"
+                       className="w-4 h-4 text-yellow-500 focus:ring-yellow-500"
                      />
                    </td>
 
@@ -347,7 +347,7 @@ function ConfiguracionCalendario() {
         {/* Botón para actualizar la configuración base */}
         <div className="mt-6 flex justify-end">
           <button
-            className="flex items-center bg-blue-600 hover:bg-blue-700 text-white px-5 py-2 rounded-lg shadow hover:shadow-md transition-colors duration-200"
+            className="flex items-center bg-yellow-500 hover:bg-yellow-600 font-nunito text-white px-5 py-2 rounded-lg shadow hover:shadow-md transition-colors duration-200"
             onClick={handleUpdateBaseConfig} // Llama a la función que ahora usa setDoc
           >
             <Save className="w-5 h-5 mr-2" />

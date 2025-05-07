@@ -1,16 +1,17 @@
 import React, { useState, useEffect } from "react";
 import { storage, db } from "../firebase/firebase";
-import { ref, uploadBytesResumable, getDownloadURL } from "firebase/storage";
-import { collection, getDocs, doc, setDoc } from "firebase/firestore";
-import { useLocation } from "react-router-dom";
-import ImageCropper from "./ImageCropper"; // Asegúrate de que la ruta sea la correcta
+import { ref, uploadBytesResumable, getDownloadURL } from "firebase/storage"; // prettier-ignore
+import { collection, getDocs, doc, setDoc, query, where } from "firebase/firestore"; // prettier-ignore
+// import { useLocation } from "react-router-dom"; // Ya no se usa
+import ImageCropper from "./ImageCropper";
+import productosIcon from '../../assets/productos.png'; // Renombrado para evitar conflicto
 
-const CrearProductos = () => {
-  const location = useLocation();
-  const productoEditar = location.state?.producto || null;
-  const modoEdicion = location.state?.modo === "editar";
+// Props: productoEditarProp, modoEdicionProp, onSave, onClose
+const CrearProductos = ({ productoEditarProp, modoEdicionProp, onSave, onClose }) => {
+  const productoEditar = productoEditarProp;
+  const modoEdicion = modoEdicionProp;
 
-  const [producto, setProducto] = useState({
+  const initialProductFormState = {
     nombre: "",
     alias: "",
     categoria: "",
@@ -29,66 +30,78 @@ const CrearProductos = () => {
     promocion: false,
     imagen: null,
     imagenRpos: null,
-  });
+    stock: 10,
+  };
+
+  const [producto, setProducto] = useState(initialProductFormState);
   const [progreso, setProgreso] = useState(0);
-  const [mensaje, setMensaje] = useState("");
+  const [mensaje, setMensaje] = useState(""); // Mensaje local para el formulario
   const [cropModal, setCropModal] = useState({ open: false, field: "", imageSrc: "" });
 
-  // Cargar datos del producto si se está en modo edición
   useEffect(() => {
     if (modoEdicion && productoEditar) {
       setProducto({
-        nombre: productoEditar.name || "",
-        alias: productoEditar.alias || "",
-        categoria: productoEditar.categoria || "",
-        precio: productoEditar.price || "",
-        visible: productoEditar.visible === 1,
-        descripcionBreve: productoEditar.description_half || "",
-        descripcion: productoEditar.description || "",
-        celiaco: productoEditar.gluten_free === "1",
-        vegetariano: productoEditar.vegetarian === "1",
-        vegano: productoEditar.vegan === "1",
-        freidora: false, // Ajusta si tienes este campo en la base
-        productoDoble: false,
-        mediaRacion: productoEditar.half ? true : false,
-        sabores: productoEditar.sabores === "1",
-        cocina: productoEditar.cocina === "1",
-        promocion: productoEditar.promocion === "1",
-        imagen: productoEditar.imagen || null,
-        imagenRpos: productoEditar.imagen_rpos || null,
+        ...initialProductFormState,
+        nombre: productoEditar.name || initialProductFormState.nombre,
+        alias: productoEditar.alias || initialProductFormState.alias,
+        categoria: productoEditar.categoria || initialProductFormState.categoria,
+        precio: productoEditar.price ? productoEditar.price.toString() : initialProductFormState.precio,
+        visible: productoEditar.hasOwnProperty('visible') ? (productoEditar.visible === 1 || productoEditar.visible === "1") : initialProductFormState.visible,
+        descripcionBreve: productoEditar.description_half || initialProductFormState.descripcionBreve,
+        descripcion: productoEditar.description || initialProductFormState.descripcion,
+        celiaco: productoEditar.hasOwnProperty('gluten_free') ? productoEditar.gluten_free === "1" : initialProductFormState.celiaco,
+        vegetariano: productoEditar.hasOwnProperty('vegetarian') ? productoEditar.vegetarian === "1" : initialProductFormState.vegetariano,
+        vegano: productoEditar.hasOwnProperty('vegan') ? productoEditar.vegan === "1" : initialProductFormState.vegano,
+        freidora: productoEditar.hasOwnProperty('freidora') ? (productoEditar.freidora === "1" || productoEditar.freidora === true) : initialProductFormState.freidora,
+        productoDoble: productoEditar.hasOwnProperty('productoDoble') ? (productoEditar.productoDoble === "1" || productoEditar.productoDoble === true) : initialProductFormState.productoDoble,
+        mediaRacion: productoEditar.hasOwnProperty('half') ? (productoEditar.half === 1 || productoEditar.half === "1") : initialProductFormState.mediaRacion,
+        sabores: productoEditar.hasOwnProperty('sabores') ? productoEditar.sabores === "1" : initialProductFormState.sabores,
+        cocina: productoEditar.hasOwnProperty('cocina') ? (productoEditar.cocina === "1" || productoEditar.cocina === true) : initialProductFormState.cocina,
+        promocion: productoEditar.hasOwnProperty('promocion') ? (productoEditar.promocion === "1" || productoEditar.promocion === true) : initialProductFormState.promocion,
+        imagen: productoEditar.imagen || initialProductFormState.imagen, // URL si ya existe
+        imagenRpos: productoEditar.imagen_rpos || initialProductFormState.imagenRpos, // URL si ya existe
+        stock: productoEditar.hasOwnProperty('stock') ? Number(productoEditar.stock) : initialProductFormState.stock,
       });
+    } else {
+      setProducto(initialProductFormState);
     }
+    setMensaje(""); // Limpiar mensaje al cambiar de modo o producto
+    setProgreso(0); // Resetear progreso
   }, [modoEdicion, productoEditar]);
 
-  // Manejo de cambios en los inputs
+
   const handleChange = (e) => {
     const { name, type, checked, value } = e.target;
-    const newValue = type === "checkbox" ? checked : value;
+    let newValue = type === "checkbox" ? checked : value;
+    if (name === "stock") {
+        if (value === "" || /^[0-9\b]+$/.test(value)) {
+            newValue = value;
+        } else {
+            return;
+        }
+    }
     setProducto({ ...producto, [name]: newValue });
   };
 
-  // Formatea el precio a 2 decimales con punto (ej. "12.00")
   const handlePriceBlur = (e) => {
     let value = e.target.value;
     if (value) {
-      const numberValue = parseFloat(value);
+      const numberValue = parseFloat(value.replace(",", "."));
       if (!isNaN(numberValue)) {
-        const formatted = numberValue.toFixed(2);
-        setProducto({ ...producto, precio: formatted });
+        setProducto({ ...producto, precio: numberValue.toFixed(2) });
+      } else {
+        setProducto({ ...producto, precio: "" });
       }
     }
   };
 
-  // Abre el modal para recortar imagen
   const handleImageChange = (e) => {
     const file = e.target.files[0];
     if (file) {
-      const imageSrc = URL.createObjectURL(file);
-      setCropModal({ open: true, field: e.target.name, imageSrc });
+      setCropModal({ open: true, field: e.target.name, imageSrc: URL.createObjectURL(file) });
     }
   };
 
-  // Recibe la imagen recortada
   const handleCropComplete = (croppedFile) => {
     setProducto({ ...producto, [cropModal.field]: croppedFile });
     setCropModal({ open: false, field: "", imageSrc: "" });
@@ -98,300 +111,249 @@ const CrearProductos = () => {
     setCropModal({ open: false, field: "", imageSrc: "" });
   };
 
-  // Obtiene nuevo ID para el producto en modo creación
   const obtenerNuevoID = async () => {
     const productosSnapshot = await getDocs(collection(db, "productos"));
     let maxId = 0;
     productosSnapshot.forEach((doc) => {
-      const data = doc.data();
-      const currentId = parseInt(data.id_product, 10);
-      if (currentId > maxId) {
-        maxId = currentId;
-      }
+      const currentId = parseInt(doc.data().id_product, 10);
+      if (!isNaN(currentId) && currentId > maxId) maxId = currentId;
     });
     return maxId + 1;
   };
 
-  // Verifica que los campos obligatorios estén completos
+  const obtenerNuevaPosicionEnCategoria = async (categoria) => {
+    if (!categoria) return 1;
+    const q = query(collection(db, "productos"), where("categoria", "==", categoria.toLowerCase()));
+    const productosSnapshot = await getDocs(q);
+    let maxPosition = 0;
+    productosSnapshot.forEach((doc) => {
+      const currentPosition = typeof doc.data().position === 'string' ? parseInt(doc.data().position, 10) : doc.data().position;
+      if (!isNaN(currentPosition) && currentPosition > maxPosition) maxPosition = currentPosition;
+    });
+    return maxPosition + 1;
+  };
+
   const camposCompletos = () =>
     producto.nombre &&
     producto.categoria &&
     producto.precio &&
-    producto.descripcionBreve &&
+    producto.descripcionBreve && // Asumiendo que descripción breve es obligatoria
     producto.descripcion &&
-    producto.imagen &&
-    producto.imagenRpos;
+    (producto.imagen || (modoEdicion && productoEditar?.imagen)) &&
+    (producto.imagenRpos || (modoEdicion && productoEditar?.imagen_rpos));
 
-  // Se ejecuta al presionar el botón
   const handleSubmit = () => {
     if (!camposCompletos()) {
-      setMensaje("Por favor, completa todos los campos obligatorios.");
+      setMensaje("Por favor, completa todos los campos obligatorios, incluyendo ambas imágenes.");
       return;
     }
+    setMensaje(modoEdicion ? "Actualizando producto..." : "Creando producto...");
     subirImagenes();
   };
 
-  // Sube las imágenes y luego guarda/actualiza el producto en Firestore
   const subirImagenes = async () => {
-    if (!producto.imagen || !producto.imagenRpos) {
-      setMensaje("Por favor, selecciona y recorta ambas imágenes.");
-      return;
-    }
-
     try {
-      let id;
+      let idProductValue;
+      let positionValue;
+
       if (modoEdicion && productoEditar) {
-        id = productoEditar.id_product;
-      } else {
-        id = await obtenerNuevoID();
-      }
-      const urls = {};
-      const imagenes = ["imagen", "imagenRpos"];
-
-      for (const img of imagenes) {
-        if (producto[img] instanceof File) {
-          const folder = img === "imagen" ? "imagenes_sinfondo" : "imagenes";
-          const storageRef = ref(storage, `${folder}/${id}`);
-          const uploadTask = uploadBytesResumable(storageRef, producto[img]);
-
-          await new Promise((resolve, reject) => {
-            uploadTask.on(
-              "state_changed",
-              (snapshot) => {
-                setProgreso((snapshot.bytesTransferred / snapshot.totalBytes) * 100);
-              },
-              (error) => reject(error),
-              async () => {
-                urls[img] = await getDownloadURL(uploadTask.snapshot.ref);
-                resolve();
-              }
-            );
-          });
-        } else {
-          urls[img] = producto[img];
+        idProductValue = productoEditar.id_product;
+        positionValue = productoEditar.position;
+        if (positionValue === undefined || positionValue === null) {
+            console.warn("Producto en edición no tiene 'position'. Se calculará una nueva.");
+            positionValue = await obtenerNuevaPosicionEnCategoria(producto.categoria);
         }
+      } else {
+        idProductValue = await obtenerNuevoID();
+        positionValue = await obtenerNuevaPosicionEnCategoria(producto.categoria);
       }
 
-      guardarProducto(urls.imagen, urls.imagenRpos, id);
+      const urls = {
+        imagen: producto.imagen instanceof File ? null : producto.imagen, // Si es string (URL), mantenerla
+        imagenRpos: producto.imagenRpos instanceof File ? null : producto.imagenRpos,
+      };
+
+      const imagenesACargar = [];
+      if (producto.imagen instanceof File) {
+        imagenesACargar.push({ field: "imagen", file: producto.imagen, folder: "imagenes_sinfondo" });
+      }
+      if (producto.imagenRpos instanceof File) {
+        imagenesACargar.push({ field: "imagenRpos", file: producto.imagenRpos, folder: "imagenes" });
+      }
+
+      for (const imgData of imagenesACargar) {
+        const storageRef = ref(storage, `${imgData.folder}/${idProductValue}`);
+        const uploadTask = uploadBytesResumable(storageRef, imgData.file);
+        await new Promise((resolve, reject) => {
+          uploadTask.on("state_changed", (snapshot) => setProgreso((snapshot.bytesTransferred / snapshot.totalBytes) * 100),
+            reject, // Error
+            async () => { urls[imgData.field] = await getDownloadURL(uploadTask.snapshot.ref); resolve(); }
+          );
+        });
+      }
+      guardarProducto(urls.imagen, urls.imagenRpos, idProductValue, positionValue);
     } catch (error) {
-      console.error(error);
-      setMensaje("Error al obtener el ID o subir las imágenes.");
+      console.error("Error en subirImagenes:", error);
+      setMensaje("Error al subir imágenes o obtener IDs.");
+      setProgreso(0);
     }
   };
 
-  const guardarProducto = async (imagenUrl, imagenRposUrl, id) => {
-    const fullPrice = producto.precio ? parseInt(parseFloat(producto.precio)) : 0;
-    const computedHalfPrice = fullPrice ? fullPrice - 6 : 0;
+  const guardarProducto = async (imagenUrl, imagenRposUrl, idDocYProd, productPosition) => {
+    const precioNumerico = producto.precio ? parseFloat(String(producto.precio).replace(",", ".")) : 0;
+    if (isNaN(precioNumerico)) {
+        setMensaje("El precio ingresado no es válido."); return;
+    }
+    const stockNumerico = producto.stock !== "" && producto.stock !== undefined ? Number(producto.stock) : 0;
 
     const productoFinal = {
       categoria: producto.categoria ? producto.categoria.toLowerCase() : "",
       description: producto.descripcion,
       description_half: producto.descripcionBreve,
       gluten_free: producto.celiaco ? "1" : "0",
-      half: producto.mediaRacion ? 1 : 0,
-      half_price: computedHalfPrice,
-      id_product: id,
+      //half: producto.mediaRacion ? "1" : "0",
+      //half_price: precioNumerico ? precioNumerico - 6 : 0, // Reconsiderar esta lógica
+      id_product: idDocYProd,
       imagen: imagenUrl,
       imagen_rpos: imagenRposUrl,
       name: producto.nombre,
       alias: producto.alias,
-      position: id,
-      price: fullPrice,
-      sabores: producto.sabores ? "1" : "",
-      stock: 0,
-      vegan: producto.vegano ? "1" : "",
-      vegetarian: producto.vegetariano ? "1" : "",
+      position: productPosition,
+      price: precioNumerico,
+      sabores: producto.sabores ? "1" : "0",
+      stock: stockNumerico,
+      vegan: producto.vegano ? "1" : "0",
+      vegetarian: producto.vegetariano ? "1" : "0",
       visible: producto.visible ? 1 : 0,
-      cocina: producto.cocina ? "1" : "0",
+      cocina: !!producto.cocina,
       promocion: producto.promocion ? "1" : "0",
+      freidora: !!producto.freidora,
+      productoDoble: producto.productoDoble ? "1" : "0",
     };
 
     try {
-      await setDoc(doc(db, "productos", id.toString()), productoFinal);
-
-      // Si el producto tiene marcado "cocina", se crea también en la colección "cocina" con su id y nombre
+      await setDoc(doc(db, "productos", idDocYProd.toString()), productoFinal);
       if (producto.cocina) {
-        await setDoc(doc(db, "cocina", id.toString()), { nombre: producto.nombre });
+        await setDoc(doc(db, "cocina", idDocYProd.toString()), { nombre: producto.nombre, id_producto: idDocYProd });
       }
-
-      setMensaje(modoEdicion ? "Producto actualizado con éxito." : "Producto creado con éxito.");
-      if (!modoEdicion) {
-        setProducto({
-          nombre: "",
-          alias: "",
-          categoria: "",
-          precio: "",
-          visible: false,
-          descripcionBreve: "",
-          descripcion: "",
-          celiaco: false,
-          vegetariano: false,
-          vegano: false,
-          freidora: false,
-          productoDoble: false,
-          mediaRacion: false,
-          sabores: false,
-          cocina: false,
-          promocion: false,
-          imagen: null,
-          imagenRpos: null,
-        });
-      }
+      // No setMensaje aquí, se maneja en ListaProductos a través de onSave
+      onSave(); // Notificar al padre
     } catch (error) {
       console.error("Error al guardar el producto:", error);
       setMensaje("Error al guardar el producto.");
+      setProgreso(0);
     }
   };
 
   return (
-    <div className="max-w-5xl mx-auto p-8 border border-gray-300 rounded-lg shadow-md bg-white">
-      <h2 className="text-2xl font-semibold text-center mb-6">
-        {modoEdicion ? "Editar Producto" : "Crear Producto"}
-      </h2>
-
+    <div className="px-4 py-4 bg-white"> {/* Padding para el contenido dentro del modal-body */}
       {/* Sección de imágenes */}
-      <div className="grid grid-cols-2 gap-6 mb-6">
-        {["imagen", "imagenRpos"].map((img, index) => (
-          <div key={index} className="flex flex-col items-center">
-            <div className="w-48 h-48 bg-gray-100 border border-gray-300 flex items-center justify-center">
-              {producto[img] ? (
-                typeof producto[img] === "string" ? (
-                  <img src={producto[img]} alt={img} className="object-cover w-full h-full" />
+      <div className="grid grid-cols-2 gap-6 mb-3">
+        {["imagen", "imagenRpos"].map((imgKey) => (
+          <div key={imgKey} className="flex flex-col items-center">
+            <div className="w-36 h-36 bg-gray-100 border border-gray-300 flex items-center justify-center rounded-md">
+              {producto[imgKey] ? (
+                typeof producto[imgKey] === "string" ? (
+                  <img src={producto[imgKey]} alt={imgKey} className="object-cover w-full h-full rounded-md" />
                 ) : (
-                  <img src={URL.createObjectURL(producto[img])} alt={img} className="object-cover w-full h-full" />
+                  <img src={URL.createObjectURL(producto[imgKey])} alt={imgKey} className="object-cover w-full h-full rounded-md" />
                 )
               ) : (
-                <img
-                  src={`https://cdn.pixabay.com/photo/2014/06/03/19/38/board-361516_1280.jpg?text=${img === "imagen" ? "Portada" : "Contraportada"}`}
-                  alt="Demo"
-                  className="object-cover w-full h-full"
-                />
+                <img src={productosIcon} alt="Imagen por defecto" className="object-cover w-full h-full rounded-md" />
               )}
             </div>
-            <label className="mt-2 inline-block px-4 py-2 bg-[#f2ac02] text-white rounded-md cursor-pointer">
-              Cambiar Imagen
-              <input type="file" name={img} accept="image/*" onChange={handleImageChange} className="hidden" />
+            <label className="mt-2 inline-block px-2 py-2 bg-white text-yellow-500 border-1 border-yellow-500 hover:bg-yellow-600 text-xs rounded-md cursor-pointer">
+              Cambiar {imgKey === "imagen" ? "Sin fondo" : "Principal"}
+              <input type="file" name={imgKey} accept="image/*" onChange={handleImageChange} className="hidden" />
             </label>
           </div>
         ))}
       </div>
 
       {/* Formulario */}
-      {/* Fila 1: Nombre y Alias */}
       <div className="grid grid-cols-2 gap-6">
         <div>
-          <label className="block text-sm font-medium text-gray-700">Nombre</label>
-          <input
-            type="text"
-            name="nombre"
-            value={producto.nombre}
-            onChange={handleChange}
-            className={`w-full px-4 py-2 mt-1 border ${!producto.nombre ? "border-red-500" : "border-gray-300"} rounded-md focus:ring-yellow-500 focus:border-yellow-500`}
-            placeholder="Nombre del producto"
-          />
+          <label className="block text-sm font-bold font-nunito text-center text-gray-700">Nombre</label>
+          <input type="text" name="nombre" value={producto.nombre} onChange={handleChange} className={`w-full px-4 py-2 text-sm font-nunito mt-1 text-center border ${!producto.nombre && mensaje.startsWith("Por favor") ? "border-red-500" : "border-gray-300"} rounded-md focus:ring-yellow-500 focus:border-yellow-500 placeholder:text-sm placeholder:text-center`} placeholder="Nombre del producto" />
         </div>
         <div>
-          <label className="block text-sm font-medium text-gray-700">Alias</label>
-          <input
-            type="text"
-            name="alias"
-            value={producto.alias}
-            onChange={handleChange}
-            className={`w-full px-4 py-2 mt-1 border ${!producto.alias ? "border-red-500" : "border-gray-300"} rounded-md focus:ring-yellow-500 focus:border-yellow-500`}
-            placeholder="Alias del producto"
-          />
+          <label className="block text-sm font-bold font-nunito text-center text-gray-700">Alias</label>
+          <input type="text" name="alias" value={producto.alias} onChange={handleChange} className="w-full px-4 py-2 text-sm mt-1 border font-nunito border-gray-300 rounded-md text-center focus:ring-yellow-500 focus:border-yellow-500 placeholder:text-sm placeholder:text-center" placeholder="Alias (opcional)" />
         </div>
       </div>
 
-      {/* Fila 2: Categoría y Precio */}
-      <div className="grid grid-cols-2 gap-6 mt-4">
+      <div className="grid grid-cols-2 gap-6 mt-3">
         <div>
-          <label className="block text-sm font-medium text-gray-700">Categoría</label>
-          <select
-            name="categoria"
-            value={producto.categoria}
-            onChange={handleChange}
-            className={`w-full px-4 py-2 mt-1 border ${!producto.categoria ? "border-red-500" : "border-gray-300"} rounded-md focus:ring-yellow-500 focus:border-yellow-500`}
-          >
+          <label className="block text-sm font-bold font-nunito text-center text-gray-700">Categoría</label>
+          <select name="categoria" value={producto.categoria} onChange={handleChange} className={`w-full font-nunito text-sm text-center px-4 py-2 mt-1 border ${!producto.categoria && mensaje.startsWith("Por favor") ? "border-red-500" : "border-gray-300"} rounded-md focus:ring-yellow-500 focus:border-yellow-500 ${producto.categoria ? 'text-gray-700' : 'text-gray-400'}`}>
             <option value="">Seleccionar</option>
             <option value="comida">Comida</option>
             <option value="complementos">Complementos</option>
-            <option value="bebida">Bebida</option>
-            <option value="postre">Postre</option>
-            <option value="extra">Extra</option>
+            <option value="bebida">Bebidas</option>
+            <option value="postres">Postres</option>
+            <option value="extras">Extras</option>
           </select>
         </div>
         <div>
-          <label className="block text-sm font-medium text-gray-700">Precio</label>
-          <div className="relative">
-            <input
-              type="text"
-              name="precio"
-              value={producto.precio}
-              onChange={handleChange}
-              onBlur={handlePriceBlur}
-              className={`w-full px-4 py-2 pr-8 mt-1 border ${!producto.precio ? "border-red-500" : "border-gray-300"} rounded-md focus:ring-yellow-500 focus:border-yellow-500`}
-              placeholder="12.00"
-            />
-            <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
-              <span className="text-gray-500">€</span>
-            </div>
-          </div>
+          <label className="block text-sm font-bold font-nunito text-center text-gray-700">Precio (€)</label>
+          <input type="text" name="precio" value={producto.precio} onChange={handleChange} onBlur={handlePriceBlur} className={`w-full px-4 py-2 text-sm text-center font-nunito text-gray-700 pr-8 mt-1 border ${!producto.precio && mensaje.startsWith("Por favor") ? "border-red-500" : "border-gray-300"} rounded-md focus:ring-yellow-500 focus:border-yellow-500 placeholder:text-sm placeholder:text-center`} placeholder="0.00" />
         </div>
       </div>
 
-      {/* Resto del formulario */}
-      <div className="grid grid-cols-2 gap-6 mt-4">
+      <div className="grid grid-cols-2 gap-6 mt-3">
         <div>
-          <label className="block text-sm font-medium text-gray-700">Descripción Breve</label>
-          <textarea
-            name="descripcionBreve"
-            value={producto.descripcionBreve}
-            onChange={handleChange}
-            className={`w-full px-4 py-2 mt-1 border ${!producto.descripcionBreve ? "border-red-500" : "border-gray-300"} rounded-md focus:ring-yellow-500 focus:border-yellow-500`}
-          />
+          <label className="block text-sm text-center font-bold text-gray-700 font-nunito">Descripción [App Tienda]</label>
+          <textarea name="descripcionBreve" value={producto.descripcionBreve} onChange={handleChange} rows="3" className={`w-full px-4 py-2 mt-1 font-nunito text-sm border ${!producto.descripcionBreve && mensaje.startsWith("Por favor") ? "border-red-500" : "border-gray-300"} rounded-md focus:ring-yellow-500 focus:border-yellow-500`} />
         </div>
         <div>
-          <label className="block text-sm font-medium text-gray-700">Descripción</label>
-          <textarea
-            name="descripcion"
-            value={producto.descripcion}
-            onChange={handleChange}
-            className={`w-full px-4 py-2 mt-1 border ${!producto.descripcion ? "border-red-500" : "border-gray-300"} rounded-md focus:ring-yellow-500 focus:border-yellow-500`}
-          />
+          <label className="block text-sm font-nunito text-center font-bold text-gray-700">Descripción [App Cliente]</label>
+          <textarea name="descripcion" value={producto.descripcion} onChange={handleChange} rows="3" className={`w-full px-4 py-2 mt-1 text-sm font-nunito border ${!producto.descripcion && mensaje.startsWith("Por favor") ? "border-red-500" : "border-gray-300"} rounded-md focus:ring-yellow-500 focus:border-yellow-500`} />
         </div>
       </div>
 
-      {/* Checkboxes */}
-      <div className="grid grid-cols-4 gap-4 mt-4">
+      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4 mt-3 ms-4 text-sm font-nunito text-gray-500 ">
         {[
-          "visible",
-          "celiaco",
-          "vegetariano",
-          "vegano",
-          "freidora",
-          "productoDoble",
-          "mediaRacion",
-          "sabores",
-          "cocina",
-          "promocion",
+          { name: "visible", label: "Visible" }, { name: "celiaco", label: "Celiaco" },
+          { name: "vegetariano", label: "Vegetariano" }, { name: "vegano", label: "Vegano" },
+          { name: "freidora", label: "Freidora" }, { name: "cocina", label: "Cocina" },
+          { name: "mediaRacion", label: "Media Ración" },
+          { name: "productoDoble", label: "Producto Doble" },
         ].map((campo) => (
-          <label key={campo} className="flex items-center space-x-2">
-            <input type="checkbox" name={campo} checked={producto[campo]} onChange={handleChange} className="h-5 w-5 accent-[#f2ac02]" />
-            <span className="text-sm text-gray-700">{campo.charAt(0).toUpperCase() + campo.slice(1)}</span>
+          <label key={campo.name} className="flex items-center space-x-2 ms-5">
+            <input type="checkbox" name={campo.name} checked={!!producto[campo.name]} onChange={handleChange} className="h-5 w-5 accent-[#f2ac02]" />
+            <span className="text-sm text-gray-700">{campo.label}</span>
           </label>
         ))}
       </div>
 
-      <button onClick={handleSubmit} className="w-full py-3 mt-6 bg-[#f2ac02] text-white rounded-md hover:bg-yellow-600">
-        {modoEdicion ? "Editar Producto" : "Crear Producto"}
-      </button>
+      <div className="mt-3">
+        <label className="block text-sm font-bold font-nunito text-center text-gray-700">Stock</label>
+        <input type="text" name="stock" value={producto.stock} onChange={handleChange} className="w-full px-4 py-2 mt-1 border font-nunito text-sm text-center border-gray-300 rounded-md focus:ring-yellow-500 focus:border-yellow-500 placeholder:text-sm" placeholder="Cantidad en stock" inputMode="numeric" pattern="[0-9]*" />
+      </div>
 
-      {mensaje && <p className="text-sm text-gray-700 mt-2 text-center">{mensaje}</p>}
+      {progreso > 0 && progreso < 100 && (
+        <div className="w-full bg-gray-200 rounded-full h-2.5 dark:bg-gray-700 my-3">
+          <div className="bg-yellow-500 h-2.5 rounded-full" style={{ width: `${progreso}%` }}></div>
+        </div>
+      )}
+      {mensaje && <p className={`text-sm font-bold font-nunito mt-4 text-center ${mensaje.includes("Error") || mensaje.startsWith("Por favor") ? "text-red-600" : "text-green-700"}`}>{mensaje}</p>}
 
-      {/* Modal de recorte */}
+      <div className="flex justify-end space-x-3 mt-6">
+        <button type="button" onClick={onClose} className="px-4 py-2 shadow-sm text-sm font-medium text-red-500 bg-white border-1 border-red-500 rounded-md hover:text-red-900 hover:border-red-900 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 ">
+          Cancelar
+        </button>
+        <button onClick={handleSubmit} disabled={progreso > 0 && progreso < 100} className="px-4 py-2 bg-[#f2ac02] text-white rounded-md hover:bg-yellow-600 flex items-center justify-center space-x-2 disabled:opacity-50 text-sm font-medium">
+          {modoEdicion ? (
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-5 h-5"><path strokeLinecap="round" strokeLinejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10" /></svg>
+          ) : (
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-5 h-5"><path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" /></svg>
+          )}
+          <span>{modoEdicion ? "Actualizar Producto" : "Crear Producto"}</span>
+        </button>
+      </div>
+
       {cropModal.open && (
-        <ImageCropper imageSrc={cropModal.imageSrc} onComplete={handleCropComplete} onCancel={handleCropCancel} />
+        <ImageCropper imageSrc={cropModal.imageSrc} onComplete={handleCropComplete} onCancel={handleCropCancel} aspectRatio={1} />
       )}
     </div>
   );

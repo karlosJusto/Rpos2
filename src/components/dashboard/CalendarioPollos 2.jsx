@@ -242,7 +242,7 @@ function CalendarioPollos() {
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col items-center py-8 px-4">
-      <div className="w-full max-w-6xl bg-white rounded-xl shadow-md overflow-hidden">
+      <div className="w-full max-w-6xl bg-white rounded-xl shadow-md ">
         {/* Header */}
         <div className="text-center py-8 border-b border-gray-100">
           <h1 className="text-4xl font-bold text-gray-800">Calendario</h1>

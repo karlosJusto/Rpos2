@@ -1,156 +1,238 @@
-// CrudEmpleados.jsx
+// src/components/dashboard/CrearEmpleado.jsx
 import React, { useState, useEffect } from "react";
-import { collection, getDocs, doc, setDoc } from "firebase/firestore";
+// *** ASEGÚRATE DE IMPORTAR query y where ***
+import { collection, getDocs, doc, setDoc, updateDoc, query, where } from "firebase/firestore";
 import { db } from "../firebase/firebase";
-import { useLocation } from "react-router-dom";
+import { Button, Form } from "react-bootstrap";
 
-const CrudEmpleados = () => {
-  const location = useLocation();
-  const empleadoEditar = location.state?.empleado || null;
-  const modoEdicion = location.state?.modo === "editar";
-
-  const [empleado, setEmpleado] = useState({
-    // id_empleado se genera automáticamente en creación
-    nombre: "",
-    pin: "",
-    rol: "empleado", // Valor por defecto
-  });
+const CreaEmpleado = ({ modoEdicion, empleadoEditar, onClose }) => {
+  const [empleado, setEmpleado] = useState({ nombre: "", pin: "", rol: "empleado" });
   const [mensaje, setMensaje] = useState("");
+  const [mostrarPin, setMostrarPin] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
 
-  // Si está en modo edición, precargar los datos del empleado
   useEffect(() => {
+    // Carga datos si estamos en modo edición y hay un empleado para editar
     if (modoEdicion && empleadoEditar) {
       setEmpleado({
         nombre: empleadoEditar.nombre || "",
         pin: empleadoEditar.pin || "",
         rol: empleadoEditar.rol || "empleado",
       });
+      setMensaje("");
+      setMostrarPin(false);
+    } else {
+      // Resetea si no es modo edición
+      setEmpleado({ nombre: "", pin: "", rol: "empleado" });
+      setMensaje("");
+      setMostrarPin(false);
     }
   }, [modoEdicion, empleadoEditar]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
-    setEmpleado({ ...empleado, [name]: value });
+    if (name === "pin") {
+      const numericValue = value.replace(/[^0-9]/g, '');
+      if (numericValue.length <= 5) {
+        setEmpleado({ ...empleado, [name]: numericValue });
+      }
+    } else {
+      setEmpleado({ ...empleado, [name]: value });
+    }
+    setMensaje("");
   };
 
-  // Función para obtener un nuevo ID basado en la cantidad de documentos existentes
-  const obtenerNuevoID = async () => {
-    const snapshot = await getDocs(collection(db, "empleados"));
-    // Se suma 1 al tamaño actual para generar un nuevo ID
-    return (snapshot.size + 1).toString();
-  };
+  const guardarEmpleado = async () => {
+    setIsSaving(true);
+    setMensaje("");
 
-  // Guardar o actualizar el empleado en Firestore
-  const guardarEmpleado = async (id) => {
-    const empleadoFinal = {
-      id_empleado: id,
-      nombre: empleado.nombre,
-      pin: empleado.pin,
-      rol: empleado.rol,
-    };
+    // Validaciones
+    if (!empleado.nombre.trim()) {
+      setMensaje("El nombre no puede estar vacío.");
+      setIsSaving(false);
+      return;
+    }
+    if (!empleado.pin || empleado.pin.length !== 5) {
+      setMensaje("El PIN debe tener exactamente 5 dígitos numéricos.");
+      setIsSaving(false);
+      return;
+    }
 
     try {
-      await setDoc(doc(db, "empleados", id), empleadoFinal);
-      setMensaje(
-        modoEdicion
-          ? "Empleado actualizado con éxito."
-          : "Empleado creado con éxito."
-      );
-      if (!modoEdicion) {
-        setEmpleado({
-          nombre: "",
-          pin: "",
-          rol: "empleado",
-        });
+      // Verifica si el PIN ya existe
+      const q = query(collection(db, "empleados"), where("pin", "==", empleado.pin));
+      const querySnapshot = await getDocs(q);
+
+      let pinDuplicado = false;
+      querySnapshot.forEach((docSnap) => {
+        // Es duplicado si:
+        // 1. Estamos editando Y el documento encontrado NO es el que estamos editando.
+        // 2. Estamos creando Y se encontró algún documento.
+        if ((modoEdicion && empleadoEditar && docSnap.id !== empleadoEditar.id) || !modoEdicion) {
+          pinDuplicado = true;
+        }
+      });
+
+      if (pinDuplicado) {
+        setMensaje("El PIN ya está en uso por otro empleado. Introduce uno diferente.");
+        setIsSaving(false);
+        return;
       }
+
+      // Datos a guardar
+      const datosEmpleado = {
+        nombre: empleado.nombre.trim(),
+        pin: empleado.pin,
+        rol: empleado.rol,
+      };
+
+      if (modoEdicion && empleadoEditar) {
+        // --- MODO EDICIÓN ---
+        // Verifica que tengamos un ID para editar
+        if (!empleadoEditar.id) {
+           console.error("Error: Falta el ID del empleado en modo edición.", empleadoEditar);
+           setMensaje("Error interno: No se pudo identificar al empleado a editar.");
+           setIsSaving(false);
+           return;
+        }
+        const empleadoDocRef = doc(db, "empleados", empleadoEditar.id);
+        await updateDoc(empleadoDocRef, datosEmpleado);
+        setMensaje("Empleado actualizado con éxito.");
+
+      } else {
+        // --- MODO CREACIÓN ---
+        const snapshot = await getDocs(collection(db, "empleados"));
+        // Filtra IDs no numéricos antes de calcular el máximo
+        const existingIds = snapshot.docs
+            .map(doc => parseInt(doc.id, 10))
+            .filter(id => !isNaN(id)); // Asegura que solo consideramos números válidos
+        const nuevoIdNumerico = existingIds.length > 0 ? Math.max(...existingIds) + 1 : 1;
+        const nuevoId = nuevoIdNumerico.toString();
+
+        // Opcional: Guarda el ID dentro del documento si tu lógica lo requiere
+        // datosEmpleado.id_empleado = nuevoId;
+
+        const nuevoEmpleadoDocRef = doc(db, "empleados", nuevoId);
+        await setDoc(nuevoEmpleadoDocRef, datosEmpleado);
+        setMensaje("Empleado creado con éxito.");
+        // Limpia formulario tras crear
+        setEmpleado({ nombre: "", pin: "", rol: "empleado" });
+      }
+
+      // Cierra el modal tras un breve retraso
+      setTimeout(() => {
+        if (onClose) onClose(); // Llama a la función del padre para cerrar
+      }, 1500);
+
     } catch (error) {
-      console.error("Error al guardar el empleado:", error);
-      setMensaje("Error al guardar el empleado.");
+      // *** Muestra el error específico en la consola ***
+      console.error("Error detallado al guardar el empleado:", error);
+      // Mensaje genérico para el usuario, pero el error detallado está en consola
+      setMensaje(`Error al guardar: ${error.message || 'Inténtalo de nuevo.'}`);
+    } finally {
+      setIsSaving(false); // Reactiva el botón en cualquier caso
     }
   };
 
-  const handleSubmit = async (e) => {
+  const handleSubmit = (e) => {
     e.preventDefault();
-    const id = modoEdicion && empleadoEditar?.id_empleado
-      ? empleadoEditar.id_empleado
-      : await obtenerNuevoID();
-    guardarEmpleado(id);
+    guardarEmpleado();
   };
 
-  const camposCompletos = () => {
-    return empleado.nombre && empleado.pin && empleado.rol;
-  };
+  const camposCompletos = () => empleado.nombre.trim() && empleado.pin && empleado.pin.length === 5 && empleado.rol;
 
+  // --- Renderiza SOLO el Formulario ---
   return (
-    <div className="max-w-2xl mx-auto p-8 border border-gray-300 rounded-lg shadow-md bg-white">
-      <h2 className="text-2xl font-semibold text-center mb-6">
-        {modoEdicion ? "Editar Empleado" : "Crear Empleado"}
-      </h2>
+    <Form onSubmit={handleSubmit}>
+      {/* Grupo Nombre */}
+      <Form.Group className="mb-3">
+        <Form.Label className="text-md font-nunito ms-2 font-extrabold text-gray-600">Nombre</Form.Label>
+        <Form.Control
+          type="text"
+          name="nombre"
+          value={empleado.nombre}
+          onChange={handleChange}
+          placeholder="Nombre del empleado"
+          required
+          disabled={isSaving}
+        />
+      </Form.Group>
 
-      <form onSubmit={handleSubmit}>
-        <div className="grid grid-cols-1 gap-6">
-          <div>
-            <label className="block text-sm font-medium text-gray-700">
-              Nombre
-            </label>
-            <input
-              type="text"
-              name="nombre"
-              value={empleado.nombre}
-              onChange={handleChange}
-              className={`w-full px-4 py-2 mt-1 border ${
-                !empleado.nombre ? "border-red-500" : "border-gray-300"
-              } rounded-md focus:ring-yellow-500 focus:border-yellow-500`}
-              placeholder="Nombre del empleado"
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700">
-              PIN
-            </label>
-            <input
-              type="text"
-              name="pin"
-              value={empleado.pin}
-              onChange={handleChange}
-              className={`w-full px-4 py-2 mt-1 border ${
-                !empleado.pin ? "border-red-500" : "border-gray-300"
-              } rounded-md focus:ring-yellow-500 focus:border-yellow-500`}
-              placeholder="PIN del empleado"
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700">
-              Rol
-            </label>
-            <select
-              name="rol"
-              value={empleado.rol}
-              onChange={handleChange}
-              className="w-full px-4 py-2 mt-1 border border-gray-300 rounded-md focus:ring-yellow-500 focus:border-yellow-500"
-            >
-              <option value="empleado">Empleado</option>
-              <option value="jefe">Jefe</option>
-            </select>
-          </div>
+      {/* Grupo PIN */}
+      <Form.Group className="mb-3">
+        <Form.Label className="text-md font-nunito ms-2 font-extrabold text-gray-600">PIN (5 dígitos numéricos)</Form.Label>
+        <div className="position-relative">
+          <Form.Control
+            type={mostrarPin ? "text" : "password"}
+            name="pin"
+            value={empleado.pin}
+            onChange={handleChange}
+            placeholder="PIN del empleado"
+            maxLength={5}
+            pattern="\d{5}"
+            required
+            disabled={isSaving}
+          />
+          {/* Botón para mostrar/ocultar PIN */}
+          <Button
+            variant="link"
+            onClick={() => setMostrarPin(!mostrarPin)}
+            className="position-absolute end-0 top-50 translate-middle-y pe-3 text-muted border-0 bg-transparent"
+            style={{ zIndex: 5 }}
+            type="button"
+            aria-label={mostrarPin ? "Ocultar PIN" : "Mostrar PIN"}
+            disabled={isSaving}
+          >
+            {/* Iconos SVG (sin cambios) */}
+            {mostrarPin ? (
+              <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="currentColor" viewBox="0 0 24 24"><path d="M12 5c-7 0-10 7-10 7s3 7 10 7 10-7 10-7-3-7-10-7zm0 12c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8a3 3 0 100 6 3 3 0 000-6z" /></svg>
+            ) : (
+              <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.477 0 8.268 2.943 9.542 7-1.274 4.057-5.065 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+            </svg>
+            )}
+          </Button>
         </div>
+      </Form.Group>
 
-        <button
-          type="submit"
-          disabled={!camposCompletos()}
-          className="w-full py-3 mt-6 bg-[#f2ac02] text-white rounded-md hover:bg-yellow-600"
+      {/* Grupo Rol */}
+      <Form.Group className="mb-3">
+        <Form.Label className="text-md font-nunito ms-2 font-extrabold text-gray-600">Role</Form.Label>
+        <Form.Select
+          name="rol"
+          value={empleado.rol}
+          onChange={handleChange}
+          disabled={isSaving}
         >
-          {modoEdicion ? "Editar Empleado" : "Crear Empleado"}
-        </button>
-      </form>
+          <option value="empleado">Empleado</option>
+          <option value="jefe">Jefe</option>
+        </Form.Select>
+      </Form.Group>
 
+      {/* Mensaje de estado/error */}
       {mensaje && (
-        <p className="text-sm text-gray-700 mt-2 text-center">{mensaje}</p>
+        // Ajusta la clase de color si el mensaje es de PIN duplicado
+        <div className={`text-center small mb-3 ${mensaje.includes("Error") || mensaje.includes("uso") ? 'text-danger' : 'text-success'}`}>
+          {mensaje}
+        </div>
       )}
-    </div>
+
+      {/* Botones del formulario */}
+      <div className="d-flex justify-content-center gap-5 p-4">
+        <Button variant="secondary" onClick={onClose} disabled={isSaving} className="text-red-500 bg-white border-1 border-red-500 hover:text-red-700 hover:border-red-700 rounded shadow-md">
+          Cancelar
+        </Button>
+        <Button className="text-md font-nunito ms-2 bg-white border-1 border-yellow-500 hover:bg-yellow-600 hover:border-yellow-600 hover:text-yellow-600 rounded text-yellow-500 shadow-md"
+          type="submit"
+          variant="warning"
+          disabled={!camposCompletos() || isSaving}
+        >
+          {isSaving ? 'Guardando...' : (modoEdicion ? "Guardar " : "Crear Empleado")}
+        </Button>
+      </div>
+    </Form>
   );
 };
 
-export default CrudEmpleados;
+export default CreaEmpleado;

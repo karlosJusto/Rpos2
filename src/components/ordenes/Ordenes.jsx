@@ -775,7 +775,7 @@ const Ordenes = () => {
 
       {/* --- Modal para Sumar Número --- */}
 
-     <Modal show={showSumarModal} onHide={handleCloseSumarModal} size="md" backdrop="static" keyboard={false} centered>
+     <Modal show={showSumarModal} onHide={handleCloseSumarModal} size="md" backdrop="static" keyboard={false} top>
        <Modal.Body className="bg-white  p-4">
          <h1 className="text-center font-nunito text-2xl text-gray-700 mb-4">Sumar en barra</h1>
          <Form.Group controlId="numeroParaSumar">

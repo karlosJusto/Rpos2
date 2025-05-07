@@ -27,9 +27,10 @@ const Card = () => {
   );
 
   // Filtrado por categoría (si existe en la URL)
-  const dataFiltered = categoria
-    ? filteredBySearch.filter((product) => product.categoria === categoria)
-    : filteredBySearch;
+  const dataFiltered = data
+  .filter(product => product.visible === 1) // <-- Añadido: Filtrar solo productos visibles
+  .filter(product => product.name?.toLowerCase().includes(buscar.toLowerCase())) // Filtrar por búsqueda
+  .filter(product => categoria ? product.categoria === categoria : true); // Filtrar por categoría si existe en la URL
 
   // Ordenamos por posición
   const sortedData = [...dataFiltered].sort((a, b) => a.position - b.position);
