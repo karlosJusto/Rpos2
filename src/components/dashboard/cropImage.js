@@ -29,9 +29,9 @@ export const getCroppedImg = (imageSrc, croppedAreaPixels) => {
             return reject(new Error("Canvas is empty"));
           }
           // Se puede convertir el blob en un File si se necesita:
-          const file = new File([blob], "cropped_image.jpg", { type: blob.type });
+          const file = new File([blob], "cropped_image.png", { type: blob.type });
           resolve(file);
-        }, "image/jpeg");
+        }, "image/png");
       };
       image.onerror = (error) => {
         reject(error);

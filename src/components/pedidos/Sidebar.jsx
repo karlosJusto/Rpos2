@@ -105,7 +105,7 @@ const Sidebar = () => {
 
              
              {empleadoNombre === 'admin' && (
-             <Link className='p-3 mb-2 hover:bg-gray-100 hover:rounded-2xl' to={"/dashboard"}>
+             <Link className='p-3 mb-2 hover:bg-gray-100 hover:rounded-2xl' to={"/dashboard/resultados"}>
 
             
 

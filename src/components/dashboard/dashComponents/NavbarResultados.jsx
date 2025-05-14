@@ -1,61 +1,75 @@
-import { useState } from 'react';
+import React from 'react'; // Eliminado useState ya que no se usa aquí
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import { createTheme, ThemeProvider } from '@mui/material/styles';
-import { TextField, IconButton, Box } from '@mui/material';
+import { TextField, IconButton } from '@mui/material'; // Box no se usa, se puede quitar si no hay otros usos
 
 import dayjs from 'dayjs';
 import 'dayjs/locale/es';
 
 dayjs.locale('es');
 
-
-
-import React from 'react'
-
+// El tema de MUI se puede definir fuera si no cambia
 const theme = createTheme({
     palette: {
       mode: 'light',
-      
-     
+      // Puedes añadir más personalizaciones del tema aquí si es necesario
     },
   });
 
-const NavbarResultados = () => {
+// El componente ahora recibe selectedDate y onDateChange como props
+const NavbarResultados = ({ selectedDate, onDateChange }) => {
+    // El estado 'fecha' y 'setFecha' se eliminan, ya que la fecha se maneja en el componente padre
 
-    const [fecha, setFecha] = useState(dayjs());
-
+    const empleadoNombre = sessionStorage.getItem('empleadoNombre');
 
   return (
     <div className="flex items-center justify-between h-full px-6">
     {/* fechas */}
-    <div className="flex items-center     rounded-lg  w-44 h-8">
+    <div className="flex items-center rounded-lg w-auto h-8"> {/* Ajustado w-44 a w-auto para flexibilidad */}
 
     <ThemeProvider theme={theme}>
       <LocalizationProvider dateAdapter={AdapterDayjs} adapterLocale="es">
-      
-         
-
           <DatePicker
-            value={fecha}
-            onChange={(newValue) => setFecha(newValue)}
-            TextField={(params) => (
-              <TextField
-                {...params}
-                variant="standard"
-                sx={{ display: 'none' }} // Ocultar input visible
-              />
-            )}
+            value={selectedDate} // Usa la prop selectedDate
+            onChange={onDateChange} // Usa la prop onDateChange
+            slots={{
+                textField: (params) => (
+                  <TextField
+                    {...params}
+                    variant="standard"
+                    InputProps={{ ...params.InputProps, disableUnderline: true }} // Quitar el subrayado
+                    sx={{
+                        // Estilos para el contenedor del input si es necesario
+                        '& .MuiInputBase-input': {
+                            padding: '8px 8px', // Ajustar padding si es necesario
+                            fontSize: '1rem', // Ajustar tamaño de fuente
+                            cursor: 'pointer',
+                            marginRight:'-60px',
+                        },
+                        // Puedes ocultar el input si solo quieres mostrar el valor y abrir con un botón
+                        // o estilizarlo para que parezca un texto normal.
+                    }}
+                  />
+                ),
+                // Puedes añadir un openPickerIcon personalizado si lo deseas
+              }}
+              // Para que el DatePicker no muestre el input y se abra con un botón externo (opcional)
+              // renderInput={(params) => <TextField {...params} sx={{ display: 'none' }} />}
           />
-
-          <IconButton  onClick={() => document.querySelector('input[type="text"]')?.focus()}>
-           
-          </IconButton>
+          {/* Si quieres un botón para abrir el DatePicker (si el input está oculto) */}
+          {/* <IconButton onClick={() => document.querySelector('input[aria-label="Choose date"]')?.focus()}>
+             <CalendarTodayIcon /> // Ejemplo de icono
+          </IconButton> */}
       
       </LocalizationProvider>
     </ThemeProvider>
       
+    </div>
+
+    <div>
+      <h1 className='text-yellow-600  text-2xl font-bold font-nunito -ms-8'>Dashboard</h1>
     </div>
    
 
@@ -89,17 +103,16 @@ const NavbarResultados = () => {
       {/* User info */}
       <div className="flex items-center gap-2 font-nunito">
       <div className="w-8 h-8 rounded-full bg-green-700 flex items-center justify-center text-white font-semibold text-sm">
-            C
+            {empleadoNombre ? empleadoNombre.charAt(0).toUpperCase() : 'U'} {/* Inicial del empleado o 'U' */}
       </div>
         <div className="text-sm">
           <p className="font-medium text-gray-900 leading-none">Empleado</p>
-          <p className="text-gray-500 text-xs leading-none text-center">Carlos</p>
+          <p className="text-gray-500 text-xs leading-none text-center">{empleadoNombre || 'Usuario'}</p>
         </div>
       </div>
     </div>
   </div>
-
   )
 }
 
-export default NavbarResultados
+export default NavbarResultados;

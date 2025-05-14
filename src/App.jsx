@@ -39,6 +39,7 @@ import ProtectedRoute from './components/login/ProtectedRoute.jsx';
 import Empleados from './components/dashboard/Empleados.jsx';
 import DashboardHomeContent from './components/dashboard/dashComponents/DashboardHomeContent.jsx';
 import FiltrarPedidosPorFecha from './components/dashboard/dashComponents/FiltrarPedidosPorFecha.jsx';
+import VistaDeResultados from './components/dashboard/dashComponents/VistaDeResultados.jsx'; 
 
 
 
@@ -116,6 +117,7 @@ function App() {
               <Route path="calendarioPollos" element={<AdminCalendarioPage />} />
               <Route path="filtrarPedidos" element={<FiltrarPedidosPorFecha />} />
               <Route path="operativaTienda" element={<OperativaTienda />} />
+              <Route path="resultados" element={<VistaDeResultados />} />
 
               {/* Nota: La ruta para crear empleado ya está manejada por el modal dentro de Empleados.jsx, no necesita ruta propia aquí */}
               {/* <Route path="crearempleado" element={<CrudEmpleados />} /> */}

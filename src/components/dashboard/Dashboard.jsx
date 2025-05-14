@@ -31,7 +31,7 @@ const Dashboard = () => {
             {/* Enlace al Dashboard principal con prop 'end' */}
             <li>
               <NavLink
-                to="/dashboard"
+                to="/dashboard/resultados"
                 end // <-- Importante para que solo coincida con /dashboard exacto
                 className={({ isActive }) =>
                   `${baseLinkClass} ${isActive ? activeLinkClass : inactiveLinkClass}`

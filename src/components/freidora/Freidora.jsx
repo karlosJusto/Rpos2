@@ -265,7 +265,7 @@ useEffect(() => {
               <img
                 src={productoInfo.imagenSrc}
                 alt={productoInfo.nombreDisplay}
-                className="w-20 h-20 p-1 bg-white border-2 border-gray-700 rounded-full object-contain"
+                className="w-16 h-16 p-1 bg-white border-2 border-gray-700 rounded-full object-contain"
               />
             </div>
             {/* Opcional: Título dentro de la tarjeta si lo deseas */}

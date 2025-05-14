@@ -161,7 +161,7 @@ const Login = () => {
           if (empleado.rol === "jefe") {
             console.log("Jefe ingresó correctamente");
             generarEstadisticasDiarias(); // Llamamos a la función para crear estadísticas
-            navigate('/dashboard'); // Redirige a /dashboard
+            navigate('/dashboard/resultados'); // Redirige a /dashboard
             //generarEstadisticas();
           } else if (empleado.rol === "empleado") {
             // Si es empleado, mostramos "No autorizado"
