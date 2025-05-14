@@ -562,86 +562,84 @@ export const initDailyCalendars = async () => {
   // Removed the isInitializing lock flag - control this in the calling useEffect
 
   try {
-    // Get current date in the specified timezone
-    const now = dayjs().tz("Europe/Madrid"); // Use your specific timezone
-    const dateString = now.format('YYYY-MM-DD'); // Format YYYY-MM-DD
+    const today = dayjs().tz("Europe/Madrid"); // Use your specific timezone
+    console.log(`[${new Date().toISOString()}] Iniciando proceso de inicialización de calendarios (hoy y los próximos 30 días)...`);
 
-    console.log(`[${new Date().toISOString()}] Iniciando generación de calendarios diarios para fecha local: ${dateString}...`);
+    // Loop from today (i=0) to today + 30 days (i=30) -> total 31 days
+    for (let i = 0; i <= 30; i++) {
+      const currentDateInLoop = today.add(i, 'day');
+      const dateString = currentDateInLoop.format('YYYY-MM-DD');
 
-    // --- PASO 1: Determinar tipo de día y obtener configuración ---
-    const holidayDocRef = doc(db, 'holiday_calendar', dateString);
-    const holidayDocSnap = await getDoc(holidayDocRef);
-    let dayId = null;
-    let dayType = 'normal'; // Default day type
+      console.log(`%c[${new Date().toISOString()}] Procesando fecha: ${dateString} (Día ${i + 1}/31)`, 'color: cyan; font-weight: bold;');
 
-    // Check if today is a holiday or pre-holiday
-    if (holidayDocSnap.exists()) {
-      const holidayData = holidayDocSnap.data();
-      if (holidayData.type === 'holiday') { dayId = "8"; dayType = 'Festivo'; }
-      else if (holidayData.type === 'preHoliday') { dayId = "9"; dayType = 'Víspera de Festivo'; }
-    }
+      // --- PASO 1: Determinar tipo de día y obtener configuración PARA dateString ---
+      const holidayDocRef = doc(db, 'holiday_calendar', dateString);
+      const holidayDocSnap = await getDoc(holidayDocRef);
+      let dayId = null;
+      let dayType = 'normal'; // Default day type
 
-    // If not a holiday/pre-holiday, determine day of the week
-    if (dayId === null) {
-      const dayOfWeek = now.day(); // dayjs().day() returns 0 for Sunday, 1 for Monday...
-      // Map dayjs day index to your calendar day IDs (assuming 1=Lunes, ..., 7=Domingo)
-      const daysMapping = { 0: "7", 1: "1", 2: "2", 3: "3", 4: "4", 5: "5", 6: "6" };
-      dayId = daysMapping[dayOfWeek];
-      dayType = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'][dayOfWeek];
-    }
-    console.log(`[${dateString}] Detectado como: ${dayType} (ID: ${dayId}).`);
+      if (holidayDocSnap.exists()) {
+        const holidayData = holidayDocSnap.data();
+        if (holidayData.type === 'holiday') { dayId = "8"; dayType = 'Festivo'; }
+        else if (holidayData.type === 'preHoliday') { dayId = "9"; dayType = 'Víspera de Festivo'; }
+      }
 
-    // Critical check: Ensure dayId was determined
-    if (!dayId) {
-        console.error(`[${dateString}] ¡Error Crítico! No se pudo determinar el ID del día. Abortando generación.`);
-        // Throw error to ensure it stops if dayId is missing
-        throw new Error("Could not determine day ID.");
-    }
+      if (dayId === null) {
+        const dayOfWeek = currentDateInLoop.day(); // 0 for Sunday, 1 for Monday...
+        const daysMapping = { 0: "7", 1: "1", 2: "2", 3: "3", 4: "4", 5: "5", 6: "6" };
+        dayId = daysMapping[dayOfWeek];
+        dayType = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'][dayOfWeek];
+      }
+      console.log(`[${dateString}] Detectado como: ${dayType} (ID: ${dayId}).`);
 
-    // Fetch the configuration for the determined day ID from the 'calendar' collection
-    const dayDocRef = doc(db, 'calendar', dayId);
-    console.log(`[${dateString}] Buscando configuración para el día ID: ${dayId} en /calendar/${dayId}`);
-    const dayDocSnap = await getDoc(dayDocRef);
+      if (!dayId) {
+          console.error(`[${dateString}] ¡Error Crítico! No se pudo determinar el ID del día. Saltando generación para esta fecha.`);
+          continue; // Skip to the next day in the loop
+      }
 
-    // Critical check: Ensure configuration exists for the day
-    if (!dayDocSnap.exists()) {
-      console.error(`[${dateString}] ¡Error Crítico! No se encontró configuración en 'calendar' para el día ID: ${dayId}. No se generaron calendarios.`);
-      throw new Error(`Configuration not found for day ID: ${dayId}`);
-    }
+      const dayDocRef = doc(db, 'calendar', dayId);
+      console.log(`[${dateString}] Buscando configuración para el día ID: ${dayId} en /calendar/${dayId}`);
+      const dayDocSnap = await getDoc(dayDocRef);
 
-    const dayConfig = dayDocSnap.data();
-    console.log(`[${dateString}] Configuración encontrada para el día ID ${dayId}.`);
+      if (!dayDocSnap.exists()) {
+        console.error(`[${dateString}] ¡Error Crítico! No se encontró configuración en 'calendar' para el día ID: ${dayId}. No se generaron calendarios para esta fecha.`);
+        continue; // Skip to the next day
+      }
 
+      const dayConfig = dayDocSnap.data();
+      console.log(`[${dateString}] Configuración encontrada para el día ID ${dayId}.`);
 
-    // --- PASO 2: Generar/fusionar los calendarios diarios para CADA producto Y ASEGURAR ENSALADAS ---
-    console.log(`[${dateString}] Iniciando generación/fusión de calendarios y verificación de ensaladas...`);
+      // --- PASO 2: Generar/fusionar los calendarios diarios para CADA producto Y ASEGURAR ENSALADAS PARA dateString ---
+      console.log(`[${dateString}] Iniciando generación/fusión de calendarios y verificación de ensaladas...`);
 
-    // Create an array of promises for all asynchronous tasks
-    const tasks = [];
+      const tasks = [];
+      Object.keys(productTypesConfig).forEach(productType => {
+        tasks.push(generateAndMergeIntervals(productType, dayConfig, dateString));
+      });
+      tasks.push(ensureDailySaladDocument(dateString));
 
-    // Add promises for generating/merging interval calendars for each product type
-    Object.keys(productTypesConfig).forEach(productType => {
-      tasks.push(generateAndMergeIntervals(productType, dayConfig, dateString));
-    });
-
-    // Add promise for ensuring the daily salad document exists
-    tasks.push(ensureDailySaladDocument(dateString));
-
-    // Execute all tasks in parallel and wait for them to complete
-    await Promise.all(tasks);
-
-    console.log(`%c[${new Date().toISOString()}] Todos los calendarios diarios (productos y ensaladas) generados/verificados para ${dateString}.`, 'color: green; font-weight: bold;');
+      try {
+        await Promise.all(tasks);
+        console.log(`%c[${new Date().toISOString()}] Todos los calendarios (productos y ensaladas) generados/verificados para ${dateString}.`, 'color: green;');
+      } catch (taskError) {
+        console.error(`[${new Date().toISOString()}] Error generando/verificando calendarios para ${dateString}:`, taskError);
+        // Continue to the next day even if this one fails
+      }
+    } // End of loop for 31 days
 
     // --- PASO 3: Procesar pedidos futuros que son para HOY ---
     // This will now only run once if the calling useEffect is correctly implemented
-    await processTodaysFutureOrders(dateString);
+    // It uses the *actual current date*, not the date from the loop.
+    const actualCurrentDateString = today.format('YYYY-MM-DD');
+    console.log(`%c[${new Date().toISOString()}] Iniciando procesamiento de pedidos futuros para HOY (${actualCurrentDateString})...`, 'color: magenta; font-weight: bold;');
+    await processTodaysFutureOrders(actualCurrentDateString);
 
-    console.log(`%c[${new Date().toISOString()}] Proceso initDailyCalendars completado para ${dateString}.`, 'color: green; font-weight: bold;');
+    console.log(`%c[${new Date().toISOString()}] Proceso initDailyCalendars completado (31 días verificados, pedidos de hoy procesados).`, 'color: green; font-weight: bold;');
 
 
   } catch (error) {
     // Log any errors that occurred during the process
-    console.error(`[${new Date().toISOString()}] Error fatal durante la inicialización completa de calendarios diarios y procesamiento de futuros:`, error);
+    console.error(`[${new Date().toISOString()}] Error fatal durante el proceso initDailyCalendars:`, error);
     // No finally block needed just for the lock anymore
   }
 };
