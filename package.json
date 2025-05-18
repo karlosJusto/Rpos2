@@ -17,6 +17,8 @@
     "canvas-toBlob": "^1.0.0",
     "date-fns": "^4.1.0",
     "dayjs": "^1.11.13",
+    "escpos": "^3.0.0-alpha.6",
+    "escpos-usb": "^3.0.0-alpha.4",
     "firebase": "^11.0.2",
     "html5-qrcode": "^2.3.8",
     "lodash": "^4.17.21",
