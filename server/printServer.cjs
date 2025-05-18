@@ -4,7 +4,7 @@ const escpos = require('escpos');
 require('iconv-lite');
 
 // --- Configuración de la Impresora de Red ---
-const PRINTER_IP = '192.168.1.30'; // MODIFICA ESTA IP POR LA DE TU IMPRESORA
+const PRINTER_IP = '192.168.1.30'; // MOoDIFICA ESTA IP POR LA DE TU IMPRESORA
 const PRINTER_PORT = 9100; // Puerto estándar para impresoras de red Epson (RAW/JetDirect)
 
 /**
