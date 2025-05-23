@@ -159,8 +159,11 @@ const PedidoRapido = forwardRef(({ datosCliente }, ref) => {
           total: (productData.price || 0).toFixed(2),
         }],
         total_pedido: (productData.price || 0).toFixed(2),
-        fechahora_realizado: new Date().toLocaleDateString('es-ES') + ' ' + new Date().toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' }),
+        //fechahora_realizado: new Date().toLocaleDateString('es-ES') + ' ' + new Date().toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' }),
+         fechahora_realizado : dayjs().format('DD/MM/YYYY HH:mm')
       };
+
+       //console.log(fechahora_realizado);
 
       await setDoc(doc(db, 'pedidos', nextId.toString()), productoRapidoData);
       await updateStock(productoStockId, cantidadDescontar);

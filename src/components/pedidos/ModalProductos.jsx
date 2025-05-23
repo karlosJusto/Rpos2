@@ -28,6 +28,7 @@ const ModalProductos = ({show, handleClose, product,isNuevoProducto}) => {
     const [clickCount, setClickCount]=useState(1);
 
     const [countCard, setcountCard]=useState(1);
+    
 
 
   // Al cargar el modal, inicializamos las opciones con los valores del producto
@@ -44,7 +45,8 @@ const ModalProductos = ({show, handleClose, product,isNuevoProducto}) => {
   }, [product]);
 
 
-  
+      // Helper para verificar flags como 'cocina' que pueden ser "1", 1 o true
+  const isCocinaFlagSet = (value) => String(value) === "1" || value === true || value === 1;
 
   const buyProducts = (product) => {
 
@@ -172,19 +174,19 @@ const ModalProductos = ({show, handleClose, product,isNuevoProducto}) => {
             </div>     
         </div>   
 
-            <div className="flex ms-[30px] gap-3 p-3">
-                            
-                        {product?.gluten_free && (
-                          <img src={singluten} alt="vegano" className="h-6 w-6 object-cover " />
-                        )}
-                        {product?.vegan && (
-                          <img src={vegano} alt="celiaco" className="h-6 w-6 object-cover" />
-                        )}
-                        {product?.vegetarian && (
-                          <img src={vegetariano} alt="vegetariano" className="h-6 w-6 object-cover" />
-                        )}
+                    <div className="flex ms-[30px] gap-3 p-3">
+                               {isCocinaFlagSet(product.gluten_free) && (
+                                        <img src={singluten} alt="sin gluten" className="h-[1.5vw] w-[1.5vw]" />
+                                      )}
+                                        {isCocinaFlagSet(product.vegan) && (
+                                        <img src={vegano} alt="sin gluten" className="h-[1.5vw] w-[1.5vw]" />
+                                      )}
+                                         {isCocinaFlagSet(product.vegetarian) && (
+                                        <img src={vegetariano} alt="sin gluten" className="h-[1.5vw] w-[1.5vw]" />
+                                      )}                          
+                                      
     
-            </div>
+                    </div>
 
       
     

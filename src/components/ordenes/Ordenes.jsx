@@ -31,6 +31,7 @@ import { createTheme, ThemeProvider } from '@mui/material/styles';
 
 import Ticket from '../pedidos/Ticket';
 import PedidoRapido from './PedidoRapido';
+import ImprimirPedidoCompleto from './ImprimirPedidoCompleto';
 
 import dayjs from 'dayjs';
 import 'dayjs/locale/es'; // Para trabajar con el locale en español
@@ -665,12 +666,17 @@ const Ordenes = () => {
                             {producto.celiaco && <img src={singluten} alt="Sin gluten" className="w-5 h-5 ml-2" />}
                             {producto.tostado>0 && <img src={fire_new} alt="Tostado" className="w-5 h-5 ml-2" />}
                             {producto.troceado && <img src={tijera_new} alt="Troceado" className="w-5 h-5 ml-2" />}
-                            {producto.salsa && <p className="ms-2 font-extrabold font-nunito"> | S.S</p>}
+                            {producto.sinsalsa && <p className="ms-2 font-extrabold font-nunito"> | S.S</p>}
                             {producto.extrasalsa && <p className="ms-2 font-extrabold font-nunito"> | E.S</p>}
                           </div>
                         );
                       })}
-                    {pedido.productos.every(producto => producto.entregado === producto.cantidad) && ( <GenerarQRCodeInvisible numeroPedido={pedido.NumeroPedido} /> )}
+                     {pedido.productos.every(producto => producto.entregado === producto.cantidad) && (
+                      <>
+                        <GenerarQRCodeInvisible numeroPedido={pedido.NumeroPedido} />
+                        <ImprimirPedidoCompleto numeroPedido={pedido.NumeroPedido} />
+                      </>
+                    )}
                     {pedido.pagado && !pedido.observaciones && ( <div className={`ml-2 p-2 gap-3 border-1 border-gray-700 ${pedido.productos.every(producto => producto.entregado === producto.cantidad) ? 'bg-[#52be80]' : 'bg-gray-300'} rounded-md w-auto font-nunito flex justify-center items-center`}><img src={dinero} alt="importe pagado" className="w-5" /></div> )}
                     {pedido.pagado && pedido.observaciones && ( <div className={`ml-2 p-2 gap-3 border-1 border-gray-700 ${pedido.productos.every(producto => producto.entregado === producto.cantidad) ? 'bg-[#52be80]' : 'bg-gray-300'} rounded-md w-auto font-nunito flex justify-center items-center`}><p className="flex items-center gap-3"><img src={dinero} alt="importe pagado" className="w-5" />Ob: {pedido.observaciones}</p></div> )}
                     {!pedido.pagado && pedido.observaciones && ( <div className={`ml-2 p-2 gap-3 border-1 border-gray-700 ${pedido.productos.every(producto => producto.entregado === producto.cantidad) ? 'bg-[#52be80]' : 'bg-gray-300'} rounded-md w-auto font-nunito flex justify-center items-center`}><p>Ob: {pedido.observaciones}</p></div> )}

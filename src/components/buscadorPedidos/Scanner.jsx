@@ -181,16 +181,17 @@ const Scanner = () => {
                   </tr>
                 </thead>
                 <tbody>
-                  <tr className="hover:bg-light">
-                    <td className="font-extrabold">{pedidoData.NumeroPedido}</td>
-                    <td>{pedidoData.cliente}</td>
-                    <td>{pedidoData.telefono}</td>
-                    <td>{pedidoData.fechahora_realizado}</td>
-                    <td>{pedidoData.fechahora}</td>
-                    <td>{empleadoNombre}</td>
-                    <td>{pedidoData.origen === 1 ? 'Online' : 'Tienda'}</td>
-                    <td>12345ABCD</td>
-                  </tr>
+                 
+               <tr className="hover:bg-light">
+                       <td className='font-extrabold'>{pedido.NumeroPedido}</td>
+                       <td>{pedido.cliente}</td>
+                       <td>{pedido.telefono}</td>
+                       <td>{pedido.fechahora_realizado}</td>
+                       <td>{pedido.fechahora}</td>
+                       <td>{pedido.empleado}</td>
+                       <td>{pedido.origen === 1 ? 'Online' : 'Tienda'}</td>
+                        <td className='text-[0.7vw] '>{pedido.idTransaction}</td>
+                     </tr>                                    
                 </tbody>
               </table>
 
@@ -209,7 +210,14 @@ const Scanner = () => {
                   <tbody>
                     {pedidoData.productos.map((producto, index) => (
                       <tr key={index}>
-                        <td>{producto.nombre}</td>
+                       <td>
+                            {producto.nombre}
+                            {producto.celiaco && ' (CE)'}
+                            {producto.tostado && ' (TOS)'}
+                            {producto.troceado && ' (TRO)'}
+                            {producto.extrasalsada && ' (ES)'}
+                            {producto.sinsalsa && ' (SS)'}
+                      </td>
                         <td>{producto.cantidad}</td>
                         <td>{producto.precio} €</td>
                         <td>{producto.total} €</td>

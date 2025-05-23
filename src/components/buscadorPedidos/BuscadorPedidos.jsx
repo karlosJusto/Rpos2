@@ -310,7 +310,7 @@ const BuscadorPedidos = () => {
                       <td>{pedido.fechahora}</td>
                       <td>{pedido.empleado}</td>
                       <td>{pedido.origen === 1 ? 'Online' : 'Tienda'}</td>
-                      <td className='text-[0.9vw] '>{pedido.idTransaction}</td>
+                      <td className='text-[0.7vw] '>{pedido.idTransaction}</td>
                     </tr>
                   </tbody>
                 </table>
@@ -330,7 +330,14 @@ const BuscadorPedidos = () => {
                     <tbody>
                       {pedido.productos.map((producto, index) => (
                         <tr key={index}>
-                          <td>{producto.nombre}</td>
+                          <td>
+                            {producto.nombre}
+                            {producto.celiaco && ' (CE)'}
+                            {producto.tostado && ' (TOS)'}
+                            {producto.troceado && ' (TRO)'}
+                            {producto.extrasalsada && ' (ES)'}
+                            {producto.sinsalsa && ' (SS)'}
+                          </td>
                           <td>{producto.cantidad}</td>
                           <td>{producto.precio} €</td>
                           <td>{producto.total} €</td>

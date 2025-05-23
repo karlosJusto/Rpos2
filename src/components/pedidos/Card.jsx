@@ -19,6 +19,9 @@ const Card = () => {
   const { categoria } = useParams();
   const { data, buscar } = useContext(dataContext);
 
+    // Helper para verificar flags como 'cocina' que pueden ser "1", 1 o true
+  const isCocinaFlagSet = (value) => String(value) === "1" || value === true || value === 1;
+
   
 
   // Filtrado por búsqueda
@@ -60,15 +63,15 @@ const Card = () => {
                 </h1>
               </div>
               <div className="flex items-center justify-center gap-3 h-[1.5vw]">
-                {product.gluten_free && (
-                  <img src={singluten} alt="sin gluten" className="h-[1.5vw] w-[1.5vw]" />
-                )}
-                {product.vegan && (
-                  <img src={vegano} alt="vegano" className="h-[1.5vw] w-[1.5vw]" />
-                )}
-                {product.vegetarian && (
-                  <img src={vegetariano} alt="vegetariano" className="h-[1.5vw] w-[1.5vw]" />
-                )}
+               {isCocinaFlagSet(product.gluten_free) && (
+                <img src={singluten} alt="sin gluten" className="h-[1.5vw] w-[1.5vw]" />
+              )}
+                {isCocinaFlagSet(product.vegan) && (
+                <img src={vegano} alt="sin gluten" className="h-[1.5vw] w-[1.5vw]" />
+              )}
+                 {isCocinaFlagSet(product.vegetarian) && (
+                <img src={vegetariano} alt="sin gluten" className="h-[1.5vw] w-[1.5vw]" />
+              )}
               </div>
               <div
                 className={`flex items-center ${

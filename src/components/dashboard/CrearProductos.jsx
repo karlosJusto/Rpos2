@@ -318,7 +318,7 @@ const CrearProductos = ({ productoEditarProp, modoEdicionProp, onSave, onClose }
             <option value="">Seleccionar</option>
             <option value="comida">Comida</option>
             <option value="complementos">Complementos</option>
-            <option value="bebida">Bebidas</option>
+            <option value="bebidas">Bebidas</option>
             <option value="postres">Postres</option>
             <option value="extras">Extras</option>
           </select>
