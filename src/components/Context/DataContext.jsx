@@ -80,7 +80,7 @@ const DataProvider = ({ children }) => {
     const pedidosOrigenUno = pedidos.filter(pedido => pedido.origen === 1);
     let cantidadPedidosOrigenUno = pedidosOrigenUno.length;
     pedidosOrigenUno.forEach(pedido => {
-      const productosConEntregadoIgualACantidad = pedido.productos.some(producto => producto.entregado === producto.cantidad);
+      const productosConEntregadoIgualACantidad = pedido.productos.every(producto => producto.entregado === producto.cantidad);
       if (productosConEntregadoIgualACantidad) {
         cantidadPedidosOrigenUno -= 1;
       }

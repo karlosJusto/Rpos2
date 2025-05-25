@@ -67,10 +67,10 @@ const Card = () => {
                 <img src={singluten} alt="sin gluten" className="h-[1.5vw] w-[1.5vw]" />
               )}
                 {isCocinaFlagSet(product.vegan) && (
-                <img src={vegano} alt="sin gluten" className="h-[1.5vw] w-[1.5vw]" />
+                <img src={vegano} alt="vegano" className="h-[1.5vw] w-[1.5vw]" />
               )}
                  {isCocinaFlagSet(product.vegetarian) && (
-                <img src={vegetariano} alt="sin gluten" className="h-[1.5vw] w-[1.5vw]" />
+                <img src={vegetariano} alt="vegetariano" className="h-[1.5vw] w-[1.5vw]" />
               )}
               </div>
               <div

@@ -266,7 +266,7 @@ const Ticket = (props) => {
       )}
 
       {/* Lista de Elementos del Carrito */}
-      <div className="p-[1.3vh] max-h-[54%] overflow-y-auto">
+      <div className="p-[1.3vh] max-h-[45%] overflow-y-auto">
         <CartElements />
       </div>
 

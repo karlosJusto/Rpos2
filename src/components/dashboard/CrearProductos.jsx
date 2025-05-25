@@ -28,6 +28,7 @@ const CrearProductos = ({ productoEditarProp, modoEdicionProp, onSave, onClose }
     vegano: false,
     freidora: false,
     productoDoble: false,
+    botonCeliaco: false,
     mediaRacion: false,
     sabores: false,
     cocina: false,
@@ -58,6 +59,7 @@ const CrearProductos = ({ productoEditarProp, modoEdicionProp, onSave, onClose }
         vegano: productoEditar.hasOwnProperty('vegan') ? productoEditar.vegan === "1" : initialProductFormState.vegano,
         freidora: productoEditar.hasOwnProperty('freidora') ? (productoEditar.freidora === "1" || productoEditar.freidora === true) : initialProductFormState.freidora,
         productoDoble: productoEditar.hasOwnProperty('productoDoble') ? (productoEditar.productoDoble === "1" || productoEditar.productoDoble === true) : initialProductFormState.productoDoble,
+        botonCeliaco: productoEditar.hasOwnProperty('botonCeliaco') ? (productoEditar.botonCeliaco === "1" || productoEditar.botonCeliaco === true) : initialProductFormState.botonCeliaco,
         mediaRacion: productoEditar.hasOwnProperty('half') ? (productoEditar.half === 1 || productoEditar.half === "1") : initialProductFormState.mediaRacion,
         sabores: productoEditar.hasOwnProperty('sabores') ? productoEditar.sabores === "1" : initialProductFormState.sabores,
         cocina: productoEditar.hasOwnProperty('cocina') ? (productoEditar.cocina === "1" || productoEditar.cocina === true) : initialProductFormState.cocina,
@@ -233,6 +235,7 @@ const CrearProductos = ({ productoEditarProp, modoEdicionProp, onSave, onClose }
       promocion: producto.promocion ? "1" : "0",
       freidora: !!producto.freidora,
       productoDoble: producto.productoDoble ? "1" : "0",
+      botonCeliaco: !!producto.botonCeliaco,
     };
 
     try {
@@ -347,6 +350,7 @@ const CrearProductos = ({ productoEditarProp, modoEdicionProp, onSave, onClose }
           { name: "freidora", label: "Freidora" }, { name: "cocina", label: "Cocina" },
           { name: "mediaRacion", label: "Media Ración" },
           { name: "productoDoble", label: "Producto Doble" },
+           { name: "botonCeliaco", label: "Check Celiaco" },
         ].map((campo) => (
           <label key={campo.name} className="flex items-center space-x-2 ms-5">
             <input type="checkbox" name={campo.name} checked={!!producto[campo.name]} onChange={handleChange} className="h-5 w-5 accent-[#f2ac02]" />

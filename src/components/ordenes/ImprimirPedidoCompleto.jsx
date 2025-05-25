@@ -1,31 +1,41 @@
-import React, { useEffect, useState, useContext } from 'react';
+import React, { useEffect, useState, useContext, useRef } from 'react';
 import { db } from '../firebase/firebase'; // Ajusta la ruta si es necesario
-import { collection, query, where, getDocs } from 'firebase/firestore';
+import { collection, query, where, getDocs, doc, getDoc, setDoc, serverTimestamp, onSnapshot } from 'firebase/firestore';
 import { dataContext } from '../Context/DataContext'; // Para el API_PRINT_URL si lo tienes ahí
 
 // Podrías definir esta URL aquí o tomarla del contexto si es compartida
-const API_PRINT_URL = 'http://localhost:3000/imprimir';
+const API_PRINT_URL = 'http://192.168.1.26:3000/imprimir';
 
-// Clave para almacenar en localStorage
-const LOCAL_STORAGE_KEY = 'attemptedPrintsRpos2'; // Usar un nombre específico para tu app
+// Nombre de la colección en Firestore para registrar intentos de impresión
+const PRINT_RECORDS_COLLECTION = 'registrosImpresionPedidosRpos2'; // Nombre específico para tu app
 
-// Función para obtener los pedidos intentados desde localStorage
-const getAttemptedPrintsFromStorage = () => {
+// Función para verificar si un pedido específico ya tiene un intento de impresión registrado en Firestore
+const checkIfPrintAttemptedInFirestore = async (numeroPedido) => {
+  if (!numeroPedido) return false;
   try {
-    const stored = localStorage.getItem(LOCAL_STORAGE_KEY);
-    return stored ? new Set(JSON.parse(stored)) : new Set();
+    const pedidoIdStr = numeroPedido.toString();
+    const printRecordRef = doc(db, PRINT_RECORDS_COLLECTION, pedidoIdStr);
+    const printRecordSnap = await getDoc(printRecordRef);
+    return printRecordSnap.exists();
   } catch (e) {
-    console.error("Error al leer de localStorage:", e);
-    return new Set(); // Retorna un Set vacío en caso de error
+    console.error("Error al verificar el registro de impresión en Firestore:", e);
+    return false; // En caso de error, asumimos que no se intentó para permitir el proceso
   }
 };
 
-// Función para guardar los pedidos intentados en localStorage
-const saveAttemptedPrintsToStorage = (attemptedSet) => {
+// Función para marcar un pedido como intentado en Firestore
+const markPrintAttemptedInFirestore = async (numeroPedido) => {
+  if (!numeroPedido) return;
   try {
-    localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(Array.from(attemptedSet)));
+    const pedidoIdStr = numeroPedido.toString();
+    const printRecordRef = doc(db, PRINT_RECORDS_COLLECTION, pedidoIdStr);
+    await setDoc(printRecordRef, {
+      numeroPedido: pedidoIdStr,
+      intentadoEn: serverTimestamp(),
+    });
+    // console.log(`Pedido ${pedidoIdStr} marcado como intentado en Firestore.`);
   } catch (e) {
-    console.error("Error al escribir en localStorage:", e);
+    console.error("Error al marcar el intento de impresión en Firestore:", e);
   }
 };
 
@@ -33,58 +43,94 @@ const ImprimirPedidoCompleto = ({ numeroPedido }) => {
   const [pedidoData, setPedidoData] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const printInitiatedForThisOrderRef = useRef(false); // Ref para evitar doble impresión
+  // const { API_PRINT_URL_CONTEXT } = useContext(dataContext); // Si usaras el contexto para la URL
+  // const resolvedApiPrintUrl = API_PRINT_URL_CONTEXT || API_PRINT_URL;
 
   useEffect(() => {
-    const attemptedPrints = getAttemptedPrintsFromStorage();
+    printInitiatedForThisOrderRef.current = false; // Resetea el cerrojo para un nuevo numeroPedido
+    let unsubscribeFromPedido = () => {}; // Placeholder para la función de desuscripción
 
-    if (numeroPedido && !attemptedPrints.has(numeroPedido.toString())) { // Asegurarse de comparar strings
-      const fetchPedidoDataAndPrint = async () => {
-        setLoading(true);
+    const processPrintRequest = async () => {
+      if (!numeroPedido) {
+        setLoading(false);
         setError(null);
         setPedidoData(null);
+        unsubscribeFromPedido(); // Limpiar suscripción si numeroPedido se vuelve nulo
+        return;
+      }
 
-        try {
-          const pedidosRef = collection(db, 'pedidos');
-          // Marcar como intentado ANTES de la operación asíncrona
-          attemptedPrints.add(numeroPedido.toString());
-          saveAttemptedPrintsToStorage(attemptedPrints);
+      setLoading(true);
+      setError(null);
+      setPedidoData(null); // Limpiar datos de un pedido anterior
 
-          const q = query(pedidosRef, where("NumeroPedido", "==", Number(numeroPedido)));
-          const querySnapshot = await getDocs(q);
+      const alreadyAttempted = await checkIfPrintAttemptedInFirestore(numeroPedido);
+      if (alreadyAttempted) {
+        // console.log(`Pedido ${numeroPedido} ya tiene un intento de impresión registrado en Firestore. Omitiendo.`);
+        setLoading(false);
+        return;
+      }
 
-          if (querySnapshot.empty) {
-            setError(`No se encontró el pedido con número: ${numeroPedido}`);
-            setLoading(false);
-            return;
-          }
+      const pedidoDocRef = doc(db, "pedidos", numeroPedido.toString());
 
-          let fetchedData = null;
-          querySnapshot.forEach((doc) => {
-            fetchedData = { id: doc.id, ...doc.data() };
-          });
+      unsubscribeFromPedido = onSnapshot(pedidoDocRef, async (docSnap) => {
+        if (docSnap.exists()) {
+          const pedidoActual = { id: docSnap.id, ...docSnap.data() };
           
-          setPedidoData(fetchedData);
-          // Una vez que los datos se han obtenido, procedemos a imprimir
-          if (fetchedData) {
-            await handleImprimirPedido(fetchedData);
+          if (pedidoActual.codigoQR) {
+            // console.log(`Código QR encontrado para el pedido ${numeroPedido}: ${pedidoActual.codigoQR}`);
+            
+            unsubscribeFromPedido(); 
+            
+            // Cerrojo local: si ya hemos iniciado la impresión para este pedido en esta instancia, no continuar.
+            if (printInitiatedForThisOrderRef.current) {
+              // console.log(`Impresión para ${numeroPedido} ya iniciada por esta instancia. Omitiendo.`);
+              setLoading(false); // Asegurarse de que el estado de carga se actualice
+              return;
+            }
+            printInitiatedForThisOrderRef.current = true; // Marcar que hemos iniciado el proceso
+            
+            const stillNotAttempted = !(await checkIfPrintAttemptedInFirestore(numeroPedido));
+            
+            if (stillNotAttempted) {
+              await markPrintAttemptedInFirestore(numeroPedido);
+              setPedidoData(pedidoActual); 
+              await handleImprimirPedido(pedidoActual);
+            } else {
+              // console.log(`Pedido ${numeroPedido} fue marcado como intentado mientras se esperaba el QR. Omitiendo impresión duplicada.`);
+            }
+            setLoading(false);
+          } else {
+            // console.log(`Esperando código QR para el pedido ${numeroPedido}... El listener sigue activo.`);
           }
-
-        } catch (err) {
-          console.error("Error buscando el pedido para imprimir:", err);
-          setError("Error al buscar el pedido.");
-          // Opcional: si falla, podríamos considerar quitarlo del Set en localStorage
-          // para permitir un reintento en futuras cargas de la página.
-          // Esto depende de si el error es temporal o persistente.
-          // attemptedPrints.delete(numeroPedido.toString());
-          // saveAttemptedPrintsToStorage(attemptedPrints);
-        } finally {
+        } else {
+          setError(`No se encontró el pedido con número: ${numeroPedido} (listener).`);
+          unsubscribeFromPedido(); 
           setLoading(false);
         }
-      };
+      }, (errorListener) => {
+        console.error("Error en el listener de Firestore para el pedido:", errorListener);
+        setError("Error escuchando el pedido.");
+        unsubscribeFromPedido(); 
+        setLoading(false);
+      });
+    };
 
-      fetchPedidoDataAndPrint();
+    if (numeroPedido) {
+      processPrintRequest();
+    } else {
+      unsubscribeFromPedido(); 
+      setLoading(false);
+      setError(null);
+      setPedidoData(null);
     }
-  }, [numeroPedido]); // La dependencia principal es numeroPedido.
+
+    return () => {
+      // console.log(`Limpiando listener para pedido ${numeroPedido}`);
+      unsubscribeFromPedido();
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [numeroPedido]); 
 
   const formatPedidoForPrint = (data) => {
     if (!data) return "Error: No hay datos del pedido para formatear.";
@@ -92,7 +138,7 @@ const ImprimirPedidoCompleto = ({ numeroPedido }) => {
     let textoRecibo = `--- PEDIDO ${data.NumeroPedido} ---\n`;
     textoRecibo += `Cliente: ${data.cliente || 'N/A'}\n`;
     textoRecibo += `Telefono: ${data.telefono || 'N/A'}\n`;
-    textoRecibo += `Hora Recogida: ${data.fechahora || 'N/A'}\n`; // Asumo que 'fechahora' es la de recogida
+    textoRecibo += `Hora Recogida: ${data.fechahora || 'N/A'}\n`; 
     if (data.observaciones) {
       textoRecibo += `Obs: ${data.observaciones}\n`;
     }
@@ -101,10 +147,7 @@ const ImprimirPedidoCompleto = ({ numeroPedido }) => {
     data.productos.forEach(p => {
       let precioFormateado = 'N/A';
       const cantidadProducto = p.cantidad !== undefined && p.cantidad !== null ? parseInt(p.cantidad, 10) : NaN;
-
-      // Intenta usar p.precio_total si existe y es numérico
       const precioTotalProducto = p.precio_total !== undefined && p.precio_total !== null ? parseFloat(p.precio_total) : NaN;
-      // Si no, calcula cantidad * precio, asegurando que sean numéricos
       const precioUnitario = p.precio !== undefined && p.precio !== null ? parseFloat(p.precio) : NaN;
 
       if (!isNaN(precioTotalProducto)) {
@@ -126,49 +169,39 @@ const ImprimirPedidoCompleto = ({ numeroPedido }) => {
     textoRecibo += `TOTAL PEDIDO: ${!isNaN(totalPedidoNumerico) ? totalPedidoNumerico.toFixed(2) : 'N/A'}\n`;
     if (data.pagado) textoRecibo += `PAGADO\n`;
     textoRecibo += `------------------------\n`;
-    // Añadir la URL del código QR si existe
-   
-    textoRecibo += `Eskerrik Asko\n`;
+    //textoRecibo += `Eskerrik Asko\n`;
     return textoRecibo;
   };
 
   const handleImprimirPedido = async (dataToPrint) => {
     const textoFormateado = formatPedidoForPrint(dataToPrint);
-    console.log(`Imprimiendo pedido #${dataToPrint.NumeroPedido}:\n${textoFormateado}`);
-
-     const payload = {
+    const payload = {
       texto: textoFormateado,
     };
 
-    if (dataToPrint.codigoQR) {
+    /*if (dataToPrint.codigoQR) {
       payload.qrUrl = dataToPrint.codigoQR;
-    }
-    console.log(dataToPrint.codigoQR);
-
+    }*/
+    
     try {
-      const response = await fetch(API_PRINT_URL, {
+      const response = await fetch(API_PRINT_URL, { 
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        //body: JSON.stringify({ texto: textoFormateado }),
-          body: JSON.stringify(payload), // Enviamos el payload completo
+        body: JSON.stringify(payload),
       });
 
       const responseBodyText = await response.text();
       if (!response.ok) {
         console.error(`Error del servidor al imprimir pedido #${dataToPrint.NumeroPedido}: ${response.status}`, responseBodyText);
-        // Considera mostrar un feedback al usuario si es necesario
       } else {
-        console.log(`Pedido #${dataToPrint.NumeroPedido} enviado a imprimir. Servidor: ${responseBodyText}`);
+        // console.log(`Pedido #${dataToPrint.NumeroPedido} enviado a imprimir. Servidor: ${responseBodyText}`);
       }
     } catch (networkError) {
       console.error(`Error de red al imprimir pedido #${dataToPrint.NumeroPedido}:`, networkError);
     }
   };
 
-  // Este componente puede no renderizar nada visible, o un pequeño indicador si lo deseas.
-  // if (loading) return <p>Preparando impresión...</p>;
-  // if (error) return <p style={{ color: 'red' }}>Error impresión: {error}</p>;
-  return null; // Opcional: no renderiza nada visible
+  return null; 
 };
 
 export default ImprimirPedidoCompleto;

@@ -247,13 +247,16 @@ useEffect(() => {
 
   const numProductosFreidora = uniqueProductosFreidoraMostrados.length;
 
-  const contenedorProductosClases = numProductosFreidora > 3
-    ? "flex items-stretch space-x-4 overflow-x-auto py-2 mx-auto w-full px-2 sm:px-4 font-nunito mt-2"
-    : "flex justify-between items-center mx-auto w-full px-4 font-nunito mt-2";
 
-  const tarjetaProductoClases = numProductosFreidora > 3
-    ? "bg-[#F3F3F3] rounded-lg h-[40vh] flex flex-col flex-1 min-w-[240px] max-w-xs"
-    : "bg-[#F3F3F3] w-[30%] rounded-lg h-[40vh] flex flex-col";
+const contenedorProductosClases =
+  numProductosFreidora > 6
+    ? "flex flex-nowrap overflow-x-auto gap-4 py-2 px-4 font-nunito mt-2 w-full"
+    : "flex flex-wrap justify-between gap-4 py-2 px-4 font-nunito mt-2 w-full";
+
+const tarjetaProductoClases =
+  numProductosFreidora > 6
+    ? "bg-[#F3F3F3] rounded-lg h-[40vh] flex flex-col flex-shrink-0 w-[15.66%] min-w-[200px]"
+    : "bg-[#F3F3F3] rounded-lg h-[40vh] flex flex-col flex-grow basis-0 min-w-[200px]";
 
 
   return (

@@ -167,7 +167,7 @@ const Scanner = () => {
               )}
 
               {/* Información del Pedido */}
-              <table className="table table-striped table-bordered shadow-sm rounded-lg mb-4 font-nunito">
+              <table className="table table-striped table-bordered shadow-sm rounded-lg mb-4 font-nunito text-sm">
                 <thead className="thead-dark">
                   <tr>
                     <th>Pedido</th>

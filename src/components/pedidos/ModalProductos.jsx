@@ -174,19 +174,18 @@ const ModalProductos = ({show, handleClose, product,isNuevoProducto}) => {
             </div>     
         </div>   
 
-                    <div className="flex ms-[30px] gap-3 p-3">
-                               {isCocinaFlagSet(product.gluten_free) && (
-                                        <img src={singluten} alt="sin gluten" className="h-[1.5vw] w-[1.5vw]" />
-                                      )}
-                                        {isCocinaFlagSet(product.vegan) && (
-                                        <img src={vegano} alt="sin gluten" className="h-[1.5vw] w-[1.5vw]" />
-                                      )}
-                                         {isCocinaFlagSet(product.vegetarian) && (
-                                        <img src={vegetariano} alt="sin gluten" className="h-[1.5vw] w-[1.5vw]" />
-                                      )}                          
-                                      
+            <div className="flex ms-[30px] gap-3 p-3">
+                      {isCocinaFlagSet(product?.gluten_free) && (
+                                      <img src={singluten} alt="sin gluten" className="h-[1.5vw] w-[1.5vw]" />
+                                    )}
+                                      {isCocinaFlagSet(product?.vegan) && (
+                                      <img src={vegano} alt="sin gluten" className="h-[1.5vw] w-[1.5vw]" />
+                                    )}
+                                       {isCocinaFlagSet(product?.vegetarian) && (
+                                      <img src={vegetariano} alt="sin gluten" className="h-[1.5vw] w-[1.5vw]" />
+                                    )}
     
-                    </div>
+            </div>
 
       
     
@@ -278,7 +277,7 @@ const ModalProductos = ({show, handleClose, product,isNuevoProducto}) => {
   )}
 
   {/* Condición para el checkbox "Celiaco" */}
-  {product && [10, 49, 3, 50].includes(Number(product.id_product)) && (
+  {product && product.botonCeliaco  && (
   <div className="form-check form-check-inline border-2 p-[1vw] border-gray-200 rounded-xl">
     <input 
       className="form-check-input m-1" 

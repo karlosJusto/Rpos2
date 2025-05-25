@@ -25,7 +25,7 @@ const ProgresoConTabs = () => {
           }`}
           onClick={() => handleTabClick(1)}
         >
-          <p className="font-nunito font-bold">1-Pollo Detallado</p>
+          <p className="font-nunito font-bold">1-Productos Día</p>
         </div>
 
         {/* Pestaña Stock del Día (ahora es la segunda pestaña) */}
@@ -37,7 +37,7 @@ const ProgresoConTabs = () => {
           }`}
           onClick={() => handleTabClick(2)}
         >
-          <p className="font-nunito font-bold">2-Productos Día</p>
+          <p className="font-nunito font-bold">2-Pollo Detallado</p>
         </div>
 
         {/* Pestaña Stock General (ahora es la tercera pestaña) */}
@@ -55,8 +55,8 @@ const ProgresoConTabs = () => {
 
       {/* Contenido de las pestañas */}
       <div className="content mt-40">
-        {activeTab === 1 && <PolloDetallo />}
-        {activeTab === 2 && <StockDia />} {/* StockDia es ahora la segunda pestaña */}
+        {activeTab === 1 && <StockDia />}
+        {activeTab === 2 && <PolloDetallo />} {/* StockDia es ahora la segunda pestaña */}
         {activeTab === 3 && <Stock />} {/* Stock es ahora la tercera pestaña */}
       </div>
     </div>

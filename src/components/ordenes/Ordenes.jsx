@@ -211,45 +211,80 @@ const Ordenes = () => {
   const sumaMedio = () => sumarNumero(0.5);
   const restaMedio = () => sumarNumero(-0.5);
 
-  const handleClick = async (numeroPedido, productoId, maxCantidad) => {
-    const pedido = pedidos.find(pedido => pedido.NumeroPedido === numeroPedido);
+  // MODIFICACIÓN PRINCIPAL AQUÍ:
+  const handleClick = async (numeroPedido, productoClickeado, maxCantidad, indiceProductoEnPedido) => {
+    const pedido = pedidos.find(p => p.NumeroPedido === numeroPedido);
     if (!pedido) {
       console.error('No se encontró el pedido con NumeroPedido:', numeroPedido);
       return;
     }
-    const producto = pedido.productos.find(producto => producto.id === productoId);
-    if (!producto) {
-      console.error('No se encontró el producto con id:', productoId);
+
+    // Usar el índice para obtener la referencia exacta al producto en el array local
+    // Esto es útil si necesitas manipular el estado local del producto antes o después de Firestore.
+    const productoLocal = pedido.productos[indiceProductoEnPedido];
+
+    // Verificación para asegurar que el producto clickeado y el producto en el índice coinciden (opcional pero bueno para la integridad).
+    if (!productoLocal || productoLocal.id !== productoClickeado.id /* Podrías añadir más comparaciones de opciones si fuera necesario aquí */) {
+      console.error('Error: Desajuste entre el producto clickeado y el producto encontrado en el pedido local mediante el índice:', indiceProductoEnPedido, 'Producto Clickeado:', productoClickeado);
       return;
     }
+
     const numeroPedidoStr = numeroPedido.toString();
     const pedidoRef = doc(db, 'pedidos', numeroPedidoStr);
+
     try {
       const pedidoDoc = await getDoc(pedidoRef);
       if (!pedidoDoc.exists()) {
         console.error('No se encontró el pedido en Firestore:', numeroPedidoStr);
         return;
       }
+
       const productosFirestore = pedidoDoc.data().productos;
-      const productoFirestore = productosFirestore.find(p => p.id === productoId);
-      if (!productoFirestore) {
-        console.error('No se encontró el producto en Firestore:', productoId);
+
+      // IMPORTANTE: Identificar el producto correcto en Firestore.
+      // Como no tienes un `id_cart` único por línea de producto, necesitas encontrar
+      // el producto en `productosFirestore` basándote en todas las propiedades que
+      // lo hacen único (ID base + sus opciones).
+      const indiceEnFirestore = productosFirestore.findIndex(p =>
+        p.id === productoClickeado.id && // Compara el ID base
+        // === COMPLETA ESTA SECCIÓN ===
+        // Añade aquí todas las demás propiedades que diferencian las variaciones.
+        // Deben coincidir con las propiedades del objeto `productoClickeado`.
+        // Ejemplo de cómo comparar propiedades que podrían ser undefined:
+        ( (p.tostado === undefined && productoClickeado.tostado === undefined) || p.tostado === productoClickeado.tostado ) &&
+        ( (p.troceado === undefined && productoClickeado.troceado === undefined) || p.troceado === productoClickeado.troceado ) &&
+        ( (p.sinsalsa === undefined && productoClickeado.sinsalsa === undefined) || p.sinsalsa === productoClickeado.sinsalsa ) &&
+        ( (p.extrasalsa === undefined && productoClickeado.extrasalsa === undefined) || p.extrasalsa === productoClickeado.extrasalsa ) &&
+        ( (p.celiaco === undefined && productoClickeado.celiaco === undefined) || p.celiaco === productoClickeado.celiaco )
+        // ... y así sucesivamente para todas las opciones que puedan tener tus productos.
+        // Asegúrate de que la comparación maneje correctamente valores `undefined` o `null`
+        // si algunas opciones no siempre están presentes.
+      );
+
+      if (indiceEnFirestore === -1) {
+        console.error('No se pudo encontrar el producto específico en Firestore. Producto clickeado:', productoClickeado, 'Productos en Firestore:', productosFirestore);
+        // Podrías intentar una búsqueda más laxa o registrar el error de forma diferente.
+        // Por ahora, si no se encuentra una coincidencia exacta, no se actualiza.
         return;
       }
-      const entregadoActual = productoFirestore.entregado || 0;
+
+      const entregadoActual = productosFirestore[indiceEnFirestore].entregado || 0;
       let nuevoEntregado = entregadoActual + 1;
       if (nuevoEntregado > maxCantidad) {
         nuevoEntregado = 0;
       }
-      const productosActualizados = productosFirestore.map(p =>
-        p.id === productoId
-          ? { ...p, entregado: nuevoEntregado }
+
+      // Crear una nueva copia del array de productos con el producto específico actualizado.
+      const productosActualizados = productosFirestore.map((p, idx) =>
+        idx === indiceEnFirestore
+          ? { ...p, entregado: nuevoEntregado } // Actualiza el producto correcto
           : p
       );
+
       await updateDoc(pedidoRef, {
         productos: productosActualizados,
       });
-      console.log('Producto actualizado en Firestore con éxito');
+      // console.log('Producto actualizado en Firestore con éxito'); // Descomentar para depuración
     } catch (error) {
       console.error('Error al actualizar el pedido en Firestore:', error);
     }
@@ -377,7 +412,7 @@ const Ordenes = () => {
     ) {
       setTotales(nuevosTotales);
     }
-  }, [bloquesPedidos, totales]);
+  }, [bloquesPedidos, totales]); // Agregado 'totales' a las dependencias
 
   let bloquesFiltrados = bloquesPedidos;
   if (!dateToPass) {
@@ -398,8 +433,8 @@ const Ordenes = () => {
     const entregadosPorBloque = bloque.pedidos.reduce((sumaEntregados, pedido) => {
       const productosDePollo = pedido.productos.filter(producto => producto.id === 1 || producto.id === 2);
       const entregados = productosDePollo.reduce((totalEntregado, producto) => {
-        if (producto.id === 1) return totalEntregado + producto.entregado;
-        if (producto.id === 2) return totalEntregado + (producto.entregado * 0.5);
+        if (producto.id === 1) return totalEntregado + (producto.entregado || 0); // Asegurar que entregado es numérico
+        if (producto.id === 2) return totalEntregado + ((producto.entregado || 0) * 0.5); // Asegurar que entregado es numérico
         return totalEntregado;
       }, 0);
       return sumaEntregados + entregados;
@@ -414,6 +449,8 @@ const Ordenes = () => {
   if (nuevoMostrarBarra !== mostrarBarra) {
       setMostrarBarra(nuevoMostrarBarra);
   }
+
+
 
 
   return (
@@ -499,16 +536,10 @@ const Ordenes = () => {
           </div>
 
           {/* --- Columna 9 (Libres) --- */}
-          <div className={`w-[8vw] h-[10vh] ${libres < 0 ? 'bg-[#cb4335]' : 'bg-[#f2ac02]'} flex flex-col justify-center items-center rounded-xl shadow-md`}>
-            {loading ? (
-              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 50 50" className="animate-spin h-12 w-12 text-white"><circle cx="25" cy="25" r="20" stroke="currentColor" strokeWidth="4" fill="none"/><path fill="currentColor" d="M 45,25 A 20,20 0 0,1 25,45 A 20,20 0 0,1 5,25 A 20,20 0 0,1 25,5 A 20,20 0 0,1 45,25 Z"/></svg>
-            ) : (
-              <>
-                <h1 className="text-white text-center text-[2.5vw] font-nunito">{libres}</h1>
-                <p className="text-white text-center text-[0.85vw] font-nunito mt-[0.90vh] ">Libres</p>
-              </>
-            )}
-          </div>
+        <div className={`w-[8vw] h-[10vh] ${libres < 0 ? 'bg-[#cb4335]' : 'bg-[#f2ac02]'} flex flex-col justify-center items-center rounded-xl shadow-md`}>
+          <h1 className="text-white text-center text-[2.5vw] font-nunito">{libres}</h1>
+          <p className="text-white text-center text-[0.85vw] font-nunito mt-[0.90vh]">Libres</p>
+        </div>
 
           {/* --- Columna 10 (VM) --- */}
           <div className='w-[8vw] h-[10vh] bg-[#f2ac02] flex flex-col justify-center items-center rounded-xl shadow-md'>
@@ -660,7 +691,10 @@ const Ordenes = () => {
                         else if (producto.categoria === 'extras') borderColor = 'border-3 border-gray-500';
                         if (entregadoActual === cantidadTotal) backgroundColor = 'bg-[#52be80]';
                         return (
-                          <div key={producto.id_cart || index} className={`border-2 ${borderColor} ${backgroundColor} p-2 rounded-md w-auto flex items-center text-md cursor-pointer`} onClick={() => handleClick(pedido.NumeroPedido, producto.id, producto.cantidad)}>
+                          <div
+                            key={producto.id_cart || index} // Si id_cart no existe, usa index. Considera una key más descriptiva si es necesario.
+                            className={`border-2 ${borderColor} ${backgroundColor} p-2 rounded-md w-auto flex items-center text-md cursor-pointer`}
+                            onClick={() => handleClick(pedido.NumeroPedido, producto, producto.cantidad, index)}>
                             {producto.alias}
                             <strong className="text-gray-500 ms-1"> [ </strong><strong>{producto.entregado}/{producto.cantidad}</strong><strong className="text-gray-500"> ] </strong>
                             {producto.celiaco && <img src={singluten} alt="Sin gluten" className="w-5 h-5 ml-2" />}
