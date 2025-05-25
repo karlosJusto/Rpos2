@@ -94,8 +94,8 @@ app.post('/imprimir', (req, res) => {
         if (qrCommandProcessed && !isErrorFromQrOperation) {
           // Si se procesó un comando QR y no hubo error en esa operación,
           // añadir un retraso para dar tiempo a la impresora a procesar la imagen.
-          const delayForQrProcessingMs = 100; // 1 segundos (ajusta según necesidad)
-          console.log(`ℹ️  Comando QR enviado. Esperando ${delayForQrProcessingMs / 100}s antes de cortar y cerrar para permitir procesamiento de imagen...`);
+          const delayForQrProcessingMs = 1000; // 1 segundos (ajusta según necesidad)
+          console.log(`ℹ️  Comando QR enviado. Esperando ${delayForQrProcessingMs / 1000}s antes de cortar y cerrar para permitir procesamiento de imagen...`);
           setTimeout(executeCutAndClose, delayForQrProcessingMs);
         } else {
           // Si no hubo QR, o si la operación del QR dio error, proceder inmediatamente.
