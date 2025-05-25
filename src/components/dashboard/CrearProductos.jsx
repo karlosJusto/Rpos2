@@ -240,8 +240,13 @@ const CrearProductos = ({ productoEditarProp, modoEdicionProp, onSave, onClose }
 
     try {
       await setDoc(doc(db, "productos", idDocYProd.toString()), productoFinal);
+
+      // Handle 'cocina' collection
+      const cocinaDocRef = doc(db, "cocina", idDocYProd.toString());
       if (producto.cocina) {
-        await setDoc(doc(db, "cocina", idDocYProd.toString()), { nombre: producto.nombre, id_producto: idDocYProd });
+        await setDoc(cocinaDocRef, { nombre: producto.nombre, id_producto: idDocYProd });
+      } else {
+        await deleteDoc(cocinaDocRef); // Ensure it's removed if not a 'cocina' product
       }
 
       // Handle 'freidora' collection
