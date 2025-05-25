@@ -113,10 +113,9 @@ const DataProvider = ({ children }) => {
     };
 
     calcularLibres();  // Llamamos a la función de cálculo de 'libres'
-    if (numeroBarra !== 0)
-    {
+    
     guardarEstadisticasDiarias();
-    }
+   
 
 }, [numeroBarra, totalProductosDespuesDeLas18, totalbloquesAntesdelas18]);
 
