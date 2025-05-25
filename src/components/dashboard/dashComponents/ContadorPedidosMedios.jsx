@@ -24,13 +24,13 @@ const ContadorPedidosMedios = ({ averageWebOrder = 0, averageTiendaOrder = 0, lo
       <div className="flex items-center justify-center gap-1 border-1 border-gray-500 py-2 px-4 rounded-md mt-3 shadow-md">
         <img src={tienda} alt="Icono tienda" className="w-6 h-6" /> 
        
-        <span className='font-nunito text-sm text-white font-bold ms-1'>Tienda: <span className='font-extrabold ms-1 me-3'>{averageTiendaOrder.toLocaleString('es-ES', { style: 'currency', currency: 'EUR' })}</span></span>
+        <span className='font-nunito text-xs text-white font-bold ms-1'>Tienda: <span className='font-extrabold text-xs ms-1 me-3'>{averageTiendaOrder.toLocaleString('es-ES', { style: 'currency', currency: 'EUR' })}</span></span>
       </div>
 
       <div className="flex items-center justify-center gap-1 border-1 border-gray-500 py-2 px-4 rounded-md mt-4 shadow-md">
         <img src={web} alt="Icono web" className="w-6 h-6" /> 
          
-        <span className='font-nunito text-sm text-white font-bold ms-1'>Web: <span className='font-extrabold ms-1 me-3'>{averageWebOrder.toLocaleString('es-ES', { style: 'currency', currency: 'EUR' })}</span></span>
+        <span className='font-nunito text-xs text-white font-bold ms-1'>Web: <span className='font-extrabold text-xs ms-1 me-3'>{averageWebOrder.toLocaleString('es-ES', { style: 'currency', currency: 'EUR' })}</span></span>
       </div>
     </>
   );

@@ -110,7 +110,7 @@ const Ordenes = () => {
 
   const [show, setShow] = useState(false);
   const [isColorChanged, setIsColorChanged] = useState(false);
-  const [vm, setVm] = useState(0);
+  //const [vm, setVm] = useState(0);
 
   const [datosCliente, setDatosCliente] = useState({
     cliente: 'AAgenerico',
@@ -351,7 +351,7 @@ const Ordenes = () => {
 
   const totalProductos = totalProductosDespuesDeLas18 + totalbloquesAntesdelas18;
 
-  useEffect(() => {
+ /* useEffect(() => {
     const cargarNumeroBarra = async () => {
       try {
         const fecha = obtenerFechaFormateada();
@@ -369,7 +369,7 @@ const Ordenes = () => {
       }
     };
     cargarNumeroBarra();
-  }, []);
+  }, []);*/
 
   const [clientes, setClientes] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
@@ -449,6 +449,8 @@ const Ordenes = () => {
   if (nuevoMostrarBarra !== mostrarBarra) {
       setMostrarBarra(nuevoMostrarBarra);
   }
+
+
 
 
 
@@ -702,6 +704,7 @@ const Ordenes = () => {
                             {producto.troceado && <img src={tijera_new} alt="Troceado" className="w-5 h-5 ml-2" />}
                             {producto.sinsalsa && <p className="ms-2 font-extrabold font-nunito"> | S.S</p>}
                             {producto.extrasalsa && <p className="ms-2 font-extrabold font-nunito"> | E.S</p>}
+                           
                           </div>
                         );
                       })}

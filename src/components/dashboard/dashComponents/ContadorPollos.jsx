@@ -26,7 +26,7 @@ const ContadorPollos = ({ chartData = [], loading, error }) => {
     <div className="h-full flex flex-col">
       <div className='flex justify-center items-center p-2'>
         <h1 className="font-nunito text-md bg-gradient-to-r from-yellow-700 to-yellow-500 bg-clip-text text-transparent font-semibold">
-          Ventas Pollos (Últimos 7 Días)
+          Ventas Pollos (Últimos 14 Días)
         </h1>
       </div>
       {chartData.length === 0 && !loading && (

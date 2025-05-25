@@ -64,21 +64,31 @@ const CartElements = () => {
               <div
                 className="flex items-center p-[0.80vh] font-bold text-gray-100 rounded-lg group hover:shadow bg-gray-600 hover:bg-gray-500"
               >
-                <img src={product.imagen} alt={product.name} className="w-[2vw]" />
+                 <img src={product.imagen} alt={product.name} className="w-[2vw]" />
                 <ElementsCantidad cantidad={product.cantidad} />
                 <span className="font-extrabold font-nunito text-gray-100 flex-1 ms-[0.75vw] whitespace-nowrap truncate">
                   {product.name} <br />
-                  {/* Mostrar opciones solo si existen y son verdaderas */}
-                  <span className="text-[0.60vw] font-nunito text-gray-400">
-                    {isTrueValue(product.extrasalsa) && <span>Extra Salsa, </span>}
-                    {isTrueValue(product.sinsalsa) && <span>Sin salsa, </span>}
-                    {isTrueValue(product.tostado) && <span>Tostado, </span>}
-                    {isTrueValue(product.troceado) && <span>Troceado, </span>}
-                    {isTrueValue(product.celiaco) && <span>Celiaco</span>}
-                  </span>
+                  {(() => {
+                    const opcionesMostradas = [];
+                    if (isTrueValue(product.extrasalsa)) opcionesMostradas.push("Extra Salsa");
+                    if (isTrueValue(product.sinsalsa)) opcionesMostradas.push("Sin salsa");
+                    if (isTrueValue(product.tostado)) opcionesMostradas.push("Tostado");
+                    if (isTrueValue(product.troceado)) opcionesMostradas.push("Troceado");
+                    // Nueva lógica para "Producto Doble"
+                    if (product.productoDoble === '1' && product.cantidad % 2 === 0) {
+                      opcionesMostradas.push("Producto Doble");
+                    }
+                    if (isTrueValue(product.celiaco)) opcionesMostradas.push("Celiaco");
+
+                    if (opcionesMostradas.length > 0) {
+                      return <span className="text-[0.60vw] font-nunito text-gray-400">{opcionesMostradas.join(", ")}</span>;
+                    }
+                    return null;
+                  })()}
                 </span>
                 {/* Total del producto */}
                 <span className="inline-flex items-center justify-center px-[0.5vw] py-[0.125vw] ms-[0.75vw] text-md font-medium text-gray-500 bg-gray-200 rounded dark:bg-gray-700 dark:text-gray-400">
+
                   {(precioProducto * product.cantidad).toFixed(2)}<span>€</span>
                 </span>
               </div>

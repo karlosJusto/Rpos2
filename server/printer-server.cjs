@@ -19,16 +19,51 @@ const PRINTER_PORT = 9100;         // Puerto estándar para impresoras ESC/POS e
 // Prueba también con 'ISO-8859-15' si tienes problemas.
 const PRINTER_ENCODING = 'CP850';
 
+// --- Cerrojo para evitar impresiones duplicadas ---
+const recentlyPrinted = new Map(); // Almacena numeroPedido -> timestamp
+const PRINT_LOCK_DURATION_MS = 60 * 1000; // 1 minuto de bloqueo para evitar duplicados
+const CLEANUP_INTERVAL_MS = PRINT_LOCK_DURATION_MS * 2; // Intervalo para limpiar el Map
+
 console.log(`ℹ️  Servidor de impresión configurado para ${PRINTER_IP}:${PRINTER_PORT} con codificación ${PRINTER_ENCODING}`);
+console.log(`ℹ️  Bloqueo de impresión duplicada activo por ${PRINT_LOCK_DURATION_MS / 1000} segundos.`);
+
+// Limpieza periódica de registros de impresión antiguos
+setInterval(() => {
+  const now = Date.now();
+  console.log(`🧹 Ejecutando limpieza de registros de impresión antiguos. Registros actuales: ${recentlyPrinted.size}`);
+  for (const [pedidoId, timestamp] of recentlyPrinted.entries()) {
+    if (now - timestamp > PRINT_LOCK_DURATION_MS) {
+      recentlyPrinted.delete(pedidoId);
+      console.log(`🗑️  Registro de impresión expirado y eliminado para pedido: ${pedidoId}`);
+    }
+  }
+}, CLEANUP_INTERVAL_MS);
 
 app.post('/imprimir', (req, res) => {
-  const { texto, qrUrl } = req.body; // Recibimos 'texto' y 'qrUrl' del frontend
+  const { texto, qrUrl, numeroPedido } = req.body; // Recibimos 'texto', 'qrUrl' y 'numeroPedido'
 
 //qrUrl='https://firebasestorage.googleapis.com/v0/b/superpollorpos.firebasestorage.app/o/qr%2F2329.png?alt=media&token=fe607973-f162-4576-ae52-faa32031cc3e';
 
   if (!texto && !qrUrl) {
     console.warn('⚠️ Solicitud de impresión recibida sin texto ni URL de QR.');
     return res.status(400).send('No se proporcionó contenido para imprimir (ni texto ni QR).');
+  }
+
+  // Verificar cerrojo de impresión duplicada si se proporciona numeroPedido
+  if (numeroPedido) {
+    const now = Date.now();
+    if (recentlyPrinted.has(numeroPedido.toString())) {
+      const lastPrintTime = recentlyPrinted.get(numeroPedido.toString());
+      if (now - lastPrintTime < PRINT_LOCK_DURATION_MS) {
+        console.log(`🚫 Impresión duplicada detectada para pedido ${numeroPedido} dentro del período de bloqueo. Omitiendo.`);
+        return res.status(429).send(`El pedido ${numeroPedido} ya se envió a imprimir recientemente o está en proceso.`);
+      }
+    }
+    // Registrar el intento de impresión actual para este numeroPedido
+    recentlyPrinted.set(numeroPedido.toString(), now);
+    console.log(`ℹ️  Registrando intento de impresión para pedido ${numeroPedido}.`);
+  } else {
+    console.warn('⚠️  Solicitud de impresión recibida sin numeroPedido. No se puede aplicar cerrojo de duplicados del lado del servidor.');
   }
 
   const networkDevice = new escpos.Network(PRINTER_IP, PRINTER_PORT);
@@ -38,6 +73,11 @@ app.post('/imprimir', (req, res) => {
   networkDevice.open(error => {
     if (error) {
       console.error(`❌ Error al conectar con la impresora en ${PRINTER_IP}:${PRINTER_PORT}:`, error);
+      // Si hubo un error de conexión, y habíamos registrado el pedido, lo eliminamos para permitir un reintento.
+      if (numeroPedido) {
+        recentlyPrinted.delete(numeroPedido.toString());
+        console.log(`ℹ️  Registro de intento de impresión para pedido ${numeroPedido} eliminado debido a error de conexión.`);
+      }
       return res.status(500).send(`Error al conectar con la impresora: ${error.message}. Verifique la IP, el puerto y la conexión de red de la impresora.`);
     }
 
@@ -94,7 +134,7 @@ app.post('/imprimir', (req, res) => {
         if (qrCommandProcessed && !isErrorFromQrOperation) {
           // Si se procesó un comando QR y no hubo error en esa operación,
           // añadir un retraso para dar tiempo a la impresora a procesar la imagen.
-          const delayForQrProcessingMs = 1000; // 1 segundos (ajusta según necesidad)
+          const delayForQrProcessingMs = 2500; // 2.5 segundos (ajusta según necesidad)
           console.log(`ℹ️  Comando QR enviado. Esperando ${delayForQrProcessingMs / 1000}s antes de cortar y cerrar para permitir procesamiento de imagen...`);
           setTimeout(executeCutAndClose, delayForQrProcessingMs);
         } else {
@@ -123,6 +163,11 @@ app.post('/imprimir', (req, res) => {
         printer.qrimage(qrUrl, qrOptions, function(errQr) {
           if (errQr) {
             console.error('❌ Error al procesar o imprimir el comando QR:', errQr);
+            // Si hubo un error con el QR, y habíamos registrado el pedido, lo eliminamos para permitir un reintento.
+            if (numeroPedido) {
+              recentlyPrinted.delete(numeroPedido.toString());
+              console.log(`ℹ️  Registro de intento de impresión para pedido ${numeroPedido} eliminado debido a error en QR.`);
+            }
             finalizarImpresion(true, `Error al imprimir QR: ${errQr.message}. El texto pudo haberse impreso.`, true);
           } else {
             console.log('✅ Comando QR enviado a la impresora.');
@@ -138,12 +183,17 @@ app.post('/imprimir', (req, res) => {
 
     } catch (printCommandsError) {
       console.error('🛑 Error durante la ejecución de comandos de impresión (texto, alineación, etc.):', printCommandsError);
+      // Si hubo un error en los comandos, y habíamos registrado el pedido, lo eliminamos para permitir un reintento.
+      if (numeroPedido) {
+        recentlyPrinted.delete(numeroPedido.toString());
+        console.log(`ℹ️  Registro de intento de impresión para pedido ${numeroPedido} eliminado debido a error en comandos de impresión.`);
+      }
       if (networkDevice && typeof networkDevice.close === 'function') {
         try {
           networkDevice.close();
           console.log('ℹ️  Conexión de red cerrada debido a un error en el proceso de comandos de impresión.');
         } catch (closeErrOnCommandError) {
-          console.error("Error al intentar cerrar dispositivo de red después de error en comandos:", closeErrOnCommandError);
+          //console.error("Error al intentar cerrar dispositivo de red después de error en comandos:", closeErrOnCommandError);
         }
       }
       if (!res.headersSent) {

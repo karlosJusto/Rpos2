@@ -38,7 +38,7 @@ const CardsResultados = ({ categoryTotals, grandTotal, loading, error }) => {
         return (
           <div key={categoryConfig.key} className={`p-3 rounded-xl shadow-md ${categoryConfig.bgColor} text-white flex flex-col justify-between min-h-[120px]`}>
             <h2 className="text-sm font-medium">{categoryConfig.name}</h2>
-            <p className="text-3xl font-bold my-2">
+            <p className="text-2xl font-bold my-2">
               {total.toLocaleString('es-ES', { style: 'currency', currency: 'EUR' })}
             </p>
             <p className="text-xs opacity-80">
@@ -50,7 +50,7 @@ const CardsResultados = ({ categoryTotals, grandTotal, loading, error }) => {
       {/* Tarjeta para el Total del Día */}
       <div className="p-3 rounded-xl shadow-md bg-red-500 text-white flex flex-col justify-between min-h-[120px]">
         <h2 className="text-sm font-medium">Total Día</h2>
-        <p className="text-3xl font-bold my-2">
+        <p className="text-2xl font-bold my-2">
           {grandTotal.toLocaleString('es-ES', { style: 'currency', currency: 'EUR' })}
         </p>
         <p className="text-xs opacity-80">

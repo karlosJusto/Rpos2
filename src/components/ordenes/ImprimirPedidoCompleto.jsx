@@ -177,6 +177,7 @@ const ImprimirPedidoCompleto = ({ numeroPedido }) => {
     const textoFormateado = formatPedidoForPrint(dataToPrint);
     const payload = {
       texto: textoFormateado,
+      numeroPedido: dataToPrint.NumeroPedido, 
     };
 
     /*if (dataToPrint.codigoQR) {

@@ -37,6 +37,7 @@ const DataProvider = ({ children }) => {
   const [totalProductosDespuesDeLas18, setTotalProductosDespuesDeLas18]=useState(0);
   const [totalbloquesAntesdelas18, setTotalbloquesAntesdelas18]=useState(0);
   const [loading, setLoading] = useState(false); // Estado de carga
+  const [isNumeroBarraInitialized, setIsNumeroBarraInitialized] = useState(false); // Para controlar la carga inicial de numeroBarra
 
   useEffect(() => {
 
@@ -45,12 +46,12 @@ const DataProvider = ({ children }) => {
    const fechaAUsar = dateToPass ? dayjs(dateToPass).locale('es').tz('Europe/Madrid') : dayjs().locale('es').tz('Europe/Madrid');
          
    // Obtener la hora actual en la zona horaria de Madrid
-   const currentTime = dayjs().locale('es').tz('Europe/Madrid');
-   const esHoy = currentTime.isSame(fechaAUsar, 'day'); // Comprobamos si la fecha es hoy
+   // const currentTime = dayjs().locale('es').tz('Europe/Madrid'); // No se usa directamente aquí
+   // const esHoy = currentTime.isSame(fechaAUsar, 'day'); // Comprobamos si la fecha es hoy // No se usa
  
    // Turno completo (dia entero)
-   let fechaIncio = fechaAUsar.hour(0).minute(0).second(0);  // Desde las 18:01
-   let fechaFin = fechaAUsar.hour(23).minute(59).second(59);  // Desde las 18:01
+   let fechaIncio = fechaAUsar.hour(0).minute(0).second(0);
+   let fechaFin = fechaAUsar.hour(23).minute(59).second(59);
 
     const pedidosRef = collection(db, 'pedidos');
     const pedidosQuery = query(
@@ -93,53 +94,87 @@ const DataProvider = ({ children }) => {
 
 
   useEffect(() => {
-    console.log("NUMERO BARRASSSSSSSSSSSSSSSS: "+numeroBarra);
+    // console.log("NUMERO BARRASSSSSSSSSSSSSSSS: "+numeroBarra); // Para depuración
     const calcularLibres = () => {
-      setLoading(true);  // Activamos el spinner
+      // setLoading(true); // Comentado según la última versión, si se necesita, gestionar globalmente
       const currentTime = dayjs().locale('es').tz('Europe/Madrid');
       const antesDelas6pm = currentTime.hour() < 18;
+      let libresCalculados;
 
-      // Realizamos el cálculo de 'libres' según el turno (mañana o tarde)
       if (antesDelas6pm) {
-        setLibres(numeroBarra - totalbloquesAntesdelas18);
+        libresCalculados = numeroBarra - totalbloquesAntesdelas18;
       } else {
-        setLibres(numeroBarra - totalProductosDespuesDeLas18);
+        libresCalculados = numeroBarra - totalProductosDespuesDeLas18;
       }
-
-      // Mantener el spinner visible durante 3 segundos
-      setTimeout(() => {
-        setLoading(false);  // Desactivamos el spinner después de 3 segundos
-      }, 0); // 
+      
+      // Actualizar 'libres' solo si el valor ha cambiado
+      setLibres(currentLibres => {
+        if (libresCalculados !== currentLibres) {
+          return libresCalculados;
+        }
+        return currentLibres;
+      });
+      // setLoading(false); // Comentado
     };
 
     calcularLibres();  // Llamamos a la función de cálculo de 'libres'
     
-    guardarEstadisticasDiarias();
+    // Solo guardar si numeroBarra ha sido inicializado desde Firestore/listener
+    if (isNumeroBarraInitialized) {
+      guardarEstadisticasDiarias();
+    }
    
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+}, [numeroBarra, totalProductosDespuesDeLas18, totalbloquesAntesdelas18, isNumeroBarraInitialized]);
 
-}, [numeroBarra, totalProductosDespuesDeLas18, totalbloquesAntesdelas18]);
-
-//escucha de la base de datos cambios en barra
+// Listener para cambios en 'enbarra' (y otros campos si es necesario) desde Firestore
 useEffect(() => {
-  const numeroBarraRef = doc(db, 'estadisticas_diarias', obtenerFechaFormateada()); // Asumiendo que 'numeroBarra' se guarda en el documento diario
-  const unsubscribe = onSnapshot(numeroBarraRef, (docSnapshot) => {
-    if (docSnapshot.exists() && docSnapshot.data().enbarra !== undefined) {
-      setNumeroBarra(docSnapshot.data().enbarra);
-      
+  const fechaActualFormateada = obtenerFechaFormateada();
+  const docRef = doc(db, 'estadisticas_diarias', fechaActualFormateada);
+  let initialSnapshotProcessed = false;
 
+  const unsubscribe = onSnapshot(docRef, (docSnapshot) => {
+    if (docSnapshot.exists()) {
+      const data = docSnapshot.data();
+      if (data.enbarra !== undefined) {
+        // Actualiza numeroBarra en el estado solo si es diferente
+        setNumeroBarra(currentNumeroBarra => {
+          if (data.enbarra !== currentNumeroBarra) {
+            return data.enbarra;
+          }
+          return currentNumeroBarra;
+        });
+      } else {
+        console.warn(`DataContext: El campo 'enbarra' no se encontró en el documento ${fechaActualFormateada}, aunque el documento existe.`);
+        // Si el campo no existe pero el documento sí, podría ser un estado inicial.
+        // Si se desea, se podría establecer numeroBarra a 0 aquí, pero Login.jsx debería manejar la creación inicial.
+        // setNumeroBarra(0); 
+      }
     } else {
-      console.log("No se encontró el valor de enbarra en el documento diario.");
+      // El documento no existe. Esto es normal al inicio de un nuevo día antes del login.
+      // Login.jsx se encargará de crear el documento con enbarra: 0.
+      // numeroBarra ya es 0 por useState(0).
+      console.log(`DataContext: Documento estadisticas_diarias para ${fechaActualFormateada} no existe aún.`);
     }
 
-      //revisar con ibai
-      //setMostrarBarra(numeroBarra-(totalbloquesAntesdelas18+totalProductosDespuesDeLas18));
-  
+    // Marcar como inicializado después del primer procesamiento del snapshot (o intento)
+    if (!initialSnapshotProcessed) {
+      setIsNumeroBarraInitialized(true);
+      initialSnapshotProcessed = true;
+    }
 
-   
+  }, (error) => {
+    console.error("Error en el listener de estadisticas_diarias en DataContext:", error);
+    // Incluso si hay un error, marcamos como inicializado para no bloquear otras lógicas indefinidamente.
+    if (!initialSnapshotProcessed) {
+      setIsNumeroBarraInitialized(true);
+      initialSnapshotProcessed = true;
+    }
   });
 
   return () => unsubscribe(); // Limpiar el listener al desmontar
-}, []); // Se ejecuta solo una vez al montar el componente
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+}, []); // Se ejecuta solo una vez al montar para establecer el listener
 
 
  // Función para guardar los datos de estadisticas_diarias
@@ -148,36 +183,39 @@ useEffect(() => {
     const fecha = obtenerFechaFormateada();
     const docRef = doc(db, "estadisticas_diarias", fecha);
     
-    await updateDoc(docRef, {
-      enbarra: numeroBarra,
-      libresManana:numeroBarra-totalbloquesAntesdelas18,
-      libresTarde: numeroBarra-totalProductosDespuesDeLas18,
-      vm: totalbloquesAntesdelas18, //bloquesAntesdelas18,
-      vt: totalProductosDespuesDeLas18,
-      vd: totalbloquesAntesdelas18+totalProductosDespuesDeLas18,
-    });
+    const docSnap = await getDoc(docRef); // Verificar si el documento existe
 
-    console.log("Datos guardados exitosamente para el día", fecha);
+    if (docSnap.exists()) { // Solo actualizar si el documento ya existe
+      await updateDoc(docRef, {
+        enbarra: numeroBarra,
+        libresManana:numeroBarra-totalbloquesAntesdelas18,
+        libresTarde: numeroBarra-totalProductosDespuesDeLas18,
+        vm: totalbloquesAntesdelas18,
+        vt: totalProductosDespuesDeLas18,
+        vd: totalbloquesAntesdelas18+totalProductosDespuesDeLas18,
+      });
+      // console.log("Datos de estadísticas diarias actualizados para el día", fecha); // Para depuración
+    } else {
+      // Si el documento no existe, Login.jsx es responsable de crearlo.
+      // No se actualiza aquí para evitar conflictos con la lógica de creación de Login.jsx.
+      console.warn(`DataContext: Intento de actualizar estadisticas_diarias para ${fecha}, pero el documento no existe. Login.jsx debería haberlo creado.`);
+    }
+
   } catch (e) {
-    console.error("Error al guardar los datos: ", e);
+    console.error("Error al guardar los datos de estadísticas diarias: ", e);
   }
 };
 
 const obtenerFechaFormateada = () => {
-  // Configurar el idioma a español
   dayjs.locale('es');
-
-  // Obtener la fecha actual y formatearla en el formato DD-MM-YYYY
-  const fechaFormateada = dayjs().format('DD-MM-YYYY');
-
-  
-
+  // Asegurar que la fecha se obtenga con la zona horaria correcta
+  const fechaFormateada = dayjs().tz('Europe/Madrid').format('DD-MM-YYYY');
   return fechaFormateada;
 };
 
 
 
-   /*useEffect(() => {
+   /*useEffect(() => { // Bloque de código comentado por el usuario
 
               // Si se pasa una fecha específica, usamos esa fecha; de lo contrario, usamos la fecha actual
               const fechaAUsar = dateToPass ? dayjs(dateToPass).locale('es').tz('Europe/Madrid') : dayjs().locale('es').tz('Europe/Madrid');
@@ -232,8 +270,8 @@ const obtenerFechaFormateada = () => {
                 setPedidos(pedidosArray);
             
                 // Filtramos los nombres de los clientes directamente desde los pedidos obtenidos
-                const nombresClientes = pedidosArray.map(pedido => pedido.cliente).filter(cliente => cliente); // Filtra solo los valores válidos
-                setClientes(nombresClientes);
+                // const nombresClientes = pedidosArray.map(pedido => pedido.cliente).filter(cliente => cliente); // Variable no usada globalmente
+                // setClientes(nombresClientes); // setClientes no está definido en este DataProvider
             
                 // Filtrar los pedidos con origen = 1
                 const pedidosConOrigenUno = pedidosArray.filter(pedido => pedido.origen === 1);
@@ -295,7 +333,7 @@ const obtenerFechaFormateada = () => {
 
   };
 
-  const categoria = useParams().categoria;
+  // const categoria = useParams().categoria; // useParams solo funciona en componentes renderizados por una Ruta.
 
   // Usamos onSnapshot para escuchar los cambios en la colección 'productos'
   useEffect(() => {
@@ -346,12 +384,12 @@ const obtenerFechaFormateada = () => {
         setNumeroBarra,
         mostrarBarra,
         setMostrarBarra,
-        totalProductosDespuesDeLas18, // Pasar el estado (aunque no lo uses para actualizar desde fuera)
-        setTotalProductosDespuesDeLas18, // Pasar la función para actualizar totalProductosDespuesDeLas18
-        totalbloquesAntesdelas18, // Pasar el estado (aunque no lo uses para actualizar desde fuera)
-        setTotalbloquesAntesdelas18, // Pasar la función para actualizar totalbloquesAntesdelas18
+        totalProductosDespuesDeLas18, 
+        setTotalProductosDespuesDeLas18, 
+        totalbloquesAntesdelas18, 
+        setTotalbloquesAntesdelas18, 
         loading,
-        setLoading,
+        setLoading, // Pasar setLoading para que otros componentes puedan indicar carga
 
         orderBeingEdited,
         setOrderBeingEdited,

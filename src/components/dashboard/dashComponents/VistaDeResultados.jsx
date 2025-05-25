@@ -136,7 +136,7 @@ const VistaDeResultados = () => {
           const salesData = [];
           const datesToQuery = [];
 
-          for (let i = 6; i >= 0; i--) { // Últimos 7 días, incluyendo hoy
+          for (let i = 14; i >= 0; i--) { // Últimos 14 días, incluyendo hoy
             const dateObj = today.subtract(i, 'day');
             datesToQuery.push({
               dateString: dateObj.format('DD/MM/YYYY'), // Para la consulta
