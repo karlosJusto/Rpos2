@@ -76,13 +76,14 @@ const Card = () => {
               <div
                 className={`flex items-center ${
                   product.id_product === 2 || product.id_product === 48
+                    || product.id_product === 39 || product.id_product === 40
                     ? 'justify-end'
                     : 'justify-between'
                 } p-[0.5vw]`}
               >
                 <h2
                   className={`text-gray-100 font-nunito text-[0.85vw] border-1 p-1 bg-gray-600 rounded-[0.375vw] mt-[0.50vw] ${
-                    product.id_product === 2 || product.id_product === 48 ? 'hidden' : ''
+                    product.id_product === 2 || product.id_product === 48 || product.id_product === 39 || product.id_product === 40 ? 'hidden' : ''
                   }`}
                 >
                   <span
