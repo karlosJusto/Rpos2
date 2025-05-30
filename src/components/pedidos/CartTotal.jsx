@@ -107,7 +107,7 @@ const CartTotal = ({ datosCliente, setDatosCliente, orderToEdit }) => {
   const { cart, setCart, setOrderBeingEdited } = useContext(dataContext);
   // --- FIN MODIFICACIÓN ---
   const navigate = useNavigate();
-
+  const isEditing = !!orderToEdit;
   // --- Estados del Componente ---
   const [mensajeModal, setMensajeModal] = useState("");
   const [showModal, setShowModal] = useState(false);
@@ -342,9 +342,12 @@ const CartTotal = ({ datosCliente, setDatosCliente, orderToEdit }) => {
       mensajesAdvertencia += `❗️No has seleccionado hora. La hora del pedido será: ${horaRedondeada}\n`;
     } else {
       const horaPedidoSeleccionada = dayjs(clienteData.fechahora, "DD/MM/YYYY HH:mm");
-      if (horaPedidoSeleccionada.isValid() && horaPedidoSeleccionada.isBefore(dayjs().subtract(5, 'minute'))) {
+      if(!isEditing){
+        if (horaPedidoSeleccionada.isValid() && horaPedidoSeleccionada.isBefore(dayjs().subtract(5, 'minute'))) {
           mensajesError += `La hora seleccionada (${horaPedidoSeleccionada.format('HH:mm')}) ya ha pasado.\n`;
       }
+      }
+
     }
 
     // 4. Validar Pollo
