@@ -37,6 +37,9 @@ const DataProvider = ({ children }) => {
   const [totalProductosDespuesDeLas18, setTotalProductosDespuesDeLas18]=useState(0);
   const [totalbloquesAntesdelas18, setTotalbloquesAntesdelas18]=useState(0);
   const [loading, setLoading] = useState(false); // Estado de carga
+  // --- NUEVO: Estado para la hora seleccionada del calendario del Layout ---
+  const [selectedSlotTime, setSelectedSlotTime] = useState(null);
+  // --- FIN NUEVO ---
   const [isNumeroBarraInitialized, setIsNumeroBarraInitialized] = useState(false); // Para controlar la carga inicial de numeroBarra
 
   useEffect(() => {
@@ -395,6 +398,10 @@ const obtenerFechaFormateada = () => {
         setOrderBeingEdited,
         isEditingOrder, 
 
+        // --- NUEVO: Pasar estado y actualizador para la hora del slot ---
+        selectedSlotTime,
+        setSelectedSlotTime,
+        // --- FIN NUEVO ---
         
       }}
     >

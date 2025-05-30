@@ -20,7 +20,9 @@ const Layout = () => {
     orderBeingEdited,
     isEditingOrder,
     setOrderBeingEdited,
-    data
+    data,
+    selectedSlotTime, // Obtener el estado del slot seleccionado
+    setSelectedSlotTime // Obtener la función para actualizar el slot
   } = useContext(dataContext);
 
   const location = useLocation();
@@ -167,8 +169,10 @@ const Layout = () => {
                         {(isMorning ? morningIntervals : afternoonIntervals).map(
                           (interval, index) => (
                             <button
-                              key={index}
-                              className="px-2 py-1 ms-4 border rounded whitespace-nowrap font-nunito"
+                              key={`${interval.start}-${index}`} // Usar una key más única
+                              className={`px-2 py-1 ms-4 border rounded whitespace-nowrap font-nunito transition-colors duration-150
+                                ${selectedSlotTime === interval.start ? 'bg-yellow-400 border-yellow-600 ring-2 ring-yellow-300' : 'hover:bg-gray-200'}`}
+                              onClick={() => setSelectedSlotTime(interval.start)} // Establecer el slot seleccionado
                             >
                               {interval.start} [
                               <span

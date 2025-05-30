@@ -6,6 +6,7 @@ import CartElements from "./CartElements";
 import CartTotal from "./CartTotal";
 import avatar from "../../assets/avatar.png";
 import dinero from "../../assets/dinero.png";
+import dayjs from "dayjs"; // Importar dayjs
 import singluten from "../../assets/singluten.png";
 import ModalClientes from "./ModalClientes";
 import { Offcanvas, Button, Nav, Modal, InputGroup, Form } from 'react-bootstrap';
@@ -22,7 +23,9 @@ const Ticket = (props) => {
     orderBeingEdited,
     isEditingOrder,
     setOrderBeingEdited,
-    pedidosConOrigenUno
+    pedidosConOrigenUno,
+    selectedSlotTime,    // Obtener el slot seleccionado del contexto
+    setSelectedSlotTime  // Obtener la función para resetear el slot
   } = useContext(dataContext);
 
   const navigate = useNavigate();
@@ -42,6 +45,37 @@ const Ticket = (props) => {
   const [showConfirmCancelModal, setShowConfirmCancelModal] = useState(false);
   const handleCloseConfirmCancelModal = () => setShowConfirmCancelModal(false);
   const handleShowConfirmCancelModal = () => setShowConfirmCancelModal(true);
+
+  // Efecto para actualizar fechahora cuando selectedSlotTime cambia
+  useEffect(() => {
+    if (selectedSlotTime) {
+      const newTime = selectedSlotTime; // e.g., "14:30"
+      
+      setDatosCliente(prevDatos => {
+        let baseDateStr;
+        // Intentar obtener la fecha de prevDatos.fechahora si existe y es válida
+        if (prevDatos.fechahora && prevDatos.fechahora.includes(' ')) {
+          const datePart = prevDatos.fechahora.split(' ')[0];
+          if (dayjs(datePart, "DD/MM/YYYY", true).isValid()) {
+            baseDateStr = datePart;
+          } else {
+            baseDateStr = dayjs().format("DD/MM/YYYY"); // Fallback a hoy si la fecha previa no es válida
+          }
+        } else {
+          baseDateStr = dayjs().format("DD/MM/YYYY"); // Hoy si no hay fecha previa
+        }
+        
+        const newFechahora = `${baseDateStr} ${newTime}`;
+        
+        // Validar antes de actualizar
+        if (dayjs(newFechahora, "DD/MM/YYYY HH:mm", true).isValid()) {
+          return { ...prevDatos, fechahora: newFechahora };
+        }
+        return prevDatos; // No actualizar si la nueva fecha/hora no es válida
+      });
+      setSelectedSlotTime(null); // Resetear el slot seleccionado en el contexto para que sea un trigger de una sola vez
+    }
+  }, [selectedSlotTime, setDatosCliente, setSelectedSlotTime]);
 
   // --- NUEVO: Estado para el modal de confirmación de vaciar ticket ---
   const [showConfirmClearModal, setShowConfirmClearModal] = useState(false);

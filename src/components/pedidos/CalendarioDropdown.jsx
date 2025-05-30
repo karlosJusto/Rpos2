@@ -102,7 +102,7 @@ function CalendarioDropdown({ onDateChange,initialDate }) {
         const [dia, mes, anio] = fechaStr.split("/");
         const [horaParsed, minutoParsed] = horaStr.split(":");
   
-        const fechaObj = new Date(`${anio}-${mes}-${dia}T${horaParsed}:${minutoParsed}:00`);
+        const fechaObj = new Date(parseInt(anio), parseInt(mes) - 1, parseInt(dia), parseInt(horaParsed), parseInt(minutoParsed));
   
         setFecha(fechaObj);
         setHora(horaParsed);
@@ -110,7 +110,9 @@ function CalendarioDropdown({ onDateChange,initialDate }) {
   
         // ✅ Notificamos al padre
         onDateChange(format(fechaObj, "dd/MM/yyyy HH:mm"));
+
       } catch (error) {
+        // Si initialDate no tiene el formato esperado "DD/MM/YYYY HH:MM"
         console.error("Error al parsear la fecha inicial:", error);
         ajustarHoraYMinutos(); // fallback
       }
