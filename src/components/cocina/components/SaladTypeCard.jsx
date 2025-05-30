@@ -15,12 +15,14 @@ import React, { useState, useEffect } from 'react';
 
   const handleUpdate = (size, newCount) => {
     updateSaladCount(type, size, newCount);
+    // Local state update for immediate UI feedback
     setValues((prev) => ({
       ...prev,
       [size]: { ...prev[size], preparadas: newCount },
     }));
   };
-
+  const grandesEnDeficit = values.grandes && values.grandes.pedidas > values.grandes.preparadas;
+  const pequenasEnDeficit = values.pequenas && values.pequenas.pedidas > values.pequenas.preparadas;
   return (
     <div className="overflow-x-auto rounded-lg -mt-5 ">
       <table className="min-w-full table-auto border-collapse  border border-gray-300 bg-white shadow-sm font-nunito">
@@ -59,7 +61,11 @@ import React, { useState, useEffect } from 'react';
           <tr className='bg-[#F3F3F3] text-xl'>
             {/* La primera columna ya está ocupada por el título */}
             {/* GRANDES -> PREPARADAS */}
-            <td className="border border-gray-900 px-4 py-2  text-center  ">
+            <td className={`border px-4 py-2 text-center ${
+              grandesEnDeficit
+                ? 'bg-red-500 text-white border-red-600'
+                : 'border-gray-900'
+            }`}>
               <div className="flex items-center justify-center space-x-2 text-xl ">
                 <button
                   onClick={() =>
@@ -68,29 +74,41 @@ import React, { useState, useEffect } from 'react';
                       Math.max(0, values.grandes.preparadas - 1)
                     )
                   }
-                  className="px-3 py-2 text-xl border  rounded"
+                  className={`px-3 py-2 text-xl border rounded ${
+                    grandesEnDeficit
+                      ? 'border-white hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-white'
+                      : 'hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-gray-300'
+                  }`}
                 >
                   -
                 </button>
-                <span className="text-xl font-medium">
+                <span className={`text-xl font-medium ${grandesEnDeficit ? 'text-white' : ''}`}>
                   {values.grandes.preparadas}
                 </span>
                 <button
                   onClick={() =>
                     handleUpdate('grandes', values.grandes.preparadas + 1)
                   }
-                  className="px-3 py-2 text-xl border rounded"
+                  className={`px-3 py-2 text-xl border rounded ${
+                    grandesEnDeficit
+                      ? 'border-white hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-white'
+                      : 'hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-gray-300'
+                  }`}
                 >
                   +
                 </button>
               </div>
             </td>
             {/* GRANDES -> PEDIDAS */}
-            <td className="border border-gray-300 px-4 py-2 text-center text-xl">
+            <td className={`border border-gray-300 px-4 py-2 text-center text-xl ${grandesEnDeficit && !values.grandes.preparadas ? 'font-bold text-red-600' : ''}`}>
               {values.grandes.pedidas}
             </td>
             {/* PEQUEÑAS -> PREPARADAS */}
-            <td className="border border-gray-300 px-4 py-2 text-center ">
+            <td className={`border px-4 py-2 text-center ${
+              pequenasEnDeficit
+                ? 'bg-red-500 text-white border-red-600'
+                : 'border-gray-300'
+            }`}>
               <div className="flex items-center justify-center space-x-2 ">
                 <button
                   onClick={() =>
@@ -99,25 +117,33 @@ import React, { useState, useEffect } from 'react';
                       Math.max(0, values.pequenas.preparadas - 1)
                     )
                   }
-                  className="px-3 py-2 text-xl border rounded"
+                  className={`px-3 py-2 text-xl border rounded ${
+                    pequenasEnDeficit
+                      ? 'border-white hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-white'
+                      : 'hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-gray-300'
+                  }`}
                 >
                   -
                 </button>
-                <span className="text-xl font-medium">
+                <span className={`text-xl font-medium ${pequenasEnDeficit ? 'text-white' : ''}`}>
                   {values.pequenas.preparadas}
                 </span>
                 <button
                   onClick={() =>
                     handleUpdate('pequenas', values.pequenas.preparadas + 1)
                   }
-                  className="px-3 py-2 text-xl border rounded"
+                  className={`px-3 py-2 text-xl border rounded ${
+                    pequenasEnDeficit
+                      ? 'border-white hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-white'
+                      : 'hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-gray-300'
+                  }`}
                 >
                   +
                 </button>
               </div>
             </td>
             {/* PEQUEÑAS -> PEDIDAS */}
-            <td className="border border-gray-300 px-4 py-2 text-center text-xl">
+            <td className={`border border-gray-300 px-4 py-2 text-center text-xl ${pequenasEnDeficit && !values.pequenas.preparadas ? 'font-bold text-red-600' : ''}`}>
               {values.pequenas.pedidas}
             </td>
           </tr>
