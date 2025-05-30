@@ -523,10 +523,19 @@ const CartTotal = ({ datosCliente, setDatosCliente, orderToEdit }) => {
               const itemCantidad = item.cantidad ?? 0;
               if (!itemId || itemCantidad <= 0) { console.warn("Item inválido en calculateStockQuantities:", item); return; }
               let stockProductId; let quantityForStock = itemCantidad;
+              const itemNameLower = item.name?.toLowerCase() || "";
+
               if (itemId === 1) stockProductId = 1;
-              else if (itemId === 2) { stockProductId = 1; quantityForStock = itemCantidad / 2; }
+              // Modificación para incluir IDs 39, 40 y "menú"
+              else if (itemId === 2 || itemId === 39 || itemId === 40 || itemNameLower.includes("menú")) {
+                stockProductId = 1; // Descuenta de Pollo (ID 1)
+                quantityForStock = itemCantidad / 2; // Descuenta 0.5 por unidad
+              }
               else if (itemId === 41) stockProductId = 41;
-              else if (itemId === 48) { stockProductId = 41; quantityForStock = itemCantidad / 2; }
+              else if (itemId === 48) {
+                stockProductId = 41; // Descuenta de Costilla (ID 41)
+                quantityForStock = itemCantidad / 2; // Descuenta 0.5 por unidad
+              }
               else stockProductId = itemId;
               if (stockProductId && quantityForStock > 0 && !isNaN(quantityForStock)) {
                   const stockProductIdStr = stockProductId.toString();

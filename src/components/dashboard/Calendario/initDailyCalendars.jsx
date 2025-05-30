@@ -371,9 +371,9 @@ const processTodaysFutureOrders = async (dateString) => {
                         let productNameForCalendar = '';
 
                         // Determine stock and calendar IDs based on the product item ID
-                        if (itemId === 1 || itemId === 2) { // Pollo Entero (1) or Medio Pollo (2)
+                        if (itemId === 1 || itemId === 2 || itemId === 39 || itemId === 40) { // Pollo Entero (1) or Medio Pollo (2)
                             stockProductId = productTypesConfig.chicken.stockProductId; // Use base stock ID (1)
-                            quantityToDeductFromStock = (itemId === 2) ? itemQuantity / 2 : itemQuantity; // Deduct 0.5 for Medio Pollo
+                            quantityToDeductFromStock = (itemId === 2 || itemId === 39 || itemId === 40) ? itemQuantity / 2 : itemQuantity; // Deduct 0.5 for Medio Pollo, Menu Pollo, Menu 1/2 Pollo
                             calendarCollection = productTypesConfig.chicken.dailyCollection;
                             quantityToAddCalendar = quantityToDeductFromStock; // Add same amount to calendar
                             productNameForCalendar = 'Pollo';
