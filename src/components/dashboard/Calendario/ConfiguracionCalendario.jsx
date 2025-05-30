@@ -3,9 +3,18 @@ import { Save } from 'lucide-react';
 // Asegúrate que la ruta a tu configuración de Firebase y contexto sea correcta
 // AÑADE setDoc a los imports de firestore
 import { db } from '../../firebase/firebase';
-import { collection, onSnapshot, doc, setDoc } from 'firebase/firestore'; // Cambiado updateDoc por setDoc
+import { collection, onSnapshot, doc, setDoc, getDoc } from 'firebase/firestore'; // Import getDoc
 // Importamos useOrder solo si necesitamos refreshDailyCalendar para refrescar OTRAS vistas
 import { useOrder } from '../../Context/OrderProviderContext';
+import {
+  productTypesConfig as productTypesConfigFromInit, // Alias to avoid conflict with local UI config
+  generateAndMergeIntervals,
+  ensureDailySaladDocument
+} from './initDailyCalendars'; // Ajusta la ruta si es necesario
+import dayjs from 'dayjs';
+import utc from 'dayjs/plugin/utc';
+import timezone from 'dayjs/plugin/timezone';
+import customParseFormat from 'dayjs/plugin/customParseFormat';
 
 // --- Configuración Específica por Producto (para la UI) ---
 // Mantenemos esto aquí para construir la tabla correctamente
@@ -14,6 +23,12 @@ const productTypesConfig = {
   costilla: { name: 'Costillas', amountField: 'costillaAmount', intervalLabel: '(15min)' }, // Ajustado label
   codillo: { name: 'Codillos', amountField: 'codilloAmount', intervalLabel: '(15min)' }, // Ajustado label
 };
+
+// Extender dayjs para la lógica de regeneración de calendarios
+dayjs.extend(utc);
+dayjs.extend(timezone);
+dayjs.extend(customParseFormat);
+dayjs.tz.setDefault("Europe/Madrid"); // O tu zona horaria relevante
 
 function ConfiguracionCalendario() {
   const [days, setDays] = useState([]);
@@ -62,9 +77,6 @@ function ConfiguracionCalendario() {
          data.chickenAmount = parseInt(data.chickenAmount) || 0;
          data.costillaAmount = parseInt(data.costillaAmount) || 0;
          data.codilloAmount = parseInt(data.codilloAmount) || 0;
-         data.webPreOrder = parseInt(data.webPreOrder) || 0;
-         data.negativeStock = !!data.negativeStock; // Asegura booleano
-
         return { id: doc.id, ...data };
       }).sort((a, b) => { // Ordena los días
            const order = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo", "Festivo", "Vispera"]; // Ajusta si tus IDs son distintos (8 y 9?)
@@ -90,7 +102,7 @@ function ConfiguracionCalendario() {
             dayCopy[field] = { ...(dayCopy[field] || { active: false, start: '', end: '' }), [scheduleField]: value };
           } else { // Actualizando un campo directo (amount, webPreOrder)
              // Convertir a número si es un campo numérico
-             const numericFields = ['chickenAmount', 'costillaAmount', 'codilloAmount', 'webPreOrder'];
+             const numericFields = ['chickenAmount', 'costillaAmount', 'codilloAmount'];
              dayCopy[field] = numericFields.includes(field) ? parseInt(value) || 0 : value;
           }
           return dayCopy;
@@ -105,9 +117,7 @@ function ConfiguracionCalendario() {
           prevDays.map((day) => {
               if (day.id === dayId) {
                   const dayCopy = { ...day };
-                  if (field === 'negativeStock') {
-                      dayCopy[field] = checked;
-                  } else if (field.includes('Schedule')) { // Activando/desactivando un horario
+                  if (field.includes('Schedule')) { // Activando/desactivando un horario
                       dayCopy[field] = {
                           ...(dayCopy[field] || { start: '', end: '' }), // Asegura objeto base
                           active: checked,
@@ -140,8 +150,6 @@ function ConfiguracionCalendario() {
               chickenAmount: parseInt(day.chickenAmount) || 0,
               costillaAmount: parseInt(day.costillaAmount) || 0,
               codilloAmount: parseInt(day.codilloAmount) || 0,
-              webPreOrder: parseInt(day.webPreOrder) || 0,
-              negativeStock: !!day.negativeStock,
               morningSchedule: {
                   active: !!day.morningSchedule?.active,
                   // Solo guarda horas si está activo
@@ -154,12 +162,6 @@ function ConfiguracionCalendario() {
                   start: (!!day.eveningSchedule?.active && day.eveningSchedule?.start) ? normalizeTime(day.eveningSchedule.start) : '',
                   end: (!!day.eveningSchedule?.active && day.eveningSchedule?.end) ? normalizeTime(day.eveningSchedule.end) : '',
               },
-              workSchedule: {
-                 // Asumiendo que workSchedule siempre guarda horas si existen, sin 'active' flag propio.
-                 // Si necesitas que workSchedule también pueda estar inactivo, añade un checkbox y un flag 'active'
-                 start: day.workSchedule?.start ? normalizeTime(day.workSchedule.start) : '',
-                 end: day.workSchedule?.end ? normalizeTime(day.workSchedule.end) : '',
-              }
               // ¡Importante! No incluimos el 'id' de React dentro del documento Firestore
           };
 
@@ -171,6 +173,59 @@ function ConfiguracionCalendario() {
       console.log("Configuración base 'calendar' actualizada (sobrescrita) correctamente.");
       alert('Configuración semanal base guardada (sobrescrita).');
 
+      // --- PASO 2: Regenerar calendarios diarios para los próximos 7 días ---
+      console.log("%cIniciando regeneración de calendarios diarios para los próximos 7 días...", "color: blue; font-weight: bold;");
+      const today = dayjs().tz("Europe/Madrid");
+
+      for (let i = 0; i < 7; i++) {
+        const currentDateInLoop = today.add(i, 'day');
+        const dateString = currentDateInLoop.format('YYYY-MM-DD');
+        console.log(`%cProcesando regeneración para fecha: ${dateString} (Día ${i + 1}/7)`, 'color: cyan;');
+
+        // Determinar tipo de día y obtener configuración
+        const holidayDocRef = doc(db, 'holiday_calendar', dateString);
+        const holidayDocSnap = await getDoc(holidayDocRef);
+        let dayId = null;
+
+        if (holidayDocSnap.exists()) {
+          const holidayData = holidayDocSnap.data();
+          if (holidayData.type === 'holiday') { dayId = "8"; }
+          else if (holidayData.type === 'preHoliday') { dayId = "9"; }
+        }
+
+        if (dayId === null) {
+          const dayOfWeek = currentDateInLoop.day(); // 0 for Sunday, 1 for Monday...
+          const daysMapping = { 0: "7", 1: "1", 2: "2", 3: "3", 4: "4", 5: "5", 6: "6" };
+          dayId = daysMapping[dayOfWeek];
+        }
+
+        if (!dayId) {
+          console.error(`[${dateString}] ¡Error! No se pudo determinar el ID del día. Saltando regeneración para esta fecha.`);
+          continue;
+        }
+
+        const dayConfigRef = doc(db, 'calendar', dayId);
+        const dayConfigSnap = await getDoc(dayConfigRef);
+
+        if (!dayConfigSnap.exists()) {
+          console.error(`[${dateString}] ¡Error! No se encontró configuración en 'calendar' para el día ID: ${dayId} (recién guardada). No se pueden regenerar calendarios para esta fecha.`);
+          continue;
+        }
+        const fetchedDayConfig = dayConfigSnap.data();
+        console.log(`[${dateString}] Configuración para ID ${dayId} obtenida. Regenerando calendarios de productos y ensaladas...`);
+
+        const dailyTasks = [];
+        Object.keys(productTypesConfigFromInit).forEach(productType => {
+          dailyTasks.push(generateAndMergeIntervals(productType, fetchedDayConfig, dateString));
+        });
+        dailyTasks.push(ensureDailySaladDocument(dateString)); // Asegurar documento de ensaladas
+
+        await Promise.all(dailyTasks);
+        console.log(`%c[${dateString}] Todos los calendarios (productos y ensaladas) regenerados/verificados.`, 'color: green;');
+      }
+      console.log("%cRegeneración de calendarios diarios para los próximos 7 días completada.", "color: blue; font-weight: bold;");
+      alert('Regeneración de calendarios diarios para los próximos 7 días completada.');
+
       // Opcional: Refrescar otras vistas si es necesario
       if (refreshDailyCalendar) {
           console.log("Llamando a refreshDailyCalendar para posible actualización de vistas...");
@@ -179,7 +234,7 @@ function ConfiguracionCalendario() {
 
     } catch (error) {
       console.error('Error al actualizar (setDoc) la configuración base en Firestore:', error);
-      alert('Error al guardar la configuración semanal.');
+      alert(`Error al guardar la configuración semanal o regenerar diarios: ${error.message}`);
     }
   };
 
@@ -207,11 +262,8 @@ function ConfiguracionCalendario() {
                    <th key={key} className="py-3 px-2 text-center text-gray-600 font-semibold whitespace-nowrap">{config.name}<br/>{config.intervalLabel}</th>
                 ))}
                 {/* Columnas Generales */}
-                <th className="py-3 px-2 text-center text-gray-600 font-semibold whitespace-nowrap">Antelación<br/>Venta Web</th>
                 <th className="py-3 px-2 text-center text-gray-600 font-semibold">Horario Mañana</th>
                 <th className="py-3 px-2 text-center text-gray-600 font-semibold">Horario Tarde</th>
-                <th className="py-3 px-2 text-center text-gray-600 font-semibold whitespace-nowrap">Venta en<br/>Negativo</th>
-                <th className="py-3 px-2 text-center text-gray-600 font-semibold">Aplicar Traba<br/>(Horario Trabajo)</th>
               </tr>
             </thead>
             <tbody>
@@ -232,20 +284,6 @@ function ConfiguracionCalendario() {
                       />
                     </td>
                   ))}
-
-                  {/* Input Antelación Web */}
-                  <td className="py-3 px-2 text-center">
-                    <div className="flex items-center justify-center">
-                       <input
-                         type="number"
-                         value={day.webPreOrder || 0}
-                         onChange={(e) => handleInputChange(day.id, 'webPreOrder', e.target.value)}
-                         className="w-16 px-2 py-1 border border-gray-300 rounded text-center text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
-                         min="0"
-                       />
-                      <span className="ml-1 text-gray-600 text-xs">min</span>
-                    </div>
-                  </td>
 
                   {/* Input Horario Mañana */}
                   <td className="py-3 px-2">
@@ -303,41 +341,6 @@ function ConfiguracionCalendario() {
                     </div>
                   </td>
 
-                   {/* Checkbox Venta Negativo */}
-                   <td className="py-3 px-2 text-center">
-                     <input
-                       type="checkbox"
-                       title="Permitir Venta en Negativo"
-                       checked={day.negativeStock || false}
-                       onChange={(e) => handleCheckboxChange(day.id, 'negativeStock', e.target.checked)}
-                       className="w-4 h-4 text-yellow-500 focus:ring-yellow-500"
-                     />
-                   </td>
-
-                  {/* Input Horario Trabajo (Traba) */}
-                  {/* Asumiendo que 'Traba' es el workSchedule */}
-                  <td className="py-3 px-2">
-                      <div className="flex items-center justify-center space-x-1">
-                        {/* Si workSchedule necesita activarse/desactivarse, añade un checkbox aquí y deshabilita inputs */}
-                         <input
-                           type="time"
-                           title="Inicio Horario Trabajo (Traba)"
-                           value={day.workSchedule?.start || ''}
-                           // Podrías deshabilitarlo si añades un 'active' flag y está inactivo
-                           onChange={(e) => handleInputChange(day.id, 'workSchedule', e.target.value, 'start')}
-                           className="w-24 px-2 py-1 border border-gray-300 rounded text-center text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
-                         />
-                         <span className="text-gray-500">-</span>
-                         <input
-                           type="time"
-                           title="Fin Horario Trabajo (Traba)"
-                           value={day.workSchedule?.end || ''}
-                           // Podrías deshabilitarlo si añades un 'active' flag y está inactivo
-                           onChange={(e) => handleInputChange(day.id, 'workSchedule', e.target.value, 'end')}
-                           className="w-24 px-2 py-1 border border-gray-300 rounded text-center text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
-                         />
-                       </div>
-                  </td>
                 </tr>
               ))}
             </tbody>

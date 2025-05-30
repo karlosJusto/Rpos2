@@ -285,10 +285,7 @@ function CalendarioProducto({ productType }) {
             // Quita el ID antes de guardar
             const { id, ...dataToSave } = updatedData;
             // Asegura que las cantidades sean números
-             dataToSave.chickenAmount = parseInt(dataToSave.chickenAmount) || 0;
-             dataToSave.costillaAmount = parseInt(dataToSave.costillaAmount) || 0;
-             dataToSave.codilloAmount = parseInt(dataToSave.codilloAmount) || 0;
-             dataToSave.webPreOrder = parseInt(dataToSave.webPreOrder) || 0;
+             dataToSave[config.amountField] = parseInt(dataToSave[config.amountField]) || 0;
 
             console.log("Actualizando /calendar/", day.id, " con:", dataToSave);
             return updateDoc(dayRef, dataToSave);
@@ -330,21 +327,11 @@ function CalendarioProducto({ productType }) {
                     {/* Label dinámico */}
                     {config.name}<br/>{config.intervalLabel}
                   </th>
-                  {/* Campos comunes */}
-                  <th className="py-4 px-2 text-left text-gray-700 font-semibold">
-                    Antelación<br/>Venta Web
-                  </th>
                   <th className="py-4 px-2 text-left text-gray-700 font-semibold">
                     Horario<br/>Mañana
                   </th>
                   <th className="py-4 px-2 text-left text-gray-700 font-semibold">
                     Horario<br/>Tarde
-                  </th>
-                  <th className="py-4 px-2 text-center text-gray-700 font-semibold">
-                    Venta en<br/>negativo
-                  </th>
-                   <th className="py-4 px-2 text-left text-gray-700 font-semibold">
-                    Aplicar<br/>Traba {/* Asumo que 'Traba' se refiere a workSchedule */}
                   </th>
                 </tr>
               </thead>
@@ -363,18 +350,6 @@ function CalendarioProducto({ productType }) {
                         }
                         className="w-16 px-2 py-1 border border-gray-300 rounded text-center"
                       />
-                    </td>
-                    {/* Inputs/Checkboxes comunes */}
-                    <td className="py-4 px-2 flex items-center">
-                       <input
-                         type="number"
-                         value={day.webPreOrder || 0}
-                         onChange={(e) =>
-                           handleInputChange(day.id, 'webPreOrder', e.target.value)
-                         }
-                         className="w-16 px-2 py-1 border border-gray-300 rounded text-center"
-                       />
-                      <span className="ml-2 text-gray-600">min</span>
                     </td>
                      {/* Horario Mañana */}
                      <td className="py-4 px-2">
@@ -437,47 +412,6 @@ function CalendarioProducto({ productType }) {
                              handleInputChange(day.id, 'eveningSchedule', e.target.value, 'end')
                            }
                            className="w-24 px-2 py-1 border border-gray-300 rounded text-center disabled:bg-gray-100"
-                         />
-                       </div>
-                     </td>
-                     {/* Venta en negativo */}
-                    <td className="py-4 px-2 text-center">
-                      <input
-                        type="checkbox"
-                        checked={day.negativeStock || false} // Asegúrate que el campo se llame así en FB
-                        onChange={(e) =>
-                          handleCheckboxChange(day.id, 'negativeStock', e.target.checked)
-                        }
-                        className="w-4 h-4 text-blue-600"
-                      />
-                    </td>
-                    {/* Aplicar Traba (WorkSchedule) */}
-                   <td className="py-4 px-2">
-                       {/* Asumo que workSchedule no tiene checkbox propio de activación en esta tabla, */}
-                       {/* sino que depende de si existe o tiene horas. Ajusta si es necesario */}
-                       <div className="flex items-center space-x-1">
-                        {/* Podrías añadir un checkbox si quieres activar/desactivar workSchedule aquí */}
-                        {/* <input type="checkbox" checked={day.workSchedule?.active || false} ... /> */}
-                         <input
-                           type="time"
-                            // Asume que si no hay start/end, está inactivo o no aplica
-                           value={normalizeTime(day.workSchedule?.start)}
-                           // Podrías deshabilitarlo si no hay horario definido o si añades un 'active' flag
-                           // disabled={!day.workSchedule?.active}
-                           onChange={(e) =>
-                             handleInputChange(day.id, 'workSchedule', e.target.value, 'start')
-                           }
-                           className="w-24 px-2 py-1 border border-gray-300 rounded text-center"
-                         />
-                         <span className="text-gray-600">-</span>
-                         <input
-                           type="time"
-                           value={normalizeTime(day.workSchedule?.end)}
-                            // disabled={!day.workSchedule?.active}
-                           onChange={(e) =>
-                             handleInputChange(day.id, 'workSchedule', e.target.value, 'end')
-                           }
-                           className="w-24 px-2 py-1 border border-gray-300 rounded text-center"
                          />
                        </div>
                      </td>

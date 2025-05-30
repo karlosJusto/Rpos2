@@ -23,7 +23,8 @@ dayjs.extend(timezone);
 dayjs.tz.setDefault("Europe/Madrid"); // O tu zona horaria relevante
 
 // --- Configuration ---
-const productTypesConfig = {
+// Export this config so other modules can use it for regeneration logic
+export const productTypesConfig = {
   chicken: {
     name: 'Pollos',
     amountField: 'chickenAmount',
@@ -128,7 +129,7 @@ const generateIntervalsForSchedule = (start, end, maxAllowed, step, scheduleType
 };
 
 // --- NUEVA FUNCIÓN para asegurar el documento de ensaladas ---
-const ensureDailySaladDocument = async (dateStringYYYYMMDD) => {
+export const ensureDailySaladDocument = async (dateStringYYYYMMDD) => {
   const dateForId = dayjs(dateStringYYYYMMDD, 'YYYY-MM-DD').format('DD-MM-YYYY'); // Formato dd-mm-aaaa para ID
   const dateForName = dayjs(dateStringYYYYMMDD, 'YYYY-MM-DD').format('DD/MM/YYYY'); // Formato dd/mm/yyyy para el nombre
   const logPrefix = `[EnsureSaladDoc][${dateForId}]`;
@@ -563,14 +564,14 @@ export const initDailyCalendars = async () => {
 
   try {
     const today = dayjs().tz("Europe/Madrid"); // Use your specific timezone
-    console.log(`[${new Date().toISOString()}] Iniciando proceso de inicialización de calendarios (hoy y los próximos 30 días)...`);
+    console.log(`[${new Date().toISOString()}] Iniciando proceso de inicialización de calendarios (hoy y los próximos 6 días)...`);
 
-    // Loop from today (i=0) to today + 30 days (i=30) -> total 31 days
-    for (let i = 0; i <= 30; i++) {
+    // Loop from today (i=0) to today + 6 days (i=6) -> total 7 days
+    for (let i = 0; i < 7; i++) {
       const currentDateInLoop = today.add(i, 'day');
       const dateString = currentDateInLoop.format('YYYY-MM-DD');
 
-      console.log(`%c[${new Date().toISOString()}] Procesando fecha: ${dateString} (Día ${i + 1}/31)`, 'color: cyan; font-weight: bold;');
+      console.log(`%c[${new Date().toISOString()}] Procesando fecha: ${dateString} (Día ${i + 1}/7)`, 'color: cyan; font-weight: bold;');
 
       // --- PASO 1: Determinar tipo de día y obtener configuración PARA dateString ---
       const holidayDocRef = doc(db, 'holiday_calendar', dateString);
@@ -625,7 +626,7 @@ export const initDailyCalendars = async () => {
         console.error(`[${new Date().toISOString()}] Error generando/verificando calendarios para ${dateString}:`, taskError);
         // Continue to the next day even if this one fails
       }
-    } // End of loop for 31 days
+    } // End of loop for 7 days
 
     // --- PASO 3: Procesar pedidos futuros que son para HOY ---
     // This will now only run once if the calling useEffect is correctly implemented
@@ -634,7 +635,7 @@ export const initDailyCalendars = async () => {
     console.log(`%c[${new Date().toISOString()}] Iniciando procesamiento de pedidos futuros para HOY (${actualCurrentDateString})...`, 'color: magenta; font-weight: bold;');
     await processTodaysFutureOrders(actualCurrentDateString);
 
-    console.log(`%c[${new Date().toISOString()}] Proceso initDailyCalendars completado (31 días verificados, pedidos de hoy procesados).`, 'color: green; font-weight: bold;');
+    console.log(`%c[${new Date().toISOString()}] Proceso initDailyCalendars completado (7 días verificados, pedidos de hoy procesados).`, 'color: green; font-weight: bold;');
 
 
   } catch (error) {
