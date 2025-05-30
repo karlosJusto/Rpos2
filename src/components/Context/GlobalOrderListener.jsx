@@ -144,7 +144,7 @@ const GlobalOrderListener = () => {
 
             // Identificar producto relevante para calendario
             // Priorizar alias si existe, luego nombre o ID si es necesario
-            if (productAliasLower === 'pollo' || productNameLower.includes('pollo asado') || productId === 1 || productId === 2) {
+            if (productAliasLower === 'pollo' || productNameLower.includes('pollo asado') || productId === 1 || productId === 2 || productId === 39 || productId === 40 || productNameLower.includes('menú')) {
                 collectionName = 'chicken_calendar_daily';
                 productKey = 'Pollo';
             } else if (productAliasLower === 'codillo' || productNameLower.includes('codillo') || productId === 50) {
@@ -166,9 +166,8 @@ const GlobalOrderListener = () => {
             const cantidadPedido = Number(producto.cantidad) || 0;
             
             if (productKey === 'Pollo') {
-                // Asume que 1/2 pollo (alias?) o ID específico cuenta como 0.5 si es necesario
-                // Simplificando: si el nombre incluye '1/2' cuenta 0.5, sino 1 * cantidad. Ajustar si la lógica es otra.
-                cantidadAIncrementar = productNameLower.includes('1/2') ? 0.5 * cantidadPedido : 1 * cantidadPedido;
+                // Si el nombre incluye '1/2' o 'menú', cuenta como 0.5, sino 1 * cantidad.
+                cantidadAIncrementar = (productNameLower.includes('1/2') || productNameLower.includes('menú')) ? 0.5 * cantidadPedido : 1 * cantidadPedido;
             } else if (productKey === 'Costilla') {
                  // Lógica específica para costillas según ID
                 if (productId === 41) { // Asumiendo ID 41 es ración completa
