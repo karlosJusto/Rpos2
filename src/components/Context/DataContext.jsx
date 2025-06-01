@@ -20,7 +20,8 @@ const DataProvider = ({ children }) => {
 
 
   const [orderBeingEdited, setOrderBeingEdited] = useState(null);
-  const isEditingOrder = orderBeingEdited !== null;
+  //const isEditingOrder = orderBeingEdited !== null;
+    const isEditingOrder = !!(orderBeingEdited && orderBeingEdited.NumeroPedido);
 
 
   const [pedidosConOrigenUno, setPedidosConOrigenUno] = useState(null);

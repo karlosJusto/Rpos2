@@ -9,7 +9,7 @@ import GenerarQRCodeInvisible from './GenerarQRCodeInvisible';
 // Importa InputGroup y Form si no lo tienes ya
 import { useState, useContext, useEffect, useRef } from 'react';
 import { dataContext } from '../Context/DataContext';
-import { doc, setDoc, updateDoc, getDoc, onSnapshot, deleteDoc } from 'firebase/firestore';
+import { doc, setDoc, updateDoc, getDoc, onSnapshot, deleteDoc, runTransaction } from 'firebase/firestore';
 import { db } from '../firebase/firebase';
 
 import { collection, getDocs, query, where } from 'firebase/firestore';
@@ -45,7 +45,7 @@ import HeaderFinal from '../cocina/components/HeaderFinal';
 
 const Ordenes = () => {
 
-  const { pedidosConOrigenUno, setPedidosConOrigenUno, setOrderBeingEdited, libres, setLibres, pedidos,dateToPass,setDateToPass, numeroBarra,setNumeroBarra, totalProductosDespuesDeLas18, setTotalProductosDespuesDeLas18, totalbloquesAntesdelas18, setTotalbloquesAntesdelas18,loading, setLoading, mostrarBarra, setMostrarBarra } = useContext(dataContext);
+  const { pedidosConOrigenUno, setPedidosConOrigenUno, setOrderBeingEdited, libres, setLibres, pedidos,dateToPass,setDateToPass, numeroBarra,setNumeroBarra, totalProductosDespuesDeLas18, setTotalProductosDespuesDeLas18, totalbloquesAntesdelas18, setTotalbloquesAntesdelas18,loading, setLoading, mostrarBarra, setMostrarBarra, setCart } = useContext(dataContext);
 
   const navigate = useNavigate();
 
@@ -76,6 +76,20 @@ const Ordenes = () => {
     }
   };
   // --- Fin de Estados y Funciones para el modal de suma ---
+
+  //crear un pedido nuevo desde editar
+  const handleCreateOrder = (pedido) => {
+  const clientInfo = {
+    cliente: pedido.cliente,
+    telefono: pedido.telefono,
+    img_perfil: pedido.img_perfil,
+    // ... (comentarios explicando qué no incluir)
+  };
+
+  setCart([]); 
+  setOrderBeingEdited(clientInfo); 
+  navigate('/layout/comida');
+};
 
 
   const handleEditOrder = (pedido) => {
@@ -662,7 +676,7 @@ const Ordenes = () => {
                   <div className="flex items-center">
                     <h3 className={`text-[0.75vw] font-semibold mr-4 text-center ${pedido.origen === 1 ? 'text-green-700' : pedido.origen === 0 ? 'text-gray-600' : 'text-gray-700'}`}>
                       {pedido.NumeroPedido}
-                      <p className="pt-1 w-24 text-[0.65vw] font-extrabold">{pedido.cliente ? pedido.cliente : 'Generico'}</p>
+                      <p className="pt-1 w-24 text-[1vw] font-extrabold">{pedido.cliente ? pedido.cliente : 'Generico'}</p>
                     </h3>
                     <div className="ms-[-0.5vw]">
                       <button className="p-1 rounded-md hover:bg-[#f2ac02] transition-all border-1 border-gray-300" onClick={() => handleShowModal1(pedido)}>
@@ -782,15 +796,51 @@ const Ordenes = () => {
       <Modal show={showModal1} onHide={handleCloseModal1} size="md" backdrop="static" keyboard={false} centered>
         {/* ... (contenido del modal iconos sin cambios) ... */}
         <Modal.Body className="flex flex-col items-center ">
-          <div className="flex space-x-4">
+         {pedidoSeleccionado && pedidoSeleccionado.origen === 1 && (
+            <div className=" p-3 text-center">
+             <h1 className='text-red-600 font-extrabold font-nunito'>-PEDIDO APP NO EDITABLE-</h1>
+            <p className='text-gray-400 font-nunito text-xs mt-1 -mb-2'> Puedes crear un nuevo pedido con los datos del cliente desde aqui</p>
+            </div>
+          )}
+          <div className="flex space-x-6">
             <div className="p-3 cursor-pointer hover:bg-yellow-500 rounded-md" onClick={() => borrarOrden(pedidoSeleccionado.NumeroPedido)}>
               <svg width="4vw" height="4vw" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><g id="SVGRepo_bgCarrier" strokeWidth="0"/><g id="SVGRepo_tracerCarrier" strokeLinecap="round" strokeLinejoin="round"/><g id="SVGRepo_iconCarrier"> <path d="M20.5001 6H3.5" stroke="#f10707 " strokeWidth="1.5" strokeLinecap="round"/> <path d="M6.5 6C6.55588 6 6.58382 6 6.60915 5.99936C7.43259 5.97849 8.15902 5.45491 8.43922 4.68032C8.44784 4.65649 8.45667 4.62999 8.47434 4.57697L8.57143 4.28571C8.65431 4.03708 8.69575 3.91276 8.75071 3.8072C8.97001 3.38607 9.37574 3.09364 9.84461 3.01877C9.96213 3 10.0932 3 10.3553 3H13.6447C13.9068 3 14.0379 3 14.1554 3.01877C14.6243 3.09364 15.03 3.38607 15.2493 3.8072C15.3043 3.91276 15.3457 4.03708 15.4286 4.28571L15.5257 4.57697C15.5433 4.62992 15.5522 4.65651 15.5608 4.68032C15.841 5.45491 16.5674 5.97849 17.3909 5.99936C17.4162 6 17.4441 6 17.5 6" stroke="#f10707 " strokeWidth="1.5"/> <path d="M18.3735 15.3991C18.1965 18.054 18.108 19.3815 17.243 20.1907C16.378 21 15.0476 21 12.3868 21H11.6134C8.9526 21 7.6222 21 6.75719 20.1907C5.89218 19.3815 5.80368 18.054 5.62669 15.3991L5.16675 8.5M18.8334 8.5L18.6334 11.5" stroke="#f10707 " strokeWidth="1.5" strokeLinecap="round"/> </g></svg>
               <p className='text-center p-1 font-nunito text-[#f10707]'>Borrar</p>
             </div>
-            <div className="p-3 cursor-pointer hover:bg-yellow-500 rounded-lg" onClick={() => handleEditOrder(pedidoSeleccionado)}>
-              <svg width="4vw" height="4vw" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><g id="SVGRepo_bgCarrier" strokeWidth="0"/><g id="SVGRepo_tracerCarrier" strokeLinecap="round" strokeLinejoin="round"/><g id="SVGRepo_iconCarrier"> <path d="M10 21.9948C6.58687 21.9658 4.70529 21.7764 3.46447 20.5355C2 19.0711 2 16.714 2 12C2 7.28595 2 4.92893 3.46447 3.46447C4.92893 2 7.28595 2 12 2C16.714 2 19.0711 2 20.5355 3.46447C21.5093 4.43821 21.8356 5.80655 21.9449 8" stroke="#808b96 " strokeWidth="1.5" strokeLinecap="round"/> <path d="M2.5 7.25C2.08579 7.25 1.75 7.58579 1.75 8C1.75 8.41421 2.08579 8.75 2.5 8.75V7.25ZM22 7.25H2.5V8.75H22V7.25Z" fill="#808b96 "/> <path d="M10.5 2.5L7 8" stroke="#808b96 " strokeWidth="1.5" strokeLinecap="round"/> <path d="M17 2.5L13.5 8" stroke="#808b96 " strokeWidth="1.5" strokeLinecap="round"/> <path d="M18.562 13.9354L18.9791 13.5183C19.6702 12.8272 20.7906 12.8272 21.4817 13.5183C22.1728 14.2094 22.1728 15.3298 21.4817 16.0209L21.0646 16.438M18.562 13.9354C18.562 13.9354 18.6142 14.8217 19.3962 15.6038C20.1783 16.3858 21.0646 16.438 21.0646 16.438M18.562 13.9354L14.7275 17.77C14.4677 18.0297 14.3379 18.1595 14.2262 18.3027C14.0945 18.4716 13.9815 18.6544 13.8894 18.8478C13.8112 19.0117 13.7532 19.1859 13.637 19.5344L13.2651 20.65L13.1448 21.0109M21.0646 16.438L17.23 20.2725C16.9703 20.5323 16.8405 20.6621 16.6973 20.7738C16.5284 20.9055 16.3456 21.0185 16.1522 21.1106C15.9883 21.1888 15.8141 21.2468 15.4656 21.363L14.35 21.7349L13.9891 21.8552M13.9891 21.8552L13.6281 21.9755C13.4567 22.0327 13.2676 21.988 13.1398 21.8602C13.012 21.7324 12.9673 21.5433 13.0245 21.3719L13.1448 21.0109M13.9891 21.8552L13.1448 21.0109" stroke="#808b96 " strokeWidth="1.5"/> </g></svg>
-              <p className='text-center p-1 font-nunito text-[#808b96]'>Editar</p>
-            </div>
+             {pedidoSeleccionado && (
+                pedidoSeleccionado.origen === 1 ? (
+                  <div className="p-3 cursor-pointer hover:bg-yellow-500 rounded-lg" onClick={() => handleCreateOrder(pedidoSeleccionado)}>
+                    <svg width="4vw" height="4vw" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                      <g id="SVGRepo_bgCarrier" strokeWidth="0"/>
+                      <g id="SVGRepo_tracerCarrier" strokeLinecap="round" strokeLinejoin="round"/>
+                      <g id="SVGRepo_iconCarrier">
+                        <path d="M12 5V19" stroke="#808b96" strokeWidth="1.5" strokeLinecap="round"/>
+                        <path d="M5 12H19" stroke="#808b96" strokeWidth="1.5" strokeLinecap="round"/>
+                        <path d="M10 21.9948C6.58687 21.9658 4.70529 21.7764 3.46447 20.5355C2 19.0711 2 16.714 2 12C2 7.28595 2 4.92893 3.46447 3.46447C4.92893 2 7.28595 2 12 2C16.714 2 19.0711 2 20.5355 3.46447C21.5093 4.43821 21.8356 5.80655 21.9449 8" stroke="#808b96" strokeWidth="1.5" strokeLinecap="round"/>
+                      </g>
+                    </svg>
+                    <p className='text-center p-1 font-nunito text-[#808b96]'>Crear</p>
+  
+                  
+                  </div>
+                  
+                ) : (
+                  <div className="p-3 cursor-pointer hover:bg-yellow-500 rounded-lg" onClick={() => handleEditOrder(pedidoSeleccionado)}>
+                    <svg width="4vw" height="4vw" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                      <g id="SVGRepo_bgCarrier" strokeWidth="0"/>
+                      <g id="SVGRepo_tracerCarrier" strokeLinecap="round" strokeLinejoin="round"/>
+                      <g id="SVGRepo_iconCarrier">
+                        <path d="M10 21.9948C6.58687 21.9658 4.70529 21.7764 3.46447 20.5355C2 19.0711 2 16.714 2 12C2 7.28595 2 4.92893 3.46447 3.46447C4.92893 2 7.28595 2 12 2C16.714 2 19.0711 2 20.5355 3.46447C21.5093 4.43821 21.8356 5.80655 21.9449 8" stroke="#808b96" strokeWidth="1.5" strokeLinecap="round"/>
+                        <path d="M2.5 7.25C2.08579 7.25 1.75 7.58579 1.75 8C1.75 8.41421 2.08579 8.75 2.5 8.75V7.25ZM22 7.25H2.5V8.75H22V7.25Z" fill="#808b96"/>
+                        <path d="M10.5 2.5L7 8" stroke="#808b96" strokeWidth="1.5" strokeLinecap="round"/>
+                        <path d="M17 2.5L13.5 8" stroke="#808b96" strokeWidth="1.5" strokeLinecap="round"/>
+                        <path d="M18.562 13.9354L18.9791 13.5183C19.6702 12.8272 20.7906 12.8272 21.4817 13.5183C22.1728 14.2094 22.1728 15.3298 21.4817 16.0209L21.0646 16.438M18.562 13.9354C18.562 13.9354 18.6142 14.8217 19.3962 15.6038C20.1783 16.3858 21.0646 16.438 21.0646 16.438M18.562 13.9354L14.7275 17.77C14.4677 18.0297 14.3379 18.1595 14.2262 18.3027C14.0945 18.4716 13.9815 18.6544 13.8894 18.8478C13.8112 19.0117 13.7532 19.1859 13.637 19.5344L13.2651 20.65L13.1448 21.0109M21.0646 16.438L17.23 20.2725C16.9703 20.5323 16.8405 20.6621 16.6973 20.7738C16.5284 20.9055 16.3456 21.0185 16.1522 21.1106C15.9883 21.1888 15.8141 21.2468 15.4656 21.363L14.35 21.7349L13.9891 21.8552M13.9891 21.8552L13.6281 21.9755C13.4567 22.0327 13.2676 21.988 13.1398 21.8602C13.012 21.7324 12.9673 21.5433 13.0245 21.3719L13.1448 21.0109M13.9891 21.8552L13.1448 21.0109" stroke="#808b96" strokeWidth="1.5"/>
+                      </g>
+                    </svg>
+                    <p className='text-center p-1 font-nunito text-[#808b96]'>Editar</p>
+                  </div>
+                )
+              )}
             <div className="p-3 cursor-pointer hover:bg-yellow-500 rounded-md">
               <svg fill="#2ad12f " height="4vw" width="4vw" version="1.1" id="Capa_1" xmlns="http://www.w3.org/2000/svg" xmlnsXlink="http://www.w3.org/1999/xlink" viewBox="0 0 220.262 220.262" xmlSpace="preserve"><g id="SVGRepo_bgCarrier" strokeWidth="0"/><g id="SVGRepo_tracerCarrier" strokeLinecap="round" strokeLinejoin="round"/><g id="SVGRepo_iconCarrier"> <g> <path d="M110.127,0C50.606,0,2.184,48.424,2.184,107.944c0,23.295,9.455,44.211,13.521,52.123 c1.893,3.685,6.416,5.135,10.099,3.243c3.684-1.893,5.136-6.415,3.243-10.099c-3.566-6.941-11.862-25.247-11.862-45.268 C17.184,56.695,58.878,15,110.127,15c51.254,0,92.951,41.695,92.951,92.944c0,51.251-41.697,92.946-92.951,92.946 c-20.044,0-35.971-6.94-41.889-9.925c-1.755-0.886-3.788-1.046-5.66-0.447l-47.242,15.097c-3.945,1.261-6.122,5.481-4.861,9.427 c1.018,3.187,3.968,5.219,7.142,5.219c0.757,0,1.526-0.115,2.285-0.358l44.391-14.186c9.287,4.311,25.633,10.173,45.834,10.173 c59.524,0,107.951-48.424,107.951-107.946C218.078,48.424,169.651,0,110.127,0z"/> <path d="M88.846,89.537c-3.285,2.523-3.902,7.231-1.38,10.517c2.523,3.285,7.23,3.903,10.517,1.38 c2.299-1.766,8.406-6.456,7.512-14.845c-0.551-4.987-5.417-11.83-9.402-16.691c-5.831-7.114-10.767-11.327-14.643-12.513 c-3.632-1.126-7.354-0.948-11.066,0.53c-7.636,3.052-13.025,8.108-15.585,14.622c-2.493,6.344-2.04,13.443,1.313,20.537 c7.827,16.522,18.288,30.791,31.093,42.413c0.05,0.047,0.101,0.093,0.152,0.139c12.987,11.48,28.352,20.325,45.675,26.293 c3.287,1.129,6.513,1.692,9.611,1.692c3.892,0,7.583-0.888,10.94-2.658c6.191-3.264,10.621-9.177,12.814-17.115 c1.056-3.848,0.82-7.564-0.689-11.024c-1.619-3.745-6.35-8.184-14.064-13.193c-5.269-3.422-12.601-7.5-17.64-7.5 c-0.003,0-0.007,0-0.011,0c-8.406,0.034-12.397,6.621-13.899,9.102c-2.146,3.543-1.014,8.155,2.529,10.301 c3.541,2.146,8.154,1.015,10.301-2.529c0.593-0.98,0.969-1.5,1.205-1.772c4.236,1.23,15.567,8.642,17.889,11.761 c0.038,0.166,0.043,0.417-0.082,0.874c-0.739,2.675-2.268,6.204-5.349,7.828c-2.879,1.516-6.312,0.863-8.677,0.051 c-15.413-5.31-29.053-13.142-40.543-23.279c-0.003-0.003-0.007-0.006-0.01-0.01c-11.377-10.308-20.693-23.023-27.688-37.788 c-1.071-2.268-2.1-5.607-0.91-8.634c1.274-3.242,4.613-5.15,7.183-6.177c0.441-0.176,0.69-0.203,0.871-0.179 c3.358,1.965,11.969,12.402,13.66,16.477C90.229,88.41,89.753,88.84,88.846,89.537z"/> </g> </g></svg>
               <p className='text-center p-1 font-nunito text-[#2ad12f]'>Mensaje</p>

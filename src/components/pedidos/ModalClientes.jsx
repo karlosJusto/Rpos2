@@ -138,10 +138,10 @@ const ModalClientes = ({ show, handleClose, onSave, initialData,clearClientData 
 
   return (
     <>
-      <Modal show={show} onHide={handleSubmitClose} size="lg" backdrop="static"  keyboard={false} centered> {/* Changed onHide to ensure reset */}
+      <Modal show={show} onHide={handleSubmitClose} size="lg" backdrop="static"  keyboard={false} top> {/* Changed onHide to ensure reset */}
 
       <Modal.Header closeButton className='border-none text-center justify-center items-center flex' onClick={handleClose}>
-          <Modal.Title className='text-center pt-2 font-nunito text-gray-600 w-full'>
+          <Modal.Title className='text-center pt-1 font-nunito text-gray-600 w-full'>
             Datos Pedido
           </Modal.Title>
       </Modal.Header>
@@ -149,7 +149,7 @@ const ModalClientes = ({ show, handleClose, onSave, initialData,clearClientData 
           
 
         <Modal.Body>
-          <div className="bg-white rounded-lg flex justify-around gap-3 appearance-none px-[3vw]">
+          <div className="bg-white rounded-lg flex justify-around gap-3 appearance-none px-[3vw] -mt-3 ">
             {/* Input Cliente */}
             <div className="form-floating w-[25vw]">
               <input
@@ -207,8 +207,8 @@ const ModalClientes = ({ show, handleClose, onSave, initialData,clearClientData 
                   <div className="px-[3vw]  mt-[1vh]"> {/* Adjusted margin */}
                     <div className="grid grid-cols-2 text-center h-auto"> {/* Adjusted height */}
                       {/* Display client name and phone */}
-                      <h1 className="text-lg font-nunito text-gray-500">{cliente.cliente}</h1>
-                      <h1 className="text-lg font-nunito text-gray-500">{cliente.telefono}</h1>
+                      <h1 className="text-lg font-nunito text-green-700">{cliente.cliente}</h1>
+                      <h1 className="text-lg font-nunito text-green-700">{cliente.telefono}</h1>
                     </div>
                   </div>
                 </div>
@@ -220,7 +220,7 @@ const ModalClientes = ({ show, handleClose, onSave, initialData,clearClientData 
           </div>
 
           {/* Calendario Dropdown */}
-          <div className='px-[4.5vh] mt-4'>
+          <div className='px-[4.5vh] mt-3'>
             {/* Pass current fechahora to potentially pre-select date */}
             <CalendarioDropdown onDateChange={handleDateChange} initialDate={formData.fechahora} />
           </div>
@@ -276,7 +276,7 @@ const ModalClientes = ({ show, handleClose, onSave, initialData,clearClientData 
         </Modal.Body>
 
         <Modal.Footer className="border-none">
-        <div className="flex justify-end space-x-3 mt-2">
+        <div className="flex justify-end space-x-3">
   <Button
      variant="danger"
     className="p-2 bg-white font-nunito text-red-500 border-red-500 hover:text-red-700 hover:border-red-700 shadow-sm"

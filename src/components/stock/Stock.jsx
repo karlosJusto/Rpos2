@@ -54,7 +54,7 @@ const Stock = () => {
   }
 
   const productosFiltrados = data.filter((producto) =>
-    producto.name.toLowerCase().includes(search.toLowerCase()) && ![1, 2, 48].includes(producto.id_product)
+    producto.name.toLowerCase().includes(search.toLowerCase()) && ![1, 2,39,40,48].includes(producto.id_product)
   );
 
   const productosPorCategoria = productosFiltrados.reduce((acc, producto) => {

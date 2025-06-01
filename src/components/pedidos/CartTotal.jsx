@@ -25,8 +25,8 @@ const updateSaladCounters = async (cartItems) => {
     let incrementEnsaladillaPequena = 0;
 
     cartItems.forEach(item => {
-        const itemId = item.id_product ?? item.id;
-        const itemName = item.name || "";
+        const itemId = item.id; // Usar item.id consistentemente
+        const itemName = item.name || item.nombre || ""; // Aceptar 'nombre' también
         const itemCantidad = item.cantidad ?? 0;
 
         if (!itemName || typeof itemCantidad !== 'number' || itemCantidad <= 0) {
@@ -101,17 +101,15 @@ const updateSaladCounters = async (cartItems) => {
 
 
 // --- Componente Principal ---
-const CartTotal = ({ datosCliente, setDatosCliente, orderToEdit }) => {
+const CartTotal = ({ datosCliente, setDatosCliente, orderToEdit }) => { // orderToEdit es orderBeingEdited del contexto, pasado como prop
   // --- Contexto y Navegación ---
-  // --- MODIFICACIÓN: Obtener setOrderBeingEdited ---
-  const { cart, setCart, setOrderBeingEdited } = useContext(dataContext);
-  // --- FIN MODIFICACIÓN ---
+  const { cart, setCart, setOrderBeingEdited, isEditingOrder } = useContext(dataContext); // Usar isEditingOrder del contexto
   const navigate = useNavigate();
-  const isEditing = !!orderToEdit;
+
   // --- Estados del Componente ---
   const [mensajeModal, setMensajeModal] = useState("");
-  const [showModal, setShowModal] = useState(false);
-  const [showModal2, setShowModal2] = useState(false);
+  const [showModal, setShowModal] = useState(false); // Modal de advertencias (continuar/cancelar)
+  const [showModal2, setShowModal2] = useState(false); // Modal de errores (solo aceptar)
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [empleadoNombre, setEmpleadoNombre] = useState(null);
 
@@ -129,13 +127,20 @@ const CartTotal = ({ datosCliente, setDatosCliente, orderToEdit }) => {
     }
   }, []);
 
+  // Define esOperacionDeActualizacion at the component level
+  // It's true if we are in editing mode (isEditingOrder from context is true)
+  // AND the orderToEdit prop (which is orderBeingEdited from context) exists AND has a NumeroPedido.
+  const esOperacionDeActualizacion = isEditingOrder && orderToEdit && orderToEdit.NumeroPedido != null;
+
   // --- Calcular Total del Carrito (para display) ---
   const total = cart.reduce(
     (acc, item) => {
-      const unitPrice = item?.price === 0
-        ? item?.precio ?? 0
-        : item?.price ?? item?.precio ?? 0;
-      const quantity = item?.cantidad ?? 1;
+      const unitPrice = Number(item?.price === 0 ? (item?.precio ?? 0) : (item?.price ?? item?.precio ?? 0));
+      const quantity = Number(item?.cantidad ?? 1);
+      if (isNaN(unitPrice) || isNaN(quantity)) {
+        console.warn("Item con precio o cantidad inválida en cálculo de total:", item);
+        return acc;
+      }
       return acc + (unitPrice * quantity);
     },
     0
@@ -153,8 +158,7 @@ const CartTotal = ({ datosCliente, setDatosCliente, orderToEdit }) => {
     return nuevaHora;
   };
 
-  // Determina la hora final del pedido
-  const fechahora = datosCliente.fechahora || obtenerHoraRedondeada().format("DD/MM/YYYY HH:mm");
+  const fechahoraFinalPedido = datosCliente.fechahora || obtenerHoraRedondeada().format("DD/MM/YYYY HH:mm");
 
   // --- Obtener Siguiente ID de Pedido (transaccional) ---
    const getNextId = async () => {
@@ -189,7 +193,7 @@ const CartTotal = ({ datosCliente, setDatosCliente, orderToEdit }) => {
     pagado: data.pagado || false,
     celiaco: data.celiaco || false,
     localidad: data.localidad || "",
-    img_perfil: data.img_perfil || "", // Incluir img_perfil
+    img_perfil: data.img_perfil || "",
   });
 
   // --- Función de Actualizar Stock (Modificada para aceptar cambios +/-) ---
@@ -249,45 +253,39 @@ const CartTotal = ({ datosCliente, setDatosCliente, orderToEdit }) => {
 
     const clienteData = sanitizeClientData(datosCliente);
 
-    // 1. Validar Teléfono
     if (!clienteData.telefono) {
       mensajesError += "El teléfono del cliente es obligatorio.\n";
     } else if (!/^\d{9}$/.test(clienteData.telefono)) {
         mensajesError += "El formato del teléfono no es válido (debe tener 9 dígitos).\n";
     }
 
-    // 2. Validación de Stock Preliminar
     console.log("Iniciando validación de stock...");
     const productQuantities = {};
-    let stockValidationError = false;
 
     currentCart.forEach(item => {
-       if (!item || item.id_product == null || typeof item.cantidad !== 'number' || item.cantidad <= 0) {
+       if (!item || item.id == null || typeof item.cantidad !== 'number' || item.cantidad <= 0) {
            console.warn("Item inválido en carrito durante validación de stock:", item);
            return;
        }
-
        let stockProductId;
        let quantityForStockCheck = item.cantidad;
-       const productName = item.name || `Producto ID ${item.id_product}`;
+       const productName = item.name || `Producto ID ${item.id}`;
 
-       if (item.id_product === 1) stockProductId = 1;
-       else if (item.id_product === 2) { stockProductId = 1; quantityForStockCheck = item.cantidad / 2; }
-       else if (item.id_product === 41) stockProductId = 41;
-       else if (item.id_product === 48) { stockProductId = 41; quantityForStockCheck = item.cantidad / 2; }
-       else stockProductId = item.id_product;
+       if (item.id === 1) stockProductId = 1;
+       else if (item.id === 2) { stockProductId = 1; quantityForStockCheck = item.cantidad / 2; }
+       else if (item.id === 41) stockProductId = 41;
+       else if (item.id === 48) { stockProductId = 41; quantityForStockCheck = item.cantidad / 2; }
+       else stockProductId = item.id;
 
        if (isNaN(quantityForStockCheck) || quantityForStockCheck <= 0) {
            console.warn(`Cantidad inválida calculada para stock check (${item.cantidad} -> ${quantityForStockCheck}) para ${productName}. Omitiendo.`);
            return;
        }
-
        const stockProductIdStr = stockProductId?.toString();
        if (!stockProductIdStr) {
            console.warn(`No se pudo determinar el ID de stock para ${productName}. Omitiendo.`);
            return;
        }
-
        if (!productQuantities[stockProductIdStr]) {
            productQuantities[stockProductIdStr] = { required: 0, name: productName };
        }
@@ -302,26 +300,21 @@ const CartTotal = ({ datosCliente, setDatosCliente, orderToEdit }) => {
                const productRef = doc(db, "productos", productIdStr);
                const productSnap = await getDoc(productRef);
                const requiredData = productQuantities[productIdStr];
-
                if (!productSnap.exists()) {
                    console.error(`Error Crítico Validación: Producto con ID ${productIdStr} no encontrado.`);
                    mensajesError += `El producto '${requiredData.name}' (ID: ${productIdStr}) no se encontró.\n`;
-                   stockValidationError = true; return;
+                   return;
                }
-
                const productData = productSnap.data();
                const currentStock = Number(productData.stock || 0);
-
                if (isNaN(currentStock)) {
                    console.error(`Error Crítico Validación: Stock inválido para producto ID ${productIdStr} (${productData.stock}).`);
                    mensajesError += `Error interno: Stock inválido para '${requiredData.name}'.\n`;
-                   stockValidationError = true; return;
+                   return;
                }
-
                if (currentStock < requiredData.required) {
                    console.warn(`Stock insuficiente para ${requiredData.name} (ID: ${productIdStr}). Necesario: ${requiredData.required}, Disponible: ${currentStock}`);
                    mensajesError += `Stock insuficiente para ${requiredData.name}.\n`;
-                   stockValidationError = true;
                } else {
                    console.log(`Stock OK para ${requiredData.name} (ID: ${productIdStr}). Necesario: ${requiredData.required}, Disponible: ${currentStock}`);
                }
@@ -330,33 +323,29 @@ const CartTotal = ({ datosCliente, setDatosCliente, orderToEdit }) => {
        } catch (error) {
            console.error("Error durante la obtención de datos de stock para validación:", error);
            mensajesError += "Error al verificar el stock. Inténtalo de nuevo.\n";
-           stockValidationError = true;
        }
     } else {
         console.log("No hay productos en el carrito que requieran verificación de stock (o todos eran inválidos).");
     }
 
-    // 3. Validar Hora
-    if (!clienteData.fechahora) {
+    if (!datosCliente.fechahora) {
       const horaRedondeada = obtenerHoraRedondeada().format('HH:mm');
       mensajesAdvertencia += `❗️No has seleccionado hora. La hora del pedido será: ${horaRedondeada}\n`;
     } else {
-      const horaPedidoSeleccionada = dayjs(clienteData.fechahora, "DD/MM/YYYY HH:mm");
-      if(!isEditing){
+      const horaPedidoSeleccionada = dayjs(fechahoraFinalPedido, "DD/MM/YYYY HH:mm");
+      // Aplicar validación de hora pasada solo si NO se está editando un pedido real
+      if(!isEditingOrder || (isEditingOrder && !orderToEdit?.NumeroPedido)){
         if (horaPedidoSeleccionada.isValid() && horaPedidoSeleccionada.isBefore(dayjs().subtract(5, 'minute'))) {
           mensajesError += `La hora seleccionada (${horaPedidoSeleccionada.format('HH:mm')}) ya ha pasado.\n`;
+        }
       }
-      }
-
     }
 
-    // 4. Validar Pollo
-    const incluyePollo = currentCart.some(item => item && (item.id_product === 1 || item.id_product === 2));
+    const incluyePollo = currentCart.some(item => item && (item.id === 1 || item.id === 2));
     if (!incluyePollo) {
       mensajesAdvertencia += "❗️Comprueba... tu pedido no incluye pollo.\n";
     }
 
-    // --- Decisión Final ---
     if (mensajesError.trim() !== "") {
       console.log("Validación fallida por errores:", mensajesError.trim());
       setMensajeModal(mensajesError.trim());
@@ -377,7 +366,10 @@ const CartTotal = ({ datosCliente, setDatosCliente, orderToEdit }) => {
 
   // --- Función Principal para Enviar/Actualizar Pedido ---
   const sendToFirestore = async ({ confirmado }) => {
-    console.log(`%c--- Iniciando sendToFirestore --- Confirmado: ${confirmado}, Editando: ${orderToEdit ? orderToEdit.NumeroPedido : 'No'}, Submitting: ${isSubmitting}`, 'color: blue; font-weight: bold;');
+    // esOperacionDeActualizacion is now defined at the component level,
+    // so it's directly usable here and in the JSX.
+
+    console.log(`%c--- Iniciando sendToFirestore --- Confirmado: ${confirmado}, Operación: ${esOperacionDeActualizacion ? 'Actualizar Pedido ID: ' + orderToEdit.NumeroPedido : 'Crear Nuevo Pedido'}, Submitting: ${isSubmitting}`, 'color: blue; font-weight: bold;');
 
     if (isSubmitting) { console.warn("Submit bloqueado: ya en curso."); return; }
     setIsSubmitting(true);
@@ -389,34 +381,33 @@ const CartTotal = ({ datosCliente, setDatosCliente, orderToEdit }) => {
         setMensajeModal("El carrito está vacío."); setShowModal2(true); setIsSubmitting(false); return;
     }
 
-    let pedidoId = orderToEdit ? orderToEdit.NumeroPedido : null;
+    let pedidoId;
     let clienteId = null;
 
     try {
-      // --- PASO 1: Validación Inicial ---
       if (!confirmado) {
         console.log("Ejecutando validación completa...");
         const isValid = await validateOrder(currentCart);
         if (!isValid) {
-          console.log("Validación fallida o esperando confirmación.");
+          console.log("Validación fallida o esperando confirmación del usuario.");
           if (!showModal && !showModal2) { setIsSubmitting(false); }
           return;
         }
-        console.log("Validación completa OK.");
+        console.log("Validación completa OK (sin errores bloqueantes).");
       } else {
-          console.log("Saltando validación (confirmado por el usuario).");
+          console.log("Saltando validación (confirmado por el usuario desde modal de advertencia).");
           if (showModal) handleCloseModal();
       }
 
       const clienteData = sanitizeClientData(datosCliente);
-      const horaPedido = fechahora; // Usa la variable global que ya tiene el valor correcto
-      const parsedHoraPedido = dayjs(horaPedido, "DD/MM/YYYY HH:mm", true);
-      if (!parsedHoraPedido.isValid()) {
-           throw new Error(`El formato de la fecha/hora final del pedido es inválido: ${horaPedido}. Use DD/MM/YYYY HH:mm`);
-      }
-       console.log("Hora final del pedido validada:", horaPedido);
+      const horaPedidoParaGuardar = fechahoraFinalPedido;
+      const parsedHoraPedido = dayjs(horaPedidoParaGuardar, "DD/MM/YYYY HH:mm", true);
 
-      // --- PASO 2: Verificar/Crear/Actualizar Cliente ---
+      if (!parsedHoraPedido.isValid()) {
+           throw new Error(`El formato de la fecha/hora final del pedido es inválido: ${horaPedidoParaGuardar}. Use DD/MM/YYYY HH:mm`);
+      }
+       console.log("Hora final del pedido para guardar, validada:", horaPedidoParaGuardar);
+
       clienteId = clienteData.telefono;
       if (!clienteId || !/^\d{9}$/.test(clienteId)) {
           throw new Error("El teléfono del cliente es inválido o falta.");
@@ -427,18 +418,19 @@ const CartTotal = ({ datosCliente, setDatosCliente, orderToEdit }) => {
       try {
           await runTransaction(db, async (transaction) => {
               const clienteDocSnap = await transaction.get(clienteRef);
+              const clientDataToSave = {
+                cliente: clienteData.cliente || "Nombre no proporcionado",
+                telefono: clienteId,
+                localidad: clienteData.localidad || "",
+                celiaco: clienteData.celiaco || false,
+                observaciones: clienteData.observaciones || "",
+                img_perfil: clienteData.img_perfil || "",
+                lastOrderDate: serverTimestamp()
+              };
+
               if (!clienteDocSnap.exists()) {
                   console.log(`Cliente ${clienteId} no encontrado. Creando...`);
-                  const newClientData = {
-                      cliente: clienteData.cliente || "Nombre no proporcionado",
-                      telefono: clienteId,
-                      localidad: clienteData.localidad || "",
-                      celiaco: clienteData.celiaco || false,
-                      observaciones: clienteData.observaciones || "",
-                      fechahora: serverTimestamp(),
-                      lastOrderDate: serverTimestamp()
-                  };
-                  transaction.set(clienteRef, newClientData);
+                  transaction.set(clienteRef, { ...clientDataToSave, fechahora_creacion: serverTimestamp() });
               } else {
                   console.log(`Cliente ${clienteId} encontrado. Actualizando...`);
                   const existingClientData = clienteDocSnap.data();
@@ -446,59 +438,74 @@ const CartTotal = ({ datosCliente, setDatosCliente, orderToEdit }) => {
                   if (clienteData.cliente && existingClientData.cliente !== clienteData.cliente) clientUpdates.cliente = clienteData.cliente;
                   if (clienteData.localidad !== undefined && existingClientData.localidad !== clienteData.localidad) clientUpdates.localidad = clienteData.localidad;
                   if (clienteData.observaciones !== undefined && existingClientData.observaciones !== clienteData.observaciones) clientUpdates.observaciones = clienteData.observaciones;
+                  if (clienteData.img_perfil && existingClientData.img_perfil !== clienteData.img_perfil) clientUpdates.img_perfil = clienteData.img_perfil;
                   const currentCeliaco = clienteData.celiaco || false;
                   if (existingClientData.celiaco !== currentCeliaco) clientUpdates.celiaco = currentCeliaco;
-                  transaction.update(clienteRef, clientUpdates);
+                  if (Object.keys(clientUpdates).length > 1) {
+                    transaction.update(clienteRef, clientUpdates);
+                  } else {
+                    transaction.update(clienteRef, { lastOrderDate: serverTimestamp() });
+                  }
               }
           });
           console.log(`Transacción de cliente ${clienteId} completada.`);
       } catch (clientError) {
+          console.error("Error en transacción de cliente:", clientError);
           throw new Error(`No se pudo procesar la información del cliente (${clienteId}). ${clientError.message}`);
       }
 
-      // --- PASO 3: Determinar si es para otro día ---
       const fechaRealizado = dayjs();
       const esParaOtroDia = !parsedHoraPedido.isSame(fechaRealizado, 'day');
       console.log(`¿Es para otro día?: ${esParaOtroDia}`);
 
-      // --- PASO 4: Preparar y Guardar/Actualizar Pedido ---
       console.log("Preparando datos del pedido para Firestore...");
       const nowString = fechaRealizado.format("DD/MM/YYYY HH:mm");
 
       const mappedProducts = currentCart.map((item) => {
-            if (!item || item.id_product == null || typeof item.cantidad !== 'number' || item.cantidad <= 0) {
+            if (!item || item.id == null || typeof item.cantidad !== 'number' || item.cantidad <= 0) {
+                 console.error("Item inválido en carrito al mapear productos:", item);
                  throw new Error("Se encontró un item inválido o con cantidad cero en el carrito.");
             }
-            const unitPrice = item?.price === 0 ? item?.precio ?? 0 : item?.price ?? item?.precio ?? 0;
+            const unitPrice = Number(item?.price === 0 ? (item?.precio ?? 0) : (item?.price ?? item?.precio ?? 0));
+            if (isNaN(unitPrice)) {
+                console.error("Precio unitario inválido para item:", item);
+                throw new Error(`Precio inválido para ${item.name || `producto ID ${item.id}`}.`);
+            }
             return {
-                id: item.id_product, nombre: item.name || "Sin Nombre", cantidad: item.cantidad,
+                id: item.id, nombre: item.name || "Sin Nombre", cantidad: item.cantidad,
                 alias: item.alias || "", observaciones: item.observaciones || "",
-                celiaco: !!(item.celiaco || clienteData.celiaco), tostado: !!item.tostado,
+                celiaco: !!(item.celiaco || clienteData.celiaco),
+                tostado: !!item.tostado,
                 sinsalsa: !!item.sinsalsa, extrasalsa: !!item.extrasalsa, troceado: !!item.troceado,
                 entregado: item.entregado || 0, categoria: item.categoria || "No especificada",
                 freidora: !!item.freidora, position: item.position ?? null,
-                precio: Number(unitPrice).toFixed(2), total: (unitPrice * item.cantidad).toFixed(2),
+                precio: Number(unitPrice).toFixed(2),
+                total: (unitPrice * item.cantidad).toFixed(2),
             };
        });
 
-       const totalPedido = currentCart.reduce((acc, item) => {
-            const unitPrice = item?.price === 0 ? item?.precio ?? 0 : item?.price ?? item?.precio ?? 0;
-            const quantity = item?.cantidad ?? 1;
+       const totalPedidoCalculado = currentCart.reduce((acc, item) => {
+            const unitPrice = Number(item?.price === 0 ? (item?.precio ?? 0) : (item?.price ?? item?.precio ?? 0));
+            const quantity = Number(item?.cantidad ?? 1);
+            if (isNaN(unitPrice) || isNaN(quantity)) return acc;
             return acc + (unitPrice * quantity);
-        }, 0).toFixed(2);
+        }, 0);
 
-      console.log(`%cProcediendo a ${orderToEdit ? 'ACTUALIZAR' : 'CREAR'} pedido... Total: ${totalPedido}€`, 'color: green; font-weight: bold;');
+      console.log(`%cProcediendo a ${esOperacionDeActualizacion ? 'ACTUALIZAR' : 'CREAR'} pedido... Total: ${totalPedidoCalculado.toFixed(2)}€`, 'color: green; font-weight: bold;');
 
-      if (orderToEdit) {
-        if (!pedidoId) { throw new Error("Falta ID para actualizar pedido."); }
+      if (esOperacionDeActualizacion) {
+        pedidoId = orderToEdit.NumeroPedido;
+        // No es necesario el if (!pedidoId) aquí porque esOperacionDeActualizacion ya lo valida.
         console.log(`Actualizando Firestore para pedido ID: ${pedidoId}`);
         const pedidoRef = doc(db, "pedidos", pedidoId.toString());
         const updateData = {
           cliente: clienteData.cliente, telefono: clienteData.telefono, localidad: clienteData.localidad,
-          celiaco: clienteData.celiaco, idCliente: clienteId, fechahora: horaPedido,
-          observaciones: clienteData.observaciones, pagado: clienteData.pagado,
-          productos: mappedProducts, total_pedido: totalPedido, paraOtroDia: esParaOtroDia,
-          fechahora_modificado: nowString, origen: orderToEdit.origen ?? 0,
+          celiaco: clienteData.celiaco, idCliente: clienteId, fechahora: horaPedidoParaGuardar,
+          observaciones: clienteData.observaciones,
+          pagado: clienteData.pagado,
+          productos: mappedProducts, total_pedido: totalPedidoCalculado.toFixed(2), paraOtroDia: esParaOtroDia,
+          fechahora_modificado: nowString,
+          origen: orderToEdit.origen ?? 0,
         };
         await updateDoc(pedidoRef, updateData);
         console.log(`Firestore: Pedido ID ${pedidoId} actualizado.`);
@@ -508,156 +515,172 @@ const CartTotal = ({ datosCliente, setDatosCliente, orderToEdit }) => {
         const pedidoData = {
            NumeroPedido: pedidoId, cliente: clienteData.cliente, telefono: clienteData.telefono,
            localidad: clienteData.localidad, celiaco: clienteData.celiaco, idCliente: clienteId,
-           fechahora: horaPedido, observaciones: clienteData.observaciones, pagado: clienteData.pagado,
-           productos: mappedProducts, total_pedido: totalPedido, paraOtroDia: esParaOtroDia,
-           empleado: empleadoNombre || "No identificado", origen: 0, fechahora_realizado: nowString,
+           fechahora: horaPedidoParaGuardar, observaciones: clienteData.observaciones, pagado: clienteData.pagado,
+           productos: mappedProducts, total_pedido: totalPedidoCalculado.toFixed(2), paraOtroDia: esParaOtroDia,
+           empleado: empleadoNombre || "No identificado",
+           origen: orderToEdit?.origen ?? 0, // Si orderToEdit es clientInfo (sin origen), será 0.
+           fechahora_realizado: nowString,
         };
         await setDoc(doc(db, "pedidos", pedidoId.toString()), pedidoData);
         console.log(`Firestore: Pedido nuevo ID ${pedidoId} creado.`);
       }
-      console.log(`Éxito: Pedido ${pedidoId} ${orderToEdit ? 'actualizado' : 'guardado'} en Firestore.`);
+      console.log(`Éxito: Pedido ${pedidoId} ${esOperacionDeActualizacion ? 'actualizado' : 'guardado'} en Firestore.`);
 
-      // --- PASO 5: Actualizar Stock ---
       console.log("Iniciando lógica de actualización de stock...");
-      const calculateStockQuantities = (items) => { /* ... (función auxiliar sin cambios) ... */
+      const calculateStockQuantities = (items) => {
           const quantities = {};
           items.forEach(item => {
-              const itemId = item.id_product ?? item.id;
-              const itemCantidad = item.cantidad ?? 0;
-              if (!itemId || itemCantidad <= 0) { console.warn("Item inválido en calculateStockQuantities:", item); return; }
+              const itemId = item.id; // CAMBIO: Usar item.id consistentemente
+              const itemCantidad = Number(item.cantidad ?? 0);
+              if (!itemId || itemCantidad <= 0 || isNaN(itemCantidad)) {
+                console.warn("Item inválido en calculateStockQuantities:", item); return;
+              }
               let stockProductId; let quantityForStock = itemCantidad;
-              const itemNameLower = item.name?.toLowerCase() || "";
+              const itemNameLower = item.name?.toLowerCase() || item.nombre?.toLowerCase() || item.alias?.toLowerCase() || "";
 
               if (itemId === 1) stockProductId = 1;
-              // Modificación para incluir IDs 39, 40 y "menú"
               else if (itemId === 2 || itemId === 39 || itemId === 40 || itemNameLower.includes("menú")) {
-                stockProductId = 1; // Descuenta de Pollo (ID 1)
-                quantityForStock = itemCantidad / 2; // Descuenta 0.5 por unidad
+                stockProductId = 1; quantityForStock = itemCantidad * 0.5;
               }
               else if (itemId === 41) stockProductId = 41;
               else if (itemId === 48) {
-                stockProductId = 41; // Descuenta de Costilla (ID 41)
-                quantityForStock = itemCantidad / 2; // Descuenta 0.5 por unidad
+                stockProductId = 41; quantityForStock = itemCantidad * 0.5;
               }
               else stockProductId = itemId;
+
               if (stockProductId && quantityForStock > 0 && !isNaN(quantityForStock)) {
                   const stockProductIdStr = stockProductId.toString();
                   quantities[stockProductIdStr] = (quantities[stockProductIdStr] || 0) + quantityForStock;
-              } else { console.warn(`Item ${item.name || itemId} omitido del cálculo de stock`); }
+              } else { console.warn(`Item ${item.name || item.nombre || item.alias || itemId} omitido del cálculo de stock (ID stock: ${stockProductId}, Cantidad stock: ${quantityForStock})`); }
           });
           return quantities;
       };
+
       const finalParaOtroDia = esParaOtroDia;
       let stockChanges = {};
-      if (orderToEdit) {
+
+      if (esOperacionDeActualizacion) {
           console.log("Calculando diferencias de stock para edición...");
           const originalParaOtroDia = orderToEdit.paraOtroDia === true;
           const originalProducts = orderToEdit.productos || [];
+
           const originalStockQuantities = calculateStockQuantities(originalProducts);
-          const finalStockQuantities = calculateStockQuantities(currentCart);
-          console.log("Cantidades Stock Original:", originalStockQuantities);
-          console.log("Cantidades Stock Final:", finalStockQuantities);
-          if (!originalParaOtroDia && !finalParaOtroDia) {
-              console.log("Caso Stock A: Hoy -> Hoy.");
-              const allProductIds = new Set([...Object.keys(originalStockQuantities), ...Object.keys(finalStockQuantities)]);
-              allProductIds.forEach(id => {
-                  const change = (finalStockQuantities[id] || 0) - (originalStockQuantities[id] || 0);
-                  if (change !== 0) stockChanges[id] = change;
-              });
-          } else if (!originalParaOtroDia && finalParaOtroDia) {
-              console.log("Caso Stock B: Hoy -> Otro Día.");
-              Object.keys(originalStockQuantities).forEach(id => { if (originalStockQuantities[id] > 0) stockChanges[id] = -originalStockQuantities[id]; });
-          } else if (originalParaOtroDia && !finalParaOtroDia) {
-              console.log("Caso Stock C: Otro Día -> Hoy.");
-              Object.keys(finalStockQuantities).forEach(id => { if (finalStockQuantities[id] > 0) stockChanges[id] = finalStockQuantities[id]; });
-          } else { console.log("Caso Stock D: Otro Día -> Otro Día."); }
-          console.log("Cambios de stock a aplicar:", stockChanges);
+          const finalStockQuantities = calculateStockQuantities(mappedProducts);
+
+          console.log("Cantidades Stock Original (del pedido guardado):", originalStockQuantities);
+          console.log("Cantidades Stock Final (del carrito actual):", finalStockQuantities);
+
+          const allProductIds = new Set([...Object.keys(originalStockQuantities), ...Object.keys(finalStockQuantities)]);
+
+          allProductIds.forEach(id => {
+            const originalQty = originalStockQuantities[id] || 0;
+            const finalQty = finalStockQuantities[id] || 0;
+            let change = 0;
+
+            if (!originalParaOtroDia && !finalParaOtroDia) {
+                change = finalQty - originalQty;
+            } else if (!originalParaOtroDia && finalParaOtroDia) {
+                change = -originalQty;
+            } else if (originalParaOtroDia && !finalParaOtroDia) {
+                change = finalQty;
+            }
+            if (change !== 0) stockChanges[id] = change;
+          });
+          console.log("Cambios de stock a aplicar (edición):", stockChanges);
       } else {
           console.log("Calculando stock para pedido nuevo...");
           if (!finalParaOtroDia) {
-              console.log("Pedido nuevo para hoy.");
-              const finalStockQuantities = calculateStockQuantities(currentCart);
-              Object.keys(finalStockQuantities).forEach(id => { if (finalStockQuantities[id] > 0) stockChanges[id] = finalStockQuantities[id]; });
-              console.log("Stock a restar:", stockChanges);
-          } else { console.log("Pedido nuevo para otro día. Omitiendo stock."); }
+              console.log("Pedido nuevo para hoy. Se restará stock.");
+              const finalStockQuantities = calculateStockQuantities(mappedProducts);
+              Object.keys(finalStockQuantities).forEach(id => {
+                if (finalStockQuantities[id] > 0) stockChanges[id] = finalStockQuantities[id];
+              });
+              console.log("Stock a restar (nuevo pedido):", stockChanges);
+          } else {
+              console.log("Pedido nuevo para otro día. Omitiendo actualización de stock.");
+          }
       }
-      const stockUpdatePromises = Object.entries(stockChanges).map(([productId, change]) => updateStock(productId, change));
-      if (stockUpdatePromises.length > 0) {
+
+      if (Object.keys(stockChanges).length > 0) {
+           const stockUpdatePromises = Object.entries(stockChanges).map(([productId, change]) => updateStock(productId, change));
            console.log(`Ejecutando ${stockUpdatePromises.length} actualizaciones de stock...`);
-           try { await Promise.all(stockUpdatePromises); console.log("Actualización de stock completada."); }
+           try {
+               await Promise.all(stockUpdatePromises);
+               console.log("Actualización de stock completada.");
+           }
            catch (stockError) {
                console.error(`¡ERROR CRÍTICO POST-GUARDADO! Pedido ${pedidoId} guardado, PERO FALLÓ STOCK:`, stockError);
-               setMensajeModal(`¡ATENCIÓN GRAVE! Pedido ${pedidoId} guardado, pero falló al actualizar stock (${stockError.message}). REVISIÓN MANUAL INMEDIATA.`);
-               setShowModal2(true); setIsSubmitting(false); return;
+               setMensajeModal(`¡ATENCIÓN GRAVE! Pedido ${pedidoId} guardado, pero falló al actualizar stock (${stockError.message}). REVISIÓN MANUAL INMEDIATA DEL STOCK.`);
+               setShowModal2(true);
+               setIsSubmitting(false);
+               return;
            }
-      } else { console.log("No se requirieron actualizaciones de stock."); }
+      } else {
+          console.log("No se requirieron actualizaciones de stock.");
+      }
 
-      // --- PASO 6: Actualizar Contadores de Ensaladas/Ensaladillas ---
       console.log("Iniciando actualización de contadores de ensaladas/ensaladillas...");
-      try { await updateSaladCounters(currentCart); console.log("Actualización de contadores intentada."); }
-      catch (saladError) { console.error(`Error no crítico al llamar a updateSaladCounters para pedido ${pedidoId}:`, saladError); }
+      try {
+        await updateSaladCounters(mappedProducts);
+        console.log("Actualización de contadores de ensaladas/ensaladillas intentada.");
+      }
+      catch (saladError) {
+        console.error(`Error no crítico al llamar a updateSaladCounters para pedido ${pedidoId}:`, saladError);
+      }
 
-      // --- PASO 7: Limpiar Estado y Navegar (Éxito Total) ---
       console.log(`%c---- ÉXITO TOTAL Pedido ID: ${pedidoId} ---- Limpiando estado y navegando...`, 'color: green; font-weight: bold; font-size: 1.1em;');
       setCart([]);
       setDatosCliente({
         cliente: "", telefono: "", fechahora: "", observaciones: "",
-        pagado: false, celiaco: false, localidad: "", img_perfil: "" // Incluir img_perfil
+        pagado: false, celiaco: false, localidad: "", img_perfil: ""
       });
-      // --- MODIFICACIÓN: Limpiar estado de edición ---
       setOrderBeingEdited(null);
-      // --- FIN MODIFICACIÓN ---
       navigate("/ordenes");
 
     } catch (error) {
       console.error("Error general durante sendToFirestore:", error);
       if (!showModal && !showModal2) {
-          setMensajeModal(`Error al procesar el pedido: ${error.message}. Revisa los datos.`);
+          setMensajeModal(`Error al procesar el pedido: ${error.message}. Revisa los datos e inténtalo de nuevo.`);
           setShowModal2(true);
       } else {
-           console.error("Error general ocurrió mientras un modal estaba activo.");
+           console.error("Error general ocurrió mientras un modal de validación/advertencia estaba activo. El mensaje del modal actual prevalece.");
            if (showModal) handleCloseModal();
            if (!showModal2) {
-                setMensajeModal(`Error al procesar el pedido: ${error.message}. Revisa los datos.`);
+                setMensajeModal(`Error al procesar el pedido: ${error.message}. Revisa los datos e inténtalo de nuevo.`);
                 setShowModal2(true);
            }
       }
-
     } finally {
-      // Asegurar que isSubmitting se resetee SOLO si no hay modales activos
       if (!showModal && !showModal2) {
          console.log("Finally: No hay modales activos, liberando isSubmitting.");
          setIsSubmitting(false);
       } else {
-          console.log("Finally: Modal activo detectado, isSubmitting permanecerá bloqueado.");
+          console.log("Finally: Modal activo detectado (error o advertencia), isSubmitting permanecerá bloqueado hasta que el usuario cierre el modal.");
       }
       console.log("--- Ejecución de sendToFirestore finalizada ---");
     }
-  }; // --- Fin de sendToFirestore ---
+  };
 
 
-  // --- Renderizado del Componente ---
   return cart.length > 0 ? (
     <>
-      {/* Sección del Total */}
       <div className="flex justify-end p-[0.5vw]">
         <a
           href="#"
           onClick={(e) => e.preventDefault()}
-          className="inline-flex items-center text-2xl font-extrabold xtext-gray-600 hover:underline dark:text-gray-400"
+          className="inline-flex items-center text-2xl font-extrabold text-gray-700 dark:text-gray-400"
         >
           <span className="text-end">{total.toFixed(2)} €</span>
         </a>
       </div>
 
-      {/* Botón Principal de Acción */}
       <div className="flex text-center justify-center items-center mt-6 mb-4">
         <button
           onClick={() => { console.log("Click en Botón Generar/Actualizar"); sendToFirestore({ confirmado: false }); }}
           disabled={isSubmitting}
           className={`w-full sm:w-auto min-w-[150px] px-6 py-3 tracking-wide  ${
-            orderToEdit ? 'bg-gray-600' : 'bg-[#f2ac02] hover:bg-yellow-600'
-            } text-white font-bold rounded-lg shadow-md hover:bg-yellow-600 focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:ring-opacity-50 transition-all duration-300 ease-in-out flex items-center justify-center ${isSubmitting ? 'opacity-50 cursor-not-allowed' : 'hover:scale-105'}`}
+            esOperacionDeActualizacion ? 'bg-gray-600 hover:bg-gray-700' : 'bg-[#f2ac02] hover:bg-yellow-600'
+            } text-white font-bold rounded-lg shadow-md focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:ring-opacity-50 transition-all duration-300 ease-in-out flex items-center justify-center ${isSubmitting ? 'opacity-50 cursor-not-allowed' : 'hover:scale-105'}`}
         >
           <svg width="28px" height="28px" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
             <path d="M4 18V6" stroke="#ffffff" strokeWidth="1.5" strokeLinecap="round"></path>
@@ -668,14 +691,12 @@ const CartTotal = ({ datosCliente, setDatosCliente, orderToEdit }) => {
             <path d="M20 18C20 20.2091 16.4183 22 12 22C7.58172 22 4 20.2091 4 18" stroke="#ffffff" strokeWidth="1.5"></path>
           </svg>
           <span className="ml-1 font-nunito text-lg">
-            {isSubmitting ? 'Procesando...' : (orderToEdit ? "Actualizar Pedido" : "Generar Pedido")}
+            {isSubmitting ? 'Procesando...' : (esOperacionDeActualizacion ? "Actualizar Pedido" : "Generar Pedido")}
           </span>
         </button>
 
       </div>
 
-      {/* --- Modales --- */}
-      {/* Modal 2: Errores o Información Bloqueante */}
       <Modal show={showModal2} onHide={() => { handleCloseModal2(); setIsSubmitting(false); }} size="md" backdrop="static" keyboard={false} centered>
         <Modal.Body className="flex flex-col items-center p-2">
           <div className='p-1'>
@@ -696,7 +717,6 @@ const CartTotal = ({ datosCliente, setDatosCliente, orderToEdit }) => {
         </Modal.Footer>
       </Modal>
 
-      {/* Modal 1: Confirmación */}
       <Modal show={showModal} onHide={() => { handleCloseModal(); setIsSubmitting(false); }} size="md" backdrop="static" keyboard={false} centered>
         <Modal.Body className="flex flex-col items-center p-4">
           <div className='p-2'>

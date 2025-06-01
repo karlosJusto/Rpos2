@@ -125,7 +125,7 @@ function CalendarioDropdown({ onDateChange,initialDate }) {
   
 
   return (
-    <div className="flex p-3 rounded border-2 border-gray-200 space-x-10 justify-around">
+    <div className="flex p-2 rounded border-2 border-gray-200 space-x-10 justify-around">
       {/* Calendario */}
       <div className="text-center w-60">
         <h2 className="text-gray-500 font-extrabold text-sm mb-1 font-nunito">Selecciona una fecha</h2>
