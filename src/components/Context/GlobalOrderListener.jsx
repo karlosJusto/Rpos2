@@ -93,6 +93,7 @@ const GlobalOrderListener = () => {
    * Sobreescribe el array 'intervals' completo.
    */
   const handleFirestoreUpdateLikeCartTotal = async (order, orderId,callId) => {
+    debugger
     const logPrefix = `[UpdateCal][${orderId}][Call ${callId}]`; // Usar callId en logs
     console.log(`${logPrefix} Iniciando procesamiento.`);
 
@@ -164,10 +165,27 @@ const GlobalOrderListener = () => {
             // Calcular la cantidad a incrementar (lógica específica por producto)
             let cantidadAIncrementar = 0;
             const cantidadPedido = Number(producto.cantidad) || 0;
-            
+
             if (productKey === 'Pollo') {
-                // Si el nombre incluye '1/2' o 'menú', cuenta como 0.5, sino 1 * cantidad.
-                cantidadAIncrementar = (productNameLower.includes('1/2') || productNameLower.includes('menú')) ? 0.5 * cantidadPedido : 1 * cantidadPedido;
+                // Revised logic for chicken products:
+                // - Menus: 0.5 chicken value per menu item, multiplied by the number of menu items ordered.
+                //   (e.g., if producto.cantidad is 3 for a menu, 0.5 * 3 = 1.5, matching observed behavior)
+                // - "1/2 Pollo" (non-menu): Fixed 0.5 chicken value.
+                // - "Pollo Entero" (non-menu, non-1/2): Fixed 1 chicken value.
+                if (productNameLower.includes('menú')) {
+                    // Handles items like "Menú Pollo", "Menú 1/2 Pollo", etc.
+                    // Assumes each menu item contributes 0.5 to the chicken count,
+                    // and cantidadPedido is the number of such menu items.
+                    cantidadAIncrementar = 0.5 * cantidadPedido;
+                } else if (productNameLower.includes('1/2')) {
+                    // Handles "1/2 Pollo Asado", etc. (but not menus containing "1/2")
+                    // This item type contributes a fixed 0.5 to the chicken count.
+                    cantidadAIncrementar = 0.5;
+                } else {
+                    // Handles "Pollo Asado" (whole chicken), etc. (not menus, not 1/2)
+                    // This item type contributes a fixed 1 to the chicken count.
+                    cantidadAIncrementar = 1;
+                }
             } else if (productKey === 'Costilla') {
                  // Lógica específica para costillas según ID
                 if (productId === 41) { // Asumiendo ID 41 es ración completa
@@ -268,12 +286,7 @@ const GlobalOrderListener = () => {
 
                     const newCount = currentCount + cantidadAIncrementar;
 
-                    // Comprobar límite SÓLO si maxAllowed es un número válido y positivo
-                    if (maxAllowed > 0 && newCount > maxAllowed) {
-                        // Límite excedido, NO actualizar, solo loggear advertencia
-                        console.warn(`${transLogPrefix} LÍMITE EXCEDIDO para ${productKey} en intervalo ${intervalLabel}. Actual: ${currentCount}, Pedido: ${cantidadAIncrementar}, Nuevo: ${newCount}, Max: ${maxAllowed}. NO SE ACTUALIZA.`);
-                        // La transacción terminará sin error, pero sin modificar este intervalo.
-                    } else {
+                    
                         // Límite no excedido (o no aplicable), actualizar contador
                         console.log(`${transLogPrefix} Actualizando ${productKey} en intervalo ${intervalLabel}: ${currentCount} -> ${newCount} (Max: ${maxAllowed > 0 ? maxAllowed : 'N/A'})`);
                         targetInterval.orderedCount = newCount;
@@ -281,7 +294,7 @@ const GlobalOrderListener = () => {
                         // 4.6 Programar la actualización en la transacción (SOBREESCRIBE TODO EL ARRAY 'intervals')
                         console.log(`${transLogPrefix} Programando transaction.update para ${calendarDocRef.path}...`);
                         transaction.update(calendarDocRef, { intervals: intervalsCopy });
-                    }
+                    
                 }); // --- Fin de la función runTransaction ---
 
                 console.log(`${logPrefix} <--- Transacción para ${productKey} completada (o límite detectado).`);

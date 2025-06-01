@@ -52,27 +52,29 @@ import OperativaTienda from './components/dashboard/dashComponents/OperativaTien
 // import HeaderFinal from "./components/cocina/components/HeaderFinal.jsx";
 
 function App() {
-  // Ref to track if the init effect has run its core logic
-  const initEffectRan = useRef(false); // <-- Add useRef
+  const initEffectRan = useRef(false);
+  // Log cuando la función del componente App se ejecuta (es decir, cada vez que se renderiza)
+  console.log("App.jsx: La función del componente App se está ejecutando (render).");
 
   // useEffect for initializing calendars, preventing StrictMode double run
   useEffect(() => {
+    console.log("App.jsx: useEffect[initDailyCalendars] - INICIO DEL EFECTO / MONTAJE.");
+
     // Check if we are in development and if the effect has already run once
     if (import.meta.env.MODE === 'development' && initEffectRan.current) {
-       console.log("App.jsx useEffect [init]: StrictMode re-run detected, skipping initDailyCalendars.");
+       console.log("App.jsx: useEffect[initDailyCalendars] - Re-ejecución por StrictMode detectada, omitiendo lógica de initDailyCalendars.");
        return; // Skip the second run in development Strict Mode
     }
 
     // Run the initialization logic
-    console.log("App.jsx useEffect [init]: Running initDailyCalendars...");
+    console.log("App.jsx: useEffect[initDailyCalendars] - Ejecutando initDailyCalendars...");
     initDailyCalendars();
 
     // Mark that the effect's core logic has run
     initEffectRan.current = true;
 
-    // Cleanup function (optional, but good practice)
     return () => {
-      console.log("App.jsx useEffect [init]: Cleanup.");
+      console.log("App.jsx: useEffect[initDailyCalendars] - LIMPIEZA DEL EFECTO / DESMONTAJE.");
       // No specific cleanup needed for initDailyCalendars itself,
       // but we keep the structure. We don't reset the ref here
       // for a one-time initialization.
@@ -83,7 +85,6 @@ function App() {
     // DataProvider envuelve todo
     <DataProvider>
     <SonidoOnChange />
-    <OrderProvider>
       <GlobalOrderListener />
       <BrowserRouter>
         <Routes>
@@ -129,7 +130,6 @@ function App() {
 
         </Routes>
       </BrowserRouter>
-    </OrderProvider>
   </DataProvider>
   );
 }

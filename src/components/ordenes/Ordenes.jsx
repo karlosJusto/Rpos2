@@ -200,17 +200,28 @@ const Ordenes = () => {
       const pedidoData = pedidoSnap.data();
       const productosDelPedido = pedidoData.productos;
       const fechahoraPedido = pedidoData.fechahora; // Formato "DD/MM/YYYY HH:MM"
+      
       let dailyDocumentIdForSalads = null;
+      let calendarDocIdYYYYMMDD = null;    // Para calendarios pollo/costilla/codillo, formato YYYY-MM-DD
+      let orderTimeHHMM = null;            // Para calendarios pollo/costilla/codillo, formato HH:MM
 
       if (fechahoraPedido && typeof fechahoraPedido === 'string' && fechahoraPedido.includes(' ')) {
-        const [datePart] = fechahoraPedido.split(' ');
+        const [datePart, timePart] = fechahoraPedido.split(' '); // datePart "DD/MM/YYYY", timePart "HH:MM"
         const [day, month, year] = datePart.split('/');
-        // Validar que las partes sean números y tengan el formato esperado
+
         if (day && month && year && /^\d{1,2}$/.test(day) && /^\d{1,2}$/.test(month) && /^\d{4}$/.test(year)) {
           dailyDocumentIdForSalads = `${day.padStart(2, '0')}-${month.padStart(2, '0')}-${year}`; // Formato DD-MM-YYYY
+          calendarDocIdYYYYMMDD = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;   // Formato YYYY-MM-DD
         } else {
           console.warn(`${logPrefix} Formato de fecha inválido en pedido: ${datePart}. No se actualizará stock diario de ensaladas.`);
         }
+
+        if (timePart && /^\d{2}:\d{2}$/.test(timePart)) {
+          orderTimeHHMM = timePart;
+        } else {
+          console.warn(`${logPrefix} Formato de hora inválido en pedido: ${timePart}. No se actualizarán calendarios de pollo/costilla/codillo.`);
+        }
+
       } else {
         console.warn(`${logPrefix} Fecha/hora del pedido ausente o inválida. No se actualizará stock diario de ensaladas.`);
       }
@@ -218,7 +229,8 @@ const Ordenes = () => {
       // 2. Restaurar el stock de cada producto en el pedido
       if (productosDelPedido && productosDelPedido.length > 0) {
         for (const productoEnPedido of productosDelPedido) {
-          const productNameLower = (productoEnPedido.nombre || productoEnPedido.alias || '').toLowerCase();
+          const productoNombreOriginal = (productoEnPedido.nombre || productoEnPedido.alias || '');
+          const productNameLower = productoNombreOriginal.toLowerCase();
           const productoCantidadEnPedido = Number(productoEnPedido.cantidad) || 0;
 
           // --- PARTE 1: Restaurar stock en la colección 'productos' (para todos los ítems del pedido) ---
@@ -301,6 +313,79 @@ const Ordenes = () => {
             } else {
               if (!dailyDocumentIdForSalads) console.warn(`${logPrefix} No se pudo determinar la fecha del pedido para ensalada ${productNameLower}. No se actualizará contador 'pedidas' en 'ensaladas'.`);
               if (cantidadARestarDePedidasEnsalada <= 0) console.warn(`${logPrefix} Cantidad a restar de 'pedidas' para ensalada ${productNameLower} es cero o negativa. No se actualizará.`);
+            }
+          }
+
+          // --- PARTE 3: Si es pollo, codillo o costilla, actualizar calendario diario ---
+          let calendarCollectionName = null;
+          let productKeyForCalendar = null; 
+          let cantidadARestarDelCalendario = 0;
+          const productoIdOriginal = productoEnPedido.id;
+
+          if (productoIdOriginal === 1 || productoIdOriginal === 2 || productoIdOriginal === 39 || productoIdOriginal === 40 || productNameLower.includes('menú pollo')) {
+            calendarCollectionName = 'chicken_calendar_daily';
+            productKeyForCalendar = 'Pollo';
+            if (productoIdOriginal === 1) { // Pollo entero
+                cantidadARestarDelCalendario = productoCantidadEnPedido;
+            } else { // 1/2 pollo o cualquier menú que incluya pollo (IDs 2, 39, 40)
+                cantidadARestarDelCalendario = 0.5 * productoCantidadEnPedido;
+            }
+          } else if (productoIdOriginal === 41 || productoIdOriginal === 48) {
+            calendarCollectionName = 'costilla_calendar_daily';
+            productKeyForCalendar = 'Costilla';
+            if (productoIdOriginal === 41) cantidadARestarDelCalendario = productoCantidadEnPedido; // Costilla entera
+            else cantidadARestarDelCalendario = 0.5 * productoCantidadEnPedido; // 1/2 costilla
+          } else if (productoIdOriginal === 50) {
+            calendarCollectionName = 'codillo_calendar_daily';
+            productKeyForCalendar = 'Codillo';
+            cantidadARestarDelCalendario = productoCantidadEnPedido;
+          }
+
+          if (calendarCollectionName && calendarDocIdYYYYMMDD && orderTimeHHMM && cantidadARestarDelCalendario > 0) {
+            const calendarDocRef = doc(db, calendarCollectionName, calendarDocIdYYYYMMDD);
+            // console.log(`${logPrefix} Intentando restar del calendario ${calendarDocRef.path} para ${productKeyForCalendar}, cantidad: ${cantidadARestarDelCalendario} a las ${orderTimeHHMM}`);
+            try {
+              await runTransaction(db, async (transaction) => {
+                const transLogPrefixCal = `${logPrefix}[TransCal][${productKeyForCalendar}]`;
+                const calendarDocSnap = await transaction.get(calendarDocRef);
+
+                if (!calendarDocSnap.exists()) {
+                  console.warn(`${transLogPrefixCal} Documento de calendario ${calendarDocRef.path} NO encontrado. No se puede restar del calendario.`);
+                  return;
+                }
+                const calendarData = calendarDocSnap.data();
+                if (!Array.isArray(calendarData?.intervals)) {
+                  console.warn(`${transLogPrefixCal} Campo 'intervals' NO es un array o falta en ${calendarDocRef.path}. No se puede restar del calendario.`);
+                  return;
+                }
+
+                let intervalsCopy = JSON.parse(JSON.stringify(calendarData.intervals));
+                let intervalFound = false;
+                let foundIntervalIndex = -1;
+
+                for (let i = 0; i < intervalsCopy.length; i++) {
+                  if (intervalsCopy[i].start === orderTimeHHMM) {
+                    intervalFound = true;
+                    foundIntervalIndex = i;
+                    break;
+                  }
+                }
+
+                if (!intervalFound) {
+                  console.warn(`${transLogPrefixCal} Intervalo para la hora ${orderTimeHHMM} no encontrado en ${calendarDocRef.path}. No se puede restar del calendario.`);
+                  return;
+                }
+
+                const targetInterval = intervalsCopy[foundIntervalIndex];
+                const currentCount = Number(targetInterval.orderedCount) || 0;
+                const newCount = currentCount - cantidadARestarDelCalendario;
+                targetInterval.orderedCount = Math.max(0, newCount); // Asegurar que no sea negativo
+
+                transaction.update(calendarDocRef, { intervals: intervalsCopy });
+                // console.log(`${transLogPrefixCal} Contador 'orderedCount' en ${calendarDocRef.path} para intervalo ${orderTimeHHMM} actualizado a ${targetInterval.orderedCount} (restando ${cantidadARestarDelCalendario}).`);
+              });
+            } catch (e) {
+              console.error(`${logPrefix} Error en transacción al restar del calendario ${calendarCollectionName} para ${productKeyForCalendar}:`, e);
             }
           }
         }
