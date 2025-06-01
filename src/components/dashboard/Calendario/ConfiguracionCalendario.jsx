@@ -35,7 +35,7 @@ function ConfiguracionCalendario() {
   // Mantenemos refreshDailyCalendar si queremos que al guardar aquí,
   // se refresque la vista del calendario diario (aunque los intervalos
   // no se regeneren desde este componente). Si no es necesario, puedes quitarlo.
-  const { refreshDailyCalendar } = useOrder();
+  const { refreshDailyCalendar } = useOrder() || {}; // Provide a fallback to prevent destructuring undefined
 
   // --- Funciones Auxiliares ---
   // Normaliza la hora a HH:MM

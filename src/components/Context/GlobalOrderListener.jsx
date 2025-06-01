@@ -5,9 +5,9 @@ import {
   collection,
   query,
   onSnapshot,
-  doc,
-  getDoc, // Usado dentro de la transacción (implícito en transaction.get)
-  // updateDoc, // No se usa directamente, transaction.update hace el trabajo
+  doc, // Para referenciar documentos
+  getDoc, // Para leer un documento específico
+  updateDoc, // Para actualizar un documento
   runTransaction, // Importante para usar transacciones
 } from 'firebase/firestore';
 
@@ -63,13 +63,13 @@ const GlobalOrderListener = () => {
           console.log(`%GLOBAL[Listener ${timestamp}] ---> DETECTADO 'added' PARA DOC ID: ${orderId}`, 'color: blue; font-weight: bold;'); // Log específico
           const callId = Math.random().toString(36).substring(7); // ID único para esta llamada
 
-          // Solo procesar pedidos con origen 0 (online) que necesitan actualizar calendario
-          if (newOrderData.origen === 0) {
-            console.log(`%c[Listener] ---> NUEVO PEDIDO ONLINE [${orderId}] (Num: ${newOrderData.NumeroPedido || 'N/A'}) DETECTADO. Procesando...`, 'color: green; font-weight: bold;');
+          // Modificado: No procesar pedidos con origen 0 (online) aquí, ya que se manejan desde la app.
+          // Este listener podría procesar otros orígenes si fuera necesario en el futuro.
+          if (newOrderData.origen !== 1) {
+            console.log(`%c[Listener] ---> PEDIDO CON ORIGEN ${newOrderData.origen} [${orderId}] (Num: ${newOrderData.NumeroPedido || 'N/A'}) DETECTADO. Procesando...`, 'color: orange; font-weight: bold;');
             handleFirestoreUpdateLikeCartTotal(newOrderData, orderId, callId); // Pasar el callId
-        } else {
-            // Opcional: Loggear otros pedidos añadidos si es útil para depuración
-            // console.log(`[Listener] Pedido añadido ID: ${orderId}, Origen: ${newOrderData.origen} (Ignorado para calendario)`);
+          } else {
+            console.log(`%c[Listener] ---> PEDIDO ONLINE [${orderId}] (Num: ${newOrderData.NumeroPedido || 'N/A'}, Origen: 0) DETECTADO. IGNORADO para actualización de calendario desde web.`, 'color: gray;');
           }
         }
         // Ignorar cambios 'modified' o 'removed' para esta lógica
@@ -93,224 +93,206 @@ const GlobalOrderListener = () => {
    * Sobreescribe el array 'intervals' completo.
    */
   const handleFirestoreUpdateLikeCartTotal = async (order, orderId,callId) => {
-    debugger
+    // debugger; // Comentado o eliminado para producción
     const logPrefix = `[UpdateCal][${orderId}][Call ${callId}]`; // Usar callId en logs
     console.log(`${logPrefix} Iniciando procesamiento.`);
+
+    let canProcessCalendars = true; // Bandera para controlar si se procesan los calendarios
+    const pedidoDocRef = doc(db, "pedidos", orderId);
+
+    // --- 0. Verificar si el pedido ya ha sido procesado por este listener ---
+    try {
+        const pedidoSnap = await getDoc(pedidoDocRef);
+        if (pedidoSnap.exists() && pedidoSnap.data().webListenerProcessed === true) {
+            console.log(`${logPrefix} Pedido ya marcado como 'webListenerProcessed'. Omitiendo procesamiento y marcado.`);
+            return; // Salir si ya está marcado como procesado
+        }
+        // Si no existe el campo, es false, o el documento no existe (raro para 'added'), continuar.
+    } catch (error) {
+        console.error(`${logPrefix} Error al verificar 'webListenerProcessed' para el pedido. Continuando con precaución:`, error);
+        // Considerar si retornar aquí para evitar doble procesamiento si la lectura falla.
+        // Por ahora, se continúa.
+    }
 
     try {
         // --- 1. Parsear Fecha y Hora del Pedido ---
         const fechahoraPedido = order.fechahora; // Formato esperado "DD/MM/YYYY HH:MM"
         if (!fechahoraPedido || typeof fechahoraPedido !== 'string' || !fechahoraPedido.includes(' ')) {
-            console.error(`${logPrefix} ERROR: Fecha/hora del pedido inválida o ausente:`, fechahoraPedido);
-            return;
+            console.error(`${logPrefix} ERROR: Fecha/hora del pedido inválida o ausente: ${fechahoraPedido}. No se procesarán calendarios.`);
+            canProcessCalendars = false;
         }
-        const [datePart, timePart] = fechahoraPedido.split(' ');
-        const [day, month, year] = datePart.split('/');
+        
+        let calendarDocId = '';
+        let orderTimeHHMM = '';
+        let orderTimeMinutes = -1;
 
-        // Validar partes de la fecha y hora
-        if (!year || !month || !day || !/^\d{4}$/.test(year) || !/^\d{1,2}$/.test(month) || !/^\d{1,2}$/.test(day)) {
-            console.error(`${logPrefix} ERROR: Formato de fecha inválido: ${datePart}`);
-            return;
+        if (canProcessCalendars) {
+            const [datePart, timePart] = fechahoraPedido.split(' ');
+            const [day, month, year] = datePart.split('/');
+
+            if (!year || !month || !day || !/^\d{4}$/.test(year) || !/^\d{1,2}$/.test(month) || !/^\d{1,2}$/.test(day)) {
+                console.error(`${logPrefix} ERROR: Formato de fecha inválido: ${datePart}. No se procesarán calendarios.`);
+                canProcessCalendars = false;
+            } else if (!timePart || !/^\d{2}:\d{2}$/.test(timePart)) {
+                console.error(`${logPrefix} ERROR: Formato de hora inválido: ${timePart}. No se procesarán calendarios.`);
+                canProcessCalendars = false;
+            } else {
+                calendarDocId = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+                orderTimeHHMM = timePart;
+                orderTimeMinutes = convertTimeToMinutes(orderTimeHHMM);
+                if (orderTimeMinutes === -1) {
+                    console.error(`${logPrefix} ERROR: No se pudo convertir la hora del pedido (${orderTimeHHMM}) a minutos. No se procesarán calendarios.`);
+                    canProcessCalendars = false;
+                } else {
+                    console.log(`${logPrefix} Info Pedido: Calendario=${calendarDocId}, Hora=${orderTimeHHMM} (${orderTimeMinutes} min)`);
+                }
+            }
         }
-        if (!timePart || !/^\d{2}:\d{2}$/.test(timePart)) {
-            console.error(`${logPrefix} ERROR: Formato de hora inválido: ${timePart}`);
-            return;
-        }
-
-        // Construir ID del documento del calendario (YYYY-MM-DD)
-        const calendarDocId = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
-        const orderTimeHHMM = timePart; // Hora del pedido "HH:MM"
-        const orderTimeMinutes = convertTimeToMinutes(orderTimeHHMM); // Hora del pedido en minutos desde medianoche
-
-        if (orderTimeMinutes === -1) {
-             console.error(`${logPrefix} ERROR: No se pudo convertir la hora del pedido (${orderTimeHHMM}) a minutos.`);
-             return;
-        }
-
-        console.log(`${logPrefix} Info Pedido: Calendario=${calendarDocId}, Hora=${orderTimeHHMM} (${orderTimeMinutes} min)`);
 
         // --- 2. Validar Productos del Pedido ---
-        if (!Array.isArray(order.productos) || order.productos.length === 0) {
-            console.warn(`${logPrefix} Advertencia: El pedido no contiene productos.`);
-            return;
+        if (canProcessCalendars && (!Array.isArray(order.productos) || order.productos.length === 0)) {
+            console.warn(`${logPrefix} Advertencia: El pedido no contiene productos. No se procesarán calendarios.`);
+            canProcessCalendars = false;
         }
 
         // --- 3. Procesar cada producto relevante en el pedido ---
-        for (const producto of order.productos) {
-            let collectionName = null;
-            let productKey = null; // Para logging claro
-            const productNameLower = producto.nombre?.toLowerCase() ?? '';
-            const productAliasLower = producto.alias?.toLowerCase() ?? '';
-            const productId = producto.id_product; // Asumiendo que existe id_product
+        if (canProcessCalendars) {
+            console.log(`${logPrefix} Procediendo a actualizar calendarios...`);
+            for (const producto of order.productos) {
+                let collectionName = null;
+                let productKey = null; 
+                const productNameLower = producto.nombre?.toLowerCase() ?? '';
+                const productAliasLower = producto.alias?.toLowerCase() ?? '';
+                const productId = producto.id; 
+                const cantidadPedido = Number(producto.cantidad) || 0;
 
-            // Identificar producto relevante para calendario
-            // Priorizar alias si existe, luego nombre o ID si es necesario
-            if (productAliasLower === 'pollo' || productNameLower.includes('pollo asado') || productId === 1 || productId === 2 || productId === 39 || productId === 40 || productNameLower.includes('menú')) {
-                collectionName = 'chicken_calendar_daily';
-                productKey = 'Pollo';
-            } else if (productAliasLower === 'codillo' || productNameLower.includes('codillo') || productId === 50) {
-                collectionName = 'codillo_calendar_daily';
-                productKey = 'Codillo';
-            } else if (productAliasLower === 'costilla' || productNameLower.includes('costilla') || productId === 41 || productId === 48) {
-                collectionName = 'costilla_calendar_daily';
-                productKey = 'Costilla';
-            }
-
-            // Si el producto no afecta a ningún calendario, saltar al siguiente
-            if (!collectionName || !productKey) {
-                // console.log(`${logPrefix} Producto "${producto.nombre || producto.alias || 'Desconocido'}" ignorado (no afecta calendarios).`);
-                continue;
-            }
-
-            // Calcular la cantidad a incrementar (lógica específica por producto)
-            let cantidadAIncrementar = 0;
-            const cantidadPedido = Number(producto.cantidad) || 0;
-
-            if (productKey === 'Pollo') {
-                // Revised logic for chicken products:
-                // - Menus: 0.5 chicken value per menu item, multiplied by the number of menu items ordered.
-                //   (e.g., if producto.cantidad is 3 for a menu, 0.5 * 3 = 1.5, matching observed behavior)
-                // - "1/2 Pollo" (non-menu): Fixed 0.5 chicken value.
-                // - "Pollo Entero" (non-menu, non-1/2): Fixed 1 chicken value.
-                if (productNameLower.includes('menú')) {
-                    // Handles items like "Menú Pollo", "Menú 1/2 Pollo", etc.
-                    // Assumes each menu item contributes 0.5 to the chicken count,
-                    // and cantidadPedido is the number of such menu items.
-                    cantidadAIncrementar = 0.5 * cantidadPedido;
-                } else if (productNameLower.includes('1/2')) {
-                    // Handles "1/2 Pollo Asado", etc. (but not menus containing "1/2")
-                    // This item type contributes a fixed 0.5 to the chicken count.
-                    cantidadAIncrementar = 0.5;
-                } else {
-                    // Handles "Pollo Asado" (whole chicken), etc. (not menus, not 1/2)
-                    // This item type contributes a fixed 1 to the chicken count.
-                    cantidadAIncrementar = 1;
+                if (productAliasLower === 'pollo' || productNameLower.includes('pollo') || productId === 1 || productId === 2 || productId === 39 || productId === 40) {
+                    collectionName = 'chicken_calendar_daily';
+                    productKey = 'Pollo';
+                } else if (productAliasLower === 'codillo' || productNameLower.includes('codillo') || productId === 50) {
+                    collectionName = 'codillo_calendar_daily';
+                    productKey = 'Codillo';
+                } else if (productAliasLower === 'costilla' || productNameLower.includes('costilla') || productId === 41 || productId === 48) {
+                    collectionName = 'costilla_calendar_daily';
+                    productKey = 'Costilla';
                 }
-            } else if (productKey === 'Costilla') {
-                 // Lógica específica para costillas según ID
-                if (productId === 41) { // Asumiendo ID 41 es ración completa
+
+                if (!collectionName || !productKey) {
+                    continue;
+                }
+
+                let cantidadAIncrementar = 0;
+                if (productKey === 'Pollo') {
+                    if (productId === 39 || productId === 40 || productNameLower.includes('menú')) {
+                        cantidadAIncrementar = 0.5 * cantidadPedido;
+                    } else if (productId === 2 || (productNameLower.includes('pollo') && (productNameLower.includes('1/2') || productNameLower.includes('medio')))) {
+                        cantidadAIncrementar = 0.5 * cantidadPedido;
+                    } else if (productId === 1 || productNameLower.includes('pollo')) {
+                        cantidadAIncrementar = 1 * cantidadPedido;
+                    } else {
+                        console.warn(`${logPrefix} Pollo identificado, pero no se pudo determinar tipo (ID: ${productId}, Nombre: ${producto.nombre}). Usando 0.`);
+                    }
+                } else if (productKey === 'Costilla') {
+                    if (productId === 48 || (productNameLower.includes('costilla') && (productNameLower.includes('1/2') || productNameLower.includes('media')))) {
+                        cantidadAIncrementar = 0.5 * cantidadPedido;
+                    } else if (productId === 41 || productNameLower.includes('costilla')) {
+                        cantidadAIncrementar = cantidadPedido;
+                    } else {
+                        console.warn(`${logPrefix} Costilla identificada, pero no se pudo determinar tipo (ID: ${productId}, Nombre: ${producto.nombre}). Usando ${cantidadPedido} por defecto.`);
+                    }
+                } else if (productKey === 'Codillo') {
                     cantidadAIncrementar = cantidadPedido;
-                } else if (productId === 48) { // Asumiendo ID 48 es media ración
-                    cantidadAIncrementar = cantidadPedido / 2; // Dividir cantidad si es media ración
-                } else {
-                     cantidadAIncrementar = cantidadPedido; // Por defecto, si no coincide ID conocido
                 }
-            } else if (productKey === 'Codillo') {
-                cantidadAIncrementar = cantidadPedido; // Asume cantidad directa
-            }
 
-            // Validar cantidad calculada
-            if (isNaN(cantidadAIncrementar) || cantidadAIncrementar <= 0) {
-                console.warn(`${logPrefix} Cantidad inválida o cero para ${productKey} (${producto.nombre || producto.alias}). Saltando.`);
-                continue;
-            }
-            
-            // Referencia al documento del calendario diario específico
-            const calendarDocRef = doc(db, collectionName, calendarDocId);
-            console.log(`${logPrefix} ---> Procesando ${productKey} (Cant: ${cantidadAIncrementar}). Transacción en ${calendarDocRef.path}`);
+                if (isNaN(cantidadAIncrementar) || cantidadAIncrementar <= 0) {
+                    console.warn(`${logPrefix} Cantidad inválida o cero para ${productKey} (${producto.nombre || producto.alias}). Saltando producto.`);
+                    continue;
+                }
+                
+                const calendarDocRef = doc(db, collectionName, calendarDocId);
+                console.log(`${logPrefix} ---> Procesando ${productKey} (Cant: ${cantidadAIncrementar}). Transacción en ${calendarDocRef.path}`);
 
-            // --- 4. Ejecutar Transacción para actualizar el calendario ---
-            try {
-                await runTransaction(db, async (transaction) => {
-                    const transLogPrefix = `${logPrefix} [Trans]`; // Prefijo para logs dentro de la transacción
-                    console.log(`${transLogPrefix} Iniciando transacción para ${productKey}.`);
+                try {
+                    await runTransaction(db, async (transaction) => {
+                        const transLogPrefix = `${logPrefix} [Trans]`;
+                        console.log(`${transLogPrefix} Iniciando transacción para ${productKey}.`);
+                        const calendarDocSnap = await transaction.get(calendarDocRef);
 
-                    // 4.1 Leer el documento del calendario DENTRO de la transacción
-                    console.log(`${transLogPrefix} Leyendo documento ${calendarDocRef.path}...`);
-                    const calendarDocSnap = await transaction.get(calendarDocRef);
-
-                    // 4.2 Validar existencia y estructura del documento
-                    if (!calendarDocSnap.exists()) {
-                        // Documento no existe, no se puede actualizar. La transacción fallará.
-                        throw new Error(`Documento ${calendarDocRef.path} NO encontrado.`);
-                    }
-                    const calendarData = calendarDocSnap.data();
-                    if (!Array.isArray(calendarData?.intervals)) {
-                        // Estructura inesperada, 'intervals' no es un array. Fallará.
-                        throw new Error(`Campo 'intervals' NO es un array o falta en ${calendarDocRef.path}.`);
-                    }
-
-                    // 4.3 Encontrar el intervalo correcto basado en la hora del pedido
-                    // IMPORTANTE: Crear una copia profunda para modificarla de forma segura
-                    let intervalsCopy = JSON.parse(JSON.stringify(calendarData.intervals));
-                    let intervalFound = false;
-                    let foundIntervalIndex = -1;
-
-                    console.log(`${transLogPrefix} Buscando intervalo para hora ${orderTimeHHMM} (${orderTimeMinutes} min) en ${intervalsCopy.length} intervalos...`);
-                    for (let i = 0; i < intervalsCopy.length; i++) {
-                        const interval = intervalsCopy[i];
-                        const startStr = interval.start; // "HH:MM"
-                        // Asumimos que no hay 'end' y que el 'start' define el slot
-                        // Si hubiera 'end', la lógica sería como en el prompt original
-                        // Adaptación: Usar solo 'start' como identificador del slot
-                        // console.log(`${transLogPrefix} - Verificando Intervalo [${i}]: start='${startStr}'`);
-
-                        // Comprobar si el 'start' del intervalo coincide con la hora del pedido
-                        if (startStr === orderTimeHHMM) {
-                             console.log(`${transLogPrefix} ¡Intervalo ENCONTRADO por coincidencia exacta de hora en índice ${i}!`);
-                            intervalFound = true;
-                            foundIntervalIndex = i;
-                            break; // Salir del bucle al encontrar
+                        if (!calendarDocSnap.exists()) {
+                            throw new Error(`Documento ${calendarDocRef.path} NO encontrado.`);
                         }
-                        // Lógica alternativa si se usara start/end:
-                        /*
-                        const endStr = interval.end;
-                        const startMin = convertTimeToMinutes(startStr);
-                        const endMin = convertTimeToMinutes(endStr);
-                        if (startMin !== -1 && endMin !== -1) {
-                             // Comprobar si la hora del pedido cae DENTRO del intervalo [start, end)
-                             // const isInInterval = orderTimeMinutes >= startMin && orderTimeMinutes < endMin;
-                             // console.log(`${transLogPrefix}   Comparando: ${orderTimeMinutes} >= ${startMin} && ${orderTimeMinutes} < ${endMin} => ${isInInterval}`);
-                             // if (isInInterval) { intervalFound = true; foundIntervalIndex = i; break; }
+                        const calendarData = calendarDocSnap.data();
+                        if (!Array.isArray(calendarData?.intervals)) {
+                            throw new Error(`Campo 'intervals' NO es un array o falta en ${calendarDocRef.path}.`);
+                        }
+
+                        let intervalsCopy = JSON.parse(JSON.stringify(calendarData.intervals));
+                        let intervalFound = false;
+                        let foundIntervalIndex = -1;
+
+                        console.log(`${transLogPrefix} Buscando intervalo para hora ${orderTimeHHMM} (${orderTimeMinutes} min) en ${intervalsCopy.length} intervalos...`);
+                        for (let i = 0; i < intervalsCopy.length; i++) {
+                            const interval = intervalsCopy[i];
+                            if (interval.start === orderTimeHHMM) {
+                                 console.log(`${transLogPrefix} ¡Intervalo ENCONTRADO por coincidencia exacta de hora en índice ${i}!`);
+                                intervalFound = true;
+                                foundIntervalIndex = i;
+                                break;
+                            }
+                        }
+
+                        if (!intervalFound) {
+                             console.warn(`${transLogPrefix} Intervalo para la hora ${orderTimeHHMM} no encontrado para ${productKey} en ${calendarDocRef.path}. No se actualizará este producto.`);
+                             return; // Salir de la transacción para este producto, pero no fallar toda la función.
+                        }
+
+                        const targetInterval = intervalsCopy[foundIntervalIndex];
+                        const currentCount = Number(targetInterval.orderedCount) || 0;
+                        const maxAllowed = Number(targetInterval.maxAllowed);
+                        const intervalLabel = targetInterval.start;
+
+                        if (isNaN(maxAllowed) || maxAllowed <= 0) {
+                             console.warn(`${transLogPrefix} ADVERTENCIA: Límite (maxAllowed) inválido o no positivo (${maxAllowed}) para ${productKey} en ${intervalLabel}. Se actualizará igualmente.`);
+                        }
+
+                        const newCount = currentCount + cantidadAIncrementar;
+
+                        if (maxAllowed > 0 && newCount > maxAllowed) {
+                            console.warn(`${transLogPrefix} LÍMITE EXCEDIDO para ${productKey} en intervalo ${intervalLabel}. Pedido: ${cantidadAIncrementar}, Actual: ${currentCount}, Nuevo (sin aplicar): ${newCount}, Límite: ${maxAllowed}. No se actualizará el contador.`);
                         } else {
-                             console.warn(`${transLogPrefix}   Intervalo [${i}] con start/end inválido(s): ${startStr}/${endStr}`);
+                            console.log(`${transLogPrefix} Actualizando ${productKey} en intervalo ${intervalLabel}: ${currentCount} -> ${newCount} (Max: ${maxAllowed > 0 ? maxAllowed : 'N/A'})`);
+                            targetInterval.orderedCount = newCount;
+                            transaction.update(calendarDocRef, { intervals: intervalsCopy });
                         }
-                        */
-                    }
-
-                    // 4.4 Si no se encontró intervalo, fallar la transacción
-                    if (!intervalFound) {
-                        //throw new Error(`Intervalo para la hora ${orderTimeHHMM} no encontrado para ${productKey} en ${calendarDocRef.path}.`);
-                    }
-
-                    // 4.5 Actualizar el contador si no se excede el límite
-                    const targetInterval = intervalsCopy[foundIntervalIndex];
-                    const currentCount = Number(targetInterval.orderedCount) || 0;
-                    const maxAllowed = Number(targetInterval.maxAllowed);
-                    const intervalLabel = targetInterval.start; // Usar 'start' como etiqueta
-
-                    if (isNaN(maxAllowed) || maxAllowed <= 0) { // Validar maxAllowed
-                         console.warn(`${transLogPrefix} ADVERTENCIA: Límite (maxAllowed) inválido o no positivo (${maxAllowed}) para ${productKey} en ${intervalLabel}. Se actualizará igualmente.`);
-                         // Decidir si fallar o continuar. Continuaremos pero loggeando.
-                    }
-
-                    const newCount = currentCount + cantidadAIncrementar;
-
-                    
-                        // Límite no excedido (o no aplicable), actualizar contador
-                        console.log(`${transLogPrefix} Actualizando ${productKey} en intervalo ${intervalLabel}: ${currentCount} -> ${newCount} (Max: ${maxAllowed > 0 ? maxAllowed : 'N/A'})`);
-                        targetInterval.orderedCount = newCount;
-
-                        // 4.6 Programar la actualización en la transacción (SOBREESCRIBE TODO EL ARRAY 'intervals')
-                        console.log(`${transLogPrefix} Programando transaction.update para ${calendarDocRef.path}...`);
-                        transaction.update(calendarDocRef, { intervals: intervalsCopy });
-                    
-                }); // --- Fin de la función runTransaction ---
-
-                console.log(`${logPrefix} <--- Transacción para ${productKey} completada (o límite detectado).`);
-
-            } catch (error) {
-                // Error específico durante la transacción (lectura, escritura, lógica interna, documento no encontrado, etc.)
-                console.error(`${logPrefix} ERROR FATAL durante la transacción para ${productKey}:`, error.message);
-                // Considerar si se debe intentar reintentar o notificar de alguna manera.
-                // Por ahora, solo logueamos y continuamos con el siguiente producto si lo hubiera.
+                    }); 
+                    console.log(`${logPrefix} <--- Transacción para ${productKey} completada (o límite detectado/intervalo no encontrado).`);
+                } catch (error) {
+                    console.error(`${logPrefix} ERROR durante la transacción para ${productKey}:`, error.message);
+                }
             }
-        } // --- Fin del bucle for (producto of order.productos) ---
+            console.log(`${logPrefix} Procesamiento de calendarios para productos (si los hubo) completado.`);
+        } else {
+            console.log(`${logPrefix} No se procesaron calendarios debido a validaciones previas fallidas o falta de productos.`);
+        }
 
-        console.log(`${logPrefix} Procesamiento finalizado.`);
+        // --- 5. Marcar el pedido como procesado por este listener ---
+        // Esto se hace después de que todas las actualizaciones de calendario se hayan intentado.
+        try {
+            console.log(`${logPrefix} Marcando pedido como 'webListenerProcessed: true'.`);
+            await updateDoc(pedidoDocRef, {
+                webListenerProcessed: true,
+                // Opcional: añadir un timestamp de cuándo fue procesado por el listener
+                // webListenerProcessedAt: serverTimestamp() // Necesitarías importar serverTimestamp
+            });
+            console.log(`${logPrefix} Pedido marcado exitosamente como 'webListenerProcessed: true'.`);
+        } catch (markError) {
+            console.error(`${logPrefix} ERROR CRÍTICO: No se pudo marcar el pedido como 'webListenerProcessed' después del procesamiento de calendarios:`, markError);
+            // Este es un problema porque el pedido podría ser reprocesado en el futuro.
+        }
+
+        console.log(`${logPrefix} Procesamiento general finalizado.`);
 
     } catch (generalError) {
-        // Error fuera de la lógica de transacción (ej. parseo inicial, error inesperado)
         console.error(`${logPrefix} ERROR GENERAL durante el procesamiento del pedido:`, generalError);
     }
   }; // --- Fin de handleFirestoreUpdateLikeCartTotal ---
