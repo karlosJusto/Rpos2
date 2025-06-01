@@ -9,7 +9,7 @@ import GenerarQRCodeInvisible from './GenerarQRCodeInvisible';
 // Importa InputGroup y Form si no lo tienes ya
 import { useState, useContext, useEffect, useRef } from 'react';
 import { dataContext } from '../Context/DataContext';
-import { doc, setDoc, updateDoc, getDoc, onSnapshot, deleteDoc, runTransaction } from 'firebase/firestore';
+import { doc, setDoc, updateDoc, getDoc, onSnapshot, deleteDoc, runTransaction, increment } from 'firebase/firestore';
 import { db } from '../firebase/firebase';
 
 import { collection, getDocs, query, where } from 'firebase/firestore';
@@ -179,19 +179,140 @@ const Ordenes = () => {
   const [pedidoSeleccionado, setPedidoSeleccionado] = useState(null);
 
   const handleShowModal1 = (pedido) => {
+    //console.log("Pedido seleccionado para modal:", pedido);
     setPedidoSeleccionado(pedido);
     setShowModal1(true);
   };
 
   const borrarOrden = async (numeroPedido) => {
     const numeroPedidoStr = numeroPedido.toString();
+    const logPrefix = `[Ordenes][borrarOrden][${numeroPedidoStr}]`;
+    const pedidoRef = doc(db, "pedidos", numeroPedidoStr);
+
     try {
-      const pedidoRef = doc(db, "pedidos", numeroPedidoStr);
+      // 1. Obtener los detalles del pedido antes de eliminarlo
+      const pedidoSnap = await getDoc(pedidoRef);
+      if (!pedidoSnap.exists()) {
+        console.error(`${logPrefix} Pedido no encontrado.`);
+        handleCloseModal1();
+        return;
+      }
+      const pedidoData = pedidoSnap.data();
+      const productosDelPedido = pedidoData.productos;
+      const fechahoraPedido = pedidoData.fechahora; // Formato "DD/MM/YYYY HH:MM"
+      let dailyDocumentIdForSalads = null;
+
+      if (fechahoraPedido && typeof fechahoraPedido === 'string' && fechahoraPedido.includes(' ')) {
+        const [datePart] = fechahoraPedido.split(' ');
+        const [day, month, year] = datePart.split('/');
+        // Validar que las partes sean números y tengan el formato esperado
+        if (day && month && year && /^\d{1,2}$/.test(day) && /^\d{1,2}$/.test(month) && /^\d{4}$/.test(year)) {
+          dailyDocumentIdForSalads = `${day.padStart(2, '0')}-${month.padStart(2, '0')}-${year}`; // Formato DD-MM-YYYY
+        } else {
+          console.warn(`${logPrefix} Formato de fecha inválido en pedido: ${datePart}. No se actualizará stock diario de ensaladas.`);
+        }
+      } else {
+        console.warn(`${logPrefix} Fecha/hora del pedido ausente o inválida. No se actualizará stock diario de ensaladas.`);
+      }
+
+      // 2. Restaurar el stock de cada producto en el pedido
+      if (productosDelPedido && productosDelPedido.length > 0) {
+        for (const productoEnPedido of productosDelPedido) {
+          const productNameLower = (productoEnPedido.nombre || productoEnPedido.alias || '').toLowerCase();
+          const productoCantidadEnPedido = Number(productoEnPedido.cantidad) || 0;
+
+          // --- PARTE 1: Restaurar stock en la colección 'productos' (para todos los ítems del pedido) ---
+          let idProductoParaStockGlobal = productoEnPedido.id.toString();
+          let cantidadParaStockGlobal = productoCantidadEnPedido;
+
+          if (productoEnPedido.id === 2) { // Caso especial: medio pollo
+            idProductoParaStockGlobal = '1'; // Afecta stock del pollo entero (ID 1)
+            cantidadParaStockGlobal = 0.5 * productoCantidadEnPedido;
+          }
+
+          if (cantidadParaStockGlobal > 0) {
+            const productRef = doc(db, 'productos', idProductoParaStockGlobal);
+            const productSnap = await getDoc(productRef);
+            if (productSnap.exists()) {
+              const currentStock = productSnap.data().stock || 0;
+              const newStock = currentStock + cantidadParaStockGlobal;
+              await updateDoc(productRef, { stock: newStock });
+              // console.log(`${logPrefix} Stock en 'productos' restaurado para ID ${idProductoParaStockGlobal}: +${cantidadParaStockGlobal}. Nuevo stock: ${newStock}`);
+            } else {
+              console.warn(`${logPrefix} Producto con ID ${idProductoParaStockGlobal} no encontrado en 'productos' al intentar restaurar stock.`);
+            }
+          } else {
+            // Esto podría pasar si productoCantidadEnPedido es 0 o si es medio pollo y la cantidad es < 2 (ej. 0.5 * 1 = 0.5, si se redondeara a 0)
+            // O si el producto original tenía cantidad 0.
+            console.warn(`${logPrefix} Cantidad para stock global es 0 o inválida para producto ${productoEnPedido.nombre || productoEnPedido.id} (Cantidad original: ${productoEnPedido.cantidad}). No se actualiza 'productos'.`);
+          }
+
+          // --- PARTE 2: Si es ensalada, actualizar también contadores en la colección 'ensaladas' ---
+          const esEnsalada = productNameLower.includes('ensaladilla') || productNameLower.includes('ensalada');
+          if (esEnsalada) {
+            const cantidadARestarDePedidasEnsalada = productoCantidadEnPedido; // La cantidad original del ítem en el pedido
+            if (dailyDocumentIdForSalads && cantidadARestarDePedidasEnsalada > 0) {
+              const saladCollectionName = 'ensaladas';
+              const saladStockRef = doc(db, saladCollectionName, dailyDocumentIdForSalads);
+              // console.log(`${logPrefix} Intentando restaurar stock para ensalada: ${cantidadARestaurarEnsalada} unidades en ${saladStockRef.path}`);
+
+              let tipoEnsaladaBase = ''; // 'ensaladas' o 'ensaladillas'
+              let tamanoEnsalada = ''; // 'grandes' o 'pequenas'
+
+              if (productNameLower.includes('ensaladilla')) {
+                tipoEnsaladaBase = 'ensaladillas';
+              } else if (productNameLower.includes('ensalada')) { // Asegurarse que no sea ensaladilla
+                tipoEnsaladaBase = 'ensaladas';
+              }
+
+              if (productNameLower.includes('1/2') || productNameLower.includes('media')) {
+                tamanoEnsalada = 'pequenas';
+              } else {
+                tamanoEnsalada = 'grandes'; // Asumir grande si no es pequeña por defecto
+              }
+
+              let fieldPathParaDecremento = null;
+              if (tipoEnsaladaBase && tamanoEnsalada) {
+                fieldPathParaDecremento = `${tipoEnsaladaBase}.${tamanoEnsalada}.pedidas`;
+              } else {
+                console.warn(`${logPrefix} No se pudo determinar el tipo/tamaño para la ensalada: ${productNameLower}. No se actualizará contador 'pedidas' en colección 'ensaladas'.`);
+              }
+
+              if (fieldPathParaDecremento) {
+                try {
+                  await runTransaction(db, async (transaction) => {
+                    const transLogPrefix = `${logPrefix}[TransEns]`;
+                    const saladStockSnap = await transaction.get(saladStockRef);
+
+                    if (!saladStockSnap.exists()) {
+                      console.warn(`${transLogPrefix} Documento de stock de ensaladas ${saladStockRef.path} NO encontrado. No se puede decrementar 'pedidas'.`);
+                      return; 
+                    }
+                    
+                    const updateData = {};
+                    updateData[fieldPathParaDecremento] = increment(-cantidadARestarDePedidasEnsalada);
+                    transaction.update(saladStockRef, updateData);
+                    // console.log(`${transLogPrefix} Contador 'pedidas' en ${dailyDocumentIdForSalads}, campo '${fieldPathParaDecremento}', decrementado en: ${cantidadARestarDePedidasEnsalada}`);
+                  });
+                } catch (e) {
+                  console.error(`${logPrefix} Error en transacción al decrementar 'pedidas' de ensaladas para ${dailyDocumentIdForSalads}:`, e);
+                }
+              }
+            } else {
+              if (!dailyDocumentIdForSalads) console.warn(`${logPrefix} No se pudo determinar la fecha del pedido para ensalada ${productNameLower}. No se actualizará contador 'pedidas' en 'ensaladas'.`);
+              if (cantidadARestarDePedidasEnsalada <= 0) console.warn(`${logPrefix} Cantidad a restar de 'pedidas' para ensalada ${productNameLower} es cero o negativa. No se actualizará.`);
+            }
+          }
+        }
+      }
+
+      // 3. Eliminar el pedido
       await deleteDoc(pedidoRef);
-      console.log(`Pedido ${numeroPedido} eliminado exitosamente.`);
+      console.log(`${logPrefix} Pedido eliminado exitosamente.`);
       handleCloseModal1();
     } catch (error) {
-      console.error("Error al borrar el pedido: ", error);
+      console.error(`${logPrefix} Error al borrar el pedido: `, error);
+      handleCloseModal1(); // Cerrar el modal incluso si hay un error
     }
   };
 
