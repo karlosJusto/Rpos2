@@ -638,7 +638,7 @@ const Cocina = () => {
           <div className='w-[8vw] h-[10vh] bg-gray-400 opacity-50 flex flex-col justify-center items-center rounded-xl shadow-md'> <h1 className="text-white text-center text-[2vw] font-nunito"></h1> <h1 className="text-white text-center text-[2w] font-nunito"></h1> </div>
           <div className='w-[8vw] h-[10vh] bg-gray-400 opacity-50 flex flex-col justify-center items-center rounded-xl shadow-md'> <h1 className="text-white text-center text-[2vw] font-nunito"></h1> <h1 className="text-white text-center text-[2w] font-nunito"></h1> </div>
           <div className={`${headerDisplayDivStyle} flex flex-col justify-center items-center rounded-xl shadow-md cursor-pointer`} onClick={handleShowDateModal}>
-            <RelojDistinto fecha={selectedDate} />
+            <RelojDistinto fecha={selectedDate} isToday={isToday} />
           </div>
       </div>
 

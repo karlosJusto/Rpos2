@@ -1,26 +1,29 @@
 import React, { useState, useEffect } from 'react';
 
-const RelojDistinto = ({ fecha }) => {
+const RelojDistinto = ({ fecha, isToday }) => {
   const [fechaDia, setFechaDia] = useState('');
   const [fechaRestante, setFechaRestante] = useState('');
   const [horaActual, setHoraActual] = useState('');
 
-  //console.log(fecha); // Verifica la fecha que se pasa como parámetro
-
   const actualizarFechaHora = () => {
     let ahora;
 
-    // Si se pasa una fecha, usa esa, si no, usa la fecha y hora actual
-    if (fecha) {
-      ahora = new Date(fecha); // Usamos la fecha pasada como parámetro
-
-      // Si la fecha no tiene hora (es decir, tiene las 00:00:00), mantenemos la hora actual
-      if (isNaN(ahora.getHours()) || ahora.getHours() === 0) {
-        const ahoraActual = new Date(); // Fecha actual con hora y minutos actuales
-        ahora.setHours(ahoraActual.getHours(), ahoraActual.getMinutes(), ahoraActual.getSeconds());
+    if (isToday) {
+      // Si es hoy, siempre usar la hora actual para que el reloj avance.
+      ahora = new Date();
+    } else if (fecha) {
+      // Si es un día de supervisión (no hoy), usar la fecha proporcionada.
+      ahora = new Date(fecha);
+      // Si la fecha de supervisión está a medianoche (común en selectores de fecha),
+      // mostrar la hora actual del día, pero para esa fecha seleccionada.
+      if (ahora.getHours() === 0 && ahora.getMinutes() === 0 && ahora.getSeconds() === 0) {
+        const ahoraReal = new Date();
+        ahora.setHours(ahoraReal.getHours(), ahoraReal.getMinutes(), ahoraReal.getSeconds());
       }
+      // Si 'fecha' ya tiene una hora específica, se usará esa.
     } else {
-      ahora = new Date(); // Si no se pasa fecha, usamos la fecha y hora actual
+      // Fallback si 'fecha' no se proporciona y no es 'isToday' (debería ser manejado por el componente padre)
+      ahora = new Date();
     }
 
     // Array con los nombres de los días de la semana, considerando que la semana empieza el lunes
@@ -50,14 +53,14 @@ const RelojDistinto = ({ fecha }) => {
   useEffect(() => {
     actualizarFechaHora();  // Llamamos a la función al montar el componente
 
-    // Opcional: Si deseas que la hora se actualice cada minuto, puedes usar un setInterval.
+    // Actualizar la hora cada minuto.
     const intervalo = setInterval(() => {
       actualizarFechaHora();
     }, 60000); // Actualiza cada minuto
 
     // Limpiar intervalo cuando el componente se desmonte
     return () => clearInterval(intervalo);
-  }, [fecha]);  // La dependencia es la fecha, se actualizará si cambia
+  }, [fecha, isToday]);  // Actualizar si 'fecha' o 'isToday' cambian
 
   return (
     <div className="flex flex-col items-center justify-center text-center p-2 rounded-lg ">

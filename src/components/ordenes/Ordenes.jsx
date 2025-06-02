@@ -782,8 +782,10 @@ const Ordenes = () => {
           </div>
 
           {/* --- Columna 13 (Reloj/Calendario) --- */}
-          <div className={`${divStyle} flex flex-col justify-center items-center rounded-xl shadow-md cursor-pointer`} onClick={handleShowModal}>
-            <RelojDistinto fecha={dateToPass} />
+          <div className={`${divStyle} flex flex-col justify-center items-center rounded-xl shadow-md cursor-pointer`} onClick={handleShowModal}>            
+            <RelojDistinto 
+              fecha={dateToPass ? dateToPass.toDate() : new Date()} 
+              isToday={!dateToPass} />
           </div>
         </div>
       </div>
