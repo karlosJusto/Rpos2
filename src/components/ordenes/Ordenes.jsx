@@ -536,12 +536,20 @@ const Ordenes = () => {
       bloques[hora].pedidos.push(pedido);
       pedido.productos.forEach((producto) => {
         bloques[hora].cantidadProductos += producto.cantidad;
+        // 'producto' aquí es el objeto original del pedido, que asumimos tiene 'producto.position'.
+        // 'producto.alias' se usa como 'nombre' en el objeto agrupado.
+        // Si 'producto.nombre' es más adecuado que 'producto.alias' para mostrar, ajústalo.
         const productoExistente = bloques[hora].productos.find(p => p.nombre === producto.alias);
         if (productoExistente) {
           productoExistente.cantidad += producto.cantidad;
           productoExistente.entregado += producto.entregado;
+          // Si 'position' es una propiedad estática del producto y el productoExistente
+          // no la tiene (por si acaso), se la asignamos.
+          if (productoExistente.position === undefined && producto.position !== undefined) {
+            productoExistente.position = producto.position;
+          }
         } else {
-          bloques[hora].productos.push({nombre: producto.alias, cantidad: producto.cantidad, categoria: producto.categoria, entregado:producto.entregado});
+          bloques[hora].productos.push({nombre: producto.alias, cantidad: producto.cantidad, categoria: producto.categoria, entregado:producto.entregado, position: producto.position});
         }
         if (producto.id === 1) bloques[hora].cantidadProductosId1 += producto.cantidad;
         if (producto.id === 2) bloques[hora].cantidadProductosId2 += producto.cantidad;
@@ -857,8 +865,17 @@ const Ordenes = () => {
                 <div className="">
                   {bloquesFiltrados[bloque].productos
                     .sort((a, b) => {
-                      const categoriaPrioridad = { comida: 1, complementos: 2, bebidas: 3, postres: 4, extras: 5 };
-                      return categoriaPrioridad[a.categoria] - categoriaPrioridad[b.categoria];
+                      const categoriaPrioridad = { comida: 1, complementos: 2, bebidas: 3, postres: 4, extras: 5, default: 6 };
+                      const categoriaA = categoriaPrioridad[a.categoria] || categoriaPrioridad.default;
+                      const categoriaB = categoriaPrioridad[b.categoria] || categoriaPrioridad.default;
+
+                      if (categoriaA !== categoriaB) {
+                        return categoriaA - categoriaB;
+                      }
+                      // Ordenación secundaria por posición si las categorías son iguales
+                      const positionA = a.position || 0; // Asumir 0 si no está definido
+                      const positionB = b.position || 0; // Asumir 0 si no está definido
+                      return positionA - positionB;
                     })
                     .map((producto, index) => {
                       const categoriaColor = producto.categoria === "comida" ? "text-yellow-500" : producto.categoria === "complementos" ? "text-green-900" : producto.categoria === "bebidas" ? "text-red-700" : producto.categoria === "postres" ? "text-purple-700" : producto.categoria === "extras" ? "text-gray-900" : "text-gray-900";
