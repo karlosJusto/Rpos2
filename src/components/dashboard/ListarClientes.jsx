@@ -1,12 +1,24 @@
 // src/components/dashboard/ListarClientes.jsx
 import React, { useState, useEffect } from 'react';
-import { collection, query, where, orderBy, limit, getDocs, startAfter } from "firebase/firestore";
+// Add doc, updateDoc, deleteDoc
+import { collection, query, where, orderBy, limit, getDocs, startAfter, doc, updateDoc, deleteDoc } from "firebase/firestore";
 import { db } from '../firebase/firebase';
-import { Modal, Button } from 'react-bootstrap';
+import { Modal, Button, Form } from 'react-bootstrap'; // Add Form for the modal
 
 import tienda from '../../assets/tienda.png';
 import web from '../../assets/web.png';
+// SVGs for edit/delete icons (can be inlined or imported)
+const EditIcon = () => (
+  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5">
+    <path strokeLinecap="round" strokeLinejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10" />
+  </svg>
+);
 
+const DeleteIcon = () => (
+  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5">
+    <path strokeLinecap="round" strokeLinejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12.56 0c1.153 0 2.242.078 3.223.224C9.308 5.901 9.73 6.09 10.5 6.473m6.038-1.122c.47-.18.99-.321 1.513-.427M4.772 5.79L4.772 5.79m14.456 0L19.228 5.79m-14.456 0L4.772 5.79M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12.56 0c1.153 0 2.242.078 3.223.224C9.308 5.901 9.73 6.09 10.5 6.473m6.038-1.122c.47-.18.99-.321 1.513-.427M4.772 5.79L4.772 5.79m14.456 0L19.228 5.79m-14.456 0L4.772 5.79" />
+  </svg>
+);
 
 const ListarClientes = () => {
   // Estados para clientes
@@ -19,18 +31,32 @@ const ListarClientes = () => {
   // Estados para pedidos (dentro del modal)
   const [pedidos, setPedidos] = useState([]);
   const [loadingPedidos, setLoadingPedidos] = useState(false);
-  const [clienteSeleccionado, setClienteSeleccionado] = useState(null);
+  const [clienteSeleccionado, setClienteSeleccionado] = useState(null); // For viewing orders
   const [showPedidosModal, setShowPedidosModal] = useState(false);
   // *** 1. Estados para paginación de pedidos ***
   const [pedidoPage, setPedidoPage] = useState(1);
   const [lastPedidoDoc, setLastPedidoDoc] = useState(null);
   const [hasMorePedidos, setHasMorePedidos] = useState(true); // Para saber si hay más páginas
 
+  // *** Estados para Modificar y Eliminar Cliente ***
+  const [showModificarClienteModal, setShowModificarClienteModal] = useState(false);
+  const [showConfirmDeleteModal, setShowConfirmDeleteModal] = useState(false);
+  const [clienteParaAccion, setClienteParaAccion] = useState(null); // Cliente para modificar o eliminar
+  const [formDataCliente, setFormDataCliente] = useState({
+    cliente: '',
+    telefono: '',
+    localidad: '',
+    email: '',
+    // img_perfil: null, // Omitir por ahora para simplificar
+  });
+  const [mensajeAccion, setMensajeAccion] = useState(""); // Para mensajes en modales de acción
+
   const clientesPorPagina = 10;
   const pedidosPorPagina = 5; // Define cuántos pedidos mostrar por página en el modal
 
   // --- Funciones para obtener datos ---
   const obtenerClientes = async (resetPaginacion = false) => {
+    // ... (obtenerClientes sin cambios)
     setLoading(true);
     try {
       const clientesRef = collection(db, 'clientes');
@@ -59,6 +85,7 @@ const ListarClientes = () => {
 
   // *** 2. Modificar obtenerPedidos para paginación ***
   const obtenerPedidos = async (idCliente, page = 1, lastVisible = null) => {
+    // ... (obtenerPedidos sin cambios)
     if (!idCliente) return;
     setLoadingPedidos(true);
     // No limpiar pedidos si estamos paginando, solo al inicio
@@ -120,7 +147,7 @@ const ListarClientes = () => {
     setLastClienteDoc(null);
   };
 
-  const handleClientePageChange = (newPage) => { // Renombrado
+  const handleClientePageChange = (newPage) => {
     if (newPage < 1) return;
     setClientePage(newPage);
   };
@@ -146,6 +173,7 @@ const ListarClientes = () => {
 
   // *** 5. Handler para paginación de pedidos ***
   const handlePedidoPageChange = (newPage) => {
+    // ... (handlePedidoPageChange sin cambios)
     if (newPage < 1) return; // No ir a páginas negativas
 
     // Si vamos hacia atrás, reseteamos lastPedidoDoc.
@@ -165,6 +193,100 @@ const ListarClientes = () => {
     // y usará lastPedidoDoc (que será null si vamos hacia atrás)
   };
 
+  // --- Handlers para Modificar Cliente ---
+  const handleOpenModificarModal = (cliente) => {
+    setClienteParaAccion(cliente);
+    setFormDataCliente({
+      cliente: cliente.cliente || '',
+      telefono: cliente.telefono || '',
+      localidad: cliente.localidad || '',
+      email: cliente.email || '',
+      // img_perfil: cliente.img_perfil || null, // Omitir por ahora
+    });
+    setMensajeAccion("");
+    setShowModificarClienteModal(true);
+  };
+
+  const handleCloseModificarModal = () => {
+    setShowModificarClienteModal(false);
+    setClienteParaAccion(null);
+    setFormDataCliente({ cliente: '', telefono: '', localidad: '', email: '' });
+    setMensajeAccion("");
+  };
+
+  const handleFormChangeCliente = (e) => {
+    const { name, value } = e.target;
+    setFormDataCliente(prev => ({ ...prev, [name]: value }));
+  };
+
+  const handleGuardarClienteModificado = async () => {
+    if (!clienteParaAccion || !clienteParaAccion.id) {
+      setMensajeAccion("Error: No se ha seleccionado un cliente para modificar.");
+      return;
+    }
+    if (!formDataCliente.cliente || !formDataCliente.telefono) {
+        setMensajeAccion("Nombre y teléfono son obligatorios.");
+        return;
+    }
+
+    setMensajeAccion("Guardando cambios...");
+    try {
+      const clienteRef = doc(db, 'clientes', clienteParaAccion.id);
+      await updateDoc(clienteRef, {
+        cliente: formDataCliente.cliente,
+        telefono: formDataCliente.telefono,
+        localidad: formDataCliente.localidad,
+        email: formDataCliente.email,
+        // img_perfil: formDataCliente.img_perfil, // Si se implementa
+      });
+      setMensajeAccion("Cliente actualizado con éxito.");
+      obtenerClientes(clientePage === 1); // Recargar clientes, resetear paginación si estamos en la primera página
+      setTimeout(() => { // Cerrar modal después de un breve mensaje
+        handleCloseModificarModal();
+      }, 1500);
+    } catch (error) {
+      console.error("Error al actualizar cliente: ", error);
+      setMensajeAccion("Error al actualizar cliente. Inténtalo de nuevo.");
+    }
+  };
+
+  // --- Handlers para Eliminar Cliente ---
+  const handleOpenEliminarModal = (cliente) => {
+    setClienteParaAccion(cliente);
+    setMensajeAccion("");
+    setShowConfirmDeleteModal(true);
+  };
+
+  const handleCloseEliminarModal = () => {
+    setShowConfirmDeleteModal(false);
+    setClienteParaAccion(null);
+    setMensajeAccion("");
+  };
+
+  const handleConfirmarEliminarCliente = async () => {
+    if (!clienteParaAccion || !clienteParaAccion.id) {
+      setMensajeAccion("Error: No se ha seleccionado un cliente para eliminar.");
+      return;
+    }
+    setMensajeAccion("Eliminando cliente...");
+    try {
+      await deleteDoc(doc(db, 'clientes', clienteParaAccion.id));
+      setMensajeAccion("Cliente eliminado con éxito.");
+      // Si el cliente eliminado era el último de la página actual y no es la primera página,
+      // podríamos querer retroceder una página.
+      if (clientes.length === 1 && clientePage > 1) {
+        setClientePage(clientePage - 1); // Esto disparará el useEffect para obtenerClientes
+      } else {
+        obtenerClientes(clientePage === 1); // Recargar clientes
+      }
+      setTimeout(() => {
+        handleCloseEliminarModal();
+      }, 1500);
+    } catch (error) {
+      console.error("Error al eliminar cliente: ", error);
+      setMensajeAccion("Error al eliminar cliente. Inténtalo de nuevo.");
+    }
+  };
 
   return (
     <div className="container mx-auto p-2 font-nunito">
@@ -212,6 +334,7 @@ const ListarClientes = () => {
                 <th className="px-4 py-3 text-center">Localidad</th>
                 <th className="px-4 py-3 text-center">Correo</th>
                 <th className="px-4 py-3 text-center">ID Cliente</th>
+                <th className="px-4 py-3 text-center">Acciones</th> {/* Nueva columna */}
               </tr>
             </thead>
             <tbody>
@@ -240,10 +363,26 @@ const ListarClientes = () => {
                     >
                       {cliente.id}
                     </td>
+                    <td className="px-4 py-2 text-center"> {/* Celda para botones */}
+                      <button
+                        onClick={() => handleOpenModificarModal(cliente)}
+                        className="p-1 text-blue-600 hover:text-blue-800 mr-2"
+                        title="Modificar cliente"
+                      >
+                        <EditIcon />
+                      </button>
+                      <button
+                        onClick={() => handleOpenEliminarModal(cliente)}
+                        className="p-1 text-red-600 hover:text-red-800"
+                        title="Eliminar cliente"
+                      >
+                        <DeleteIcon />
+                      </button>
+                    </td>
                   </tr>
                 ))
               ) : (
-                <tr><td colSpan="6" className="text-center py-4 text-gray-500">No se encontraron clientes {search ? `con el nombre "${search}"` : ''}.</td></tr>
+                <tr><td colSpan="7" className="text-center py-4 text-gray-500">No se encontraron clientes {search ? `con el nombre "${search}"` : ''}.</td></tr>
               )}
             </tbody>
           </table>
@@ -251,7 +390,7 @@ const ListarClientes = () => {
       )}
 
       {/* Paginación Clientes */}
-      {!loading && (clientes.length > 0 || clientePage > 1) && (
+      {!loading && (clientes.length > 0 || clientePage > 1) && ( // Sin cambios
         <div className="flex justify-center items-center mt-6 gap-4">
           <button onClick={() => handleClientePageChange(clientePage - 1)} disabled={clientePage === 1} className="px-4 py-2 bg-yellow-500 text-white rounded-md disabled:opacity-50 disabled:cursor-not-allowed shadow hover:bg-yellow-600 transition flex items-center gap-2">
             <svg xmlns="http://www.w3.org/2000/svg" fill="white" viewBox="0 0 24 24" className="w-5 h-5"><path d="M10.707 17.293a1 1 0 01-1.414 1.414l-5-5a1 1 0 010-1.414l5-5a1 1 0 011.414 1.414L7.414 12l3.293 3.293zM19.707 17.293a1 1 0 01-1.414 1.414l-5-5a1 1 0 010-1.414l5-5a1 1 0 011.414 1.414L16.414 12l3.293 3.293z"/></svg>
@@ -267,11 +406,11 @@ const ListarClientes = () => {
 
 
       {/* Modal de Pedidos */}
-      <Modal show={showPedidosModal} onHide={handleClosePedidosModal} centered size="xl">
+      <Modal show={showPedidosModal} onHide={handleClosePedidosModal} centered size="xl"> {/* Sin cambios significativos, solo el nombre del cliente */}
         
         <Modal.Body>
             <div className='text-center text-2xl text-gray-700 text-bold p-3 mb-2'>
-            <h1> Pedidos de: {clienteSeleccionado?.cliente || 'Cliente'} (ID: {clienteSeleccionado?.id || ''})</h1>
+            <h1> Pedidos de: {clienteSeleccionado?.cliente || 'Cliente'} (ID: {clienteSeleccionado?.id || ''})</h1> {/* Nombre del cliente */}
             </div>
         
 
@@ -358,6 +497,64 @@ const ListarClientes = () => {
 
         </Modal.Body>
       
+      </Modal>
+
+      {/* Modal para Modificar Cliente */}
+      <Modal show={showModificarClienteModal} onHide={handleCloseModificarModal} centered>
+        <Modal.Header closeButton>
+          <Modal.Title className="text-gray-700 font-nunito font-bold">Modificar Cliente</Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          {mensajeAccion && <p className={`text-sm font-bold font-nunito mb-3 text-center ${mensajeAccion.includes("Error") || mensajeAccion.startsWith("Nombre y teléfono") ? "text-red-600" : "text-green-700"}`}>{mensajeAccion}</p>}
+          <Form>
+            <Form.Group className="mb-3" controlId="formClienteNombre">
+              <Form.Label className="text-gray-700 font-nunito">Nombre</Form.Label>
+              <Form.Control type="text" name="cliente" value={formDataCliente.cliente} onChange={handleFormChangeCliente} placeholder="Nombre del cliente" className="font-nunito text-sm"/>
+            </Form.Group>
+            <Form.Group className="mb-3" controlId="formClienteTelefono">
+              <Form.Label className="text-gray-700 font-nunito">Teléfono</Form.Label>
+              <Form.Control type="text" name="telefono" value={formDataCliente.telefono} onChange={handleFormChangeCliente} placeholder="Teléfono" className="font-nunito text-sm"/>
+            </Form.Group>
+            <Form.Group className="mb-3" controlId="formClienteLocalidad">
+              <Form.Label className="text-gray-700 font-nunito">Localidad</Form.Label>
+              <Form.Control type="text" name="localidad" value={formDataCliente.localidad} onChange={handleFormChangeCliente} placeholder="Localidad (opcional)" className="font-nunito text-sm"/>
+            </Form.Group>
+            <Form.Group className="mb-3" controlId="formClienteEmail">
+              <Form.Label className="text-gray-700 font-nunito">Email</Form.Label>
+              <Form.Control type="email" name="email" value={formDataCliente.email} onChange={handleFormChangeCliente} placeholder="Email (opcional)" className="font-nunito text-sm"/>
+            </Form.Group>
+            {/* Podríamos añadir input para img_perfil aquí si se decide implementar */}
+          </Form>
+        </Modal.Body>
+        <Modal.Footer>
+          <Button variant="secondary" onClick={handleCloseModificarModal} className="px-4 py-2 shadow-sm text-sm font-medium text-gray-700 bg-gray-200 border-gray-300 rounded-md hover:bg-gray-300">
+            Cancelar
+          </Button>
+          <Button variant="primary" onClick={handleGuardarClienteModificado} className="px-4 py-2 bg-yellow-500 text-white rounded-md hover:bg-yellow-600 text-sm font-medium">
+            Guardar Cambios
+          </Button>
+        </Modal.Footer>
+      </Modal>
+
+      {/* Modal para Confirmar Eliminación de Cliente */}
+      <Modal show={showConfirmDeleteModal} onHide={handleCloseEliminarModal} centered>
+        <Modal.Header closeButton>
+          <Modal.Title className="text-gray-700 font-nunito font-bold">Confirmar Eliminación</Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          {mensajeAccion && <p className={`text-sm font-bold font-nunito mb-3 text-center ${mensajeAccion.includes("Error") ? "text-red-600" : "text-green-700"}`}>{mensajeAccion}</p>}
+          <p className="text-gray-600 font-nunito">
+            ¿Estás seguro de que deseas eliminar al cliente <strong className="text-gray-800">{clienteParaAccion?.cliente}</strong>? Esta acción no se puede deshacer.
+          </p>
+        </Modal.Body>
+        <Modal.Footer>
+          <Button variant="secondary" onClick={handleCloseEliminarModal} className="px-4 py-2 shadow-sm text-sm font-medium text-gray-700 bg-gray-200 border-gray-300 rounded-md hover:bg-gray-300">
+            Cancelar
+          </Button>
+          <Button variant="danger" onClick={handleConfirmarEliminarCliente} className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 text-sm font-medium">
+            Sí, Eliminar
+          </Button>
+        </Modal.Footer>
       </Modal>
     </div>
   );
