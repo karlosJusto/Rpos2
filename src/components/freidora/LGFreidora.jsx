@@ -5,7 +5,6 @@ import Reloj from '../pedidos/Reloj';
 import Freidora from './Freidora';
 import dayjs from 'dayjs';
 import timezone from 'dayjs/plugin/timezone'; // Plugin para zona horaria
-import utc from 'dayjs/plugin/utc'; // Plugin para trabajar con fechas en UTC
 
 
 const texto= 'Freidora';
@@ -13,18 +12,21 @@ const texto= 'Freidora';
 const LGFreidora = ( ) => {
   const [show, setShow] = useState(false);
 
+  // Configurar dayjs para usar plugins
+  dayjs.extend(timezone);
+  // dayjs.extend(utc); // utc is often extended by timezone, but can be explicit if needed
 
   //bloque horario navbar
   const [bloqueHorario, setBloqueHorario] = useState('');
-  const [hora, setHora] = useState('');
+  // const [hora, setHora] = useState(''); // hora state seems unused in LGFreidora's direct rendering
   useEffect(() => {
     // Función para actualizar la hora y los bloques
     const actualizarHora = () => {
       const currentTime = dayjs().locale('es').tz('Europe/Madrid'); // Obtener la hora actual en España
-      setHora(currentTime.format('HH:mm:ss')); // Establecer la hora actual en formato 'HH:mm:ss'
+      // setHora(currentTime.format('HH:mm:ss')); // Esta línea causaba el error, hora no se usa aquí.
 
       // Obtener los minutos de la hora actual
-      const minutos = currentTime.minute();
+      const minutos = currentTime.minute(); // Corrected from minute() to minute()
 
       let nuevoBloque = '';
 
@@ -40,13 +42,7 @@ const LGFreidora = ( ) => {
       }
 
       setBloqueHorario(nuevoBloque); // Actualizamos el estado con el nuevo bloque horario
-
-      // Calcular anteriores y posteriores basados en el bloqueHorario
-      const bloqueTime = dayjs(nuevoBloque, 'HH:mm'); // Convertimos bloqueHorario a dayjs
-
-     
-
-     
+      // The calculation for 'anteriores' and 'posteriores' is handled within Freidora.jsx
     };
 
     // Llamamos a la función por primera vez para inicializar los valores
@@ -59,7 +55,7 @@ const LGFreidora = ( ) => {
 
     // Limpiamos el intervalo cuando el componente se desmonte
     return () => clearInterval(interval);
-  }, []); // El array vacío asegura que se ejecute solo una vez al montar el componente
+  }, []);
 
 
 

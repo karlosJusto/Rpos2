@@ -1,6 +1,6 @@
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState, useMemo, useRef, useCallback } from 'react';
 import { db } from '../firebase/firebase';
-import { collection, query, where, onSnapshot, getDocs, orderBy } from 'firebase/firestore'; // Importa onSnapshot, getDocs, orderBy
+import { collection, query, where, onSnapshot, getDocs, orderBy, doc, updateDoc } from 'firebase/firestore'; // Importa onSnapshot, getDocs, orderBy, doc, updateDoc
 import singluten from '../../assets/singluten.png'; // Imagen sin gluten
 import dayjs from 'dayjs';
 import timezone from 'dayjs/plugin/timezone'; // Plugin para zona horaria
@@ -23,6 +23,10 @@ const Freidora = () => {
   const [posteriores, setPosteriores] = useState('');
   const [pedidosTotales, setPedidosTotales] = useState({}); // Inicializado como objeto para consistencia
   const [productosFreidoraConfig, setProductosFreidoraConfig] = useState([]); // State for freidora products
+
+  const audioRef = useRef(null);
+  const previousRelevantOrderProductIdsRef = useRef(new Set()); // Stores "orderId-productId-uniqueId"
+  const initialLoadFreidoraDoneRef = useRef(false);
 
   useEffect(() => {
     // Función para actualizar la hora y los bloques
@@ -64,6 +68,13 @@ const Freidora = () => {
     const interval = setInterval(actualizarHora, 60000); 
     return () => clearInterval(interval);
   }, []);
+
+  const playNotificationSoundFreidora = useCallback(() => {
+    if (audioRef.current) {
+      audioRef.current.play().catch(error => console.warn("Error playing freidora notification sound:", error));
+    }
+  }, []);
+
 
   // useEffect to load freidora products configuration from Firebase
   useEffect(() => {
@@ -132,92 +143,165 @@ useEffect(() => {
 
   const unsubscribe = onSnapshot(q, (snapshot) => {
     const pedidosDelDiaAcumulados = {}; // Para acumular cantidades por clave única
-    let productosTotalesAcumulados = {}; // Para la sección "Totales"
+    const productosTotalesAcumulados = {}; // Para la sección "Totales"
+    let anyNewFreidoraItemFoundGlobal = false;
+    const currentSnapshotRelevantProductIds = new Set();
+    const updatePromises = [];
 
-    snapshot.forEach((doc) => {
-      const pedidoData = doc.data();
-      if (pedidoData.productos) {
-        const fechaRecogidaPedido = dayjs(pedidoData.fechahora, 'DD/MM/YYYY HH:mm').tz('Europe/Madrid');
-        pedidoData.productos.forEach((productoItem) => {
-          if (productoItem.freidora === true) {
-            let productoBase = {
-              id: productoItem.id,
-              nombre: productoItem.nombre,
-              alias: productoItem.alias,
-              cantidad: productoItem.cantidad,
-              celiaco: productoItem.celiaco,
-              cantidad_celiaco: 0, // Inicializar
-              numeropedido: pedidoData.NumeroPedido,
-              entregado: productoItem.entregado || 0,
-              fechahora: fechaRecogidaPedido.format('HH:mm'),
-              doble: false,
-            };
+    snapshot.forEach((pedidoDoc) => {
+      const pedidoData = { id: pedidoDoc.id, ...pedidoDoc.data() };
+      let ordenNecesitaActualizacionFirestore = false;
+      let itemsQueDispararonSonidoEnEstaOrden = new Set();
 
-            let claveUnicaPedido = `${productoBase.id}-${productoBase.fechahora}`;
-            let esDobleOriginal = false;
+      const productosModificados = pedidoData.productos ? pedidoData.productos.map((prod, idx) => {
+        let p = { ...prod };
+        if (p.freidora === true) {
+          const itemUniqueId = `${pedidoData.id}-${p.id}-${p.uniqueId || idx}`;
+          currentSnapshotRelevantProductIds.add(itemUniqueId);
 
-            if ((productoBase.id === 10 || productoBase.id === 3) && productoBase.cantidad > 1) {
-              claveUnicaPedido += "_doble";
-              esDobleOriginal = true;
+          if (p.vistoFreidora === undefined) {
+            p.vistoFreidora = false;
+            ordenNecesitaActualizacionFirestore = true;
+          }
+
+          if (p.vistoFreidora === false && initialLoadFreidoraDoneRef.current && !previousRelevantOrderProductIdsRef.current.has(itemUniqueId)) {
+            anyNewFreidoraItemFoundGlobal = true;
+            itemsQueDispararonSonidoEnEstaOrden.add(itemUniqueId);
+            // No se marca p.vistoFreidora = true aquí directamente, se hará antes del updateDoc
+            ordenNecesitaActualizacionFirestore = true; // Ensure update is flagged
+          }
+        }
+        return p;
+      }) : [];
+
+      if (ordenNecesitaActualizacionFirestore) {
+        const productosParaFirestore = productosModificados.map((prod, idx) => {
+          let p = { ...prod };
+          if (p.freidora === true) {
+            const itemUniqueId = `${pedidoData.id}-${p.id}-${p.uniqueId || idx}`;
+            if (itemsQueDispararonSonidoEnEstaOrden.has(itemUniqueId)) {
+              p.vistoFreidora = true; // Mark as seen if it triggered sound
             }
+          }
+          return p;
+        });
+        const pedidoRef = doc(db, 'pedidos', pedidoData.id);
+        updatePromises.push(
+          updateDoc(pedidoRef, { productos: productosParaFirestore })
+            .then(() => console.log(`[Freidora] Firestore updated for ${pedidoData.id} (vistoFreidora)`))
+            .catch(err => console.error(`[Freidora] Error updating ${pedidoData.id} (vistoFreidora)`, err))
+        );
+      }
+      
+      // Accumulation logic using the potentially updated products
+      const productosParaAcumular = ordenNecesitaActualizacionFirestore ? productosModificados.map((prod, idx) => {
+        let p = { ...prod }; // Start with a copy of the modified product
+        if (p.freidora === true) {
+            const itemUniqueId = `${pedidoData.id}-${p.id}-${p.uniqueId || idx}`;
+            if (itemsQueDispararonSonidoEnEstaOrden.has(itemUniqueId)) {
+                p.vistoFreidora = true; // Ensure `vistoFreidora` is true if it triggered sound
+            }
+        }
+        return p;
+      }) : (pedidoData.productos || []);
 
-            if (pedidosDelDiaAcumulados[claveUnicaPedido]) {
-              if (esDobleOriginal) {
-                pedidosDelDiaAcumulados[claveUnicaPedido].cantidad += Math.floor(productoBase.cantidad / 2);
-                pedidosDelDiaAcumulados[claveUnicaPedido].entregado += Math.floor(productoBase.entregado / 2);
-                if (productoBase.celiaco) {
-                  pedidosDelDiaAcumulados[claveUnicaPedido].cantidad_celiaco += Math.floor(productoBase.cantidad / 2);
-                }
-                if ((productoBase.cantidad % 2) > 0) {
-                  const claveSimpleRestante = claveUnicaPedido.replace('_doble', '');
-                  if (pedidosDelDiaAcumulados[claveSimpleRestante]) {
-                      pedidosDelDiaAcumulados[claveSimpleRestante].cantidad += 1;
-                      pedidosDelDiaAcumulados[claveSimpleRestante].entregado += (productoBase.entregado % 2);
-                      if (productoBase.celiaco) pedidosDelDiaAcumulados[claveSimpleRestante].cantidad_celiaco += 1;
-                  } else {
-                      let itemSimpleRestante = { ...productoBase, cantidad: 1, entregado: (productoBase.entregado % 2), cantidad_celiaco: productoBase.celiaco ? 1 : 0, doble: false };
-                      pedidosDelDiaAcumulados[claveSimpleRestante] = itemSimpleRestante;
+
+      if (productosParaAcumular) {
+          const fechaRecogidaPedido = dayjs(pedidoData.fechahora, 'DD/MM/YYYY HH:mm').tz('Europe/Madrid');
+          productosParaAcumular.forEach((productoItem) => {
+            if (productoItem.freidora === true) {
+              let productoBase = {
+                id: productoItem.id,
+                nombre: productoItem.nombre,
+                alias: productoItem.alias,
+                cantidad: productoItem.cantidad,
+                celiaco: productoItem.celiaco,
+                cantidad_celiaco: 0,
+                numeropedido: pedidoData.NumeroPedido,
+                entregado: productoItem.entregado || 0,
+                fechahora: fechaRecogidaPedido.format('HH:mm'),
+                doble: false,
+                vistoFreidora: productoItem.vistoFreidora, // Carry over the status
+              };
+  
+              let claveUnicaPedido = `${productoBase.id}-${productoBase.fechahora}`;
+              let esDobleOriginal = false;
+  
+              if ((productoBase.id === 10 || productoBase.id === 3) && productoBase.cantidad > 1) {
+                claveUnicaPedido += "_doble";
+                esDobleOriginal = true;
+              }
+  
+              if (pedidosDelDiaAcumulados[claveUnicaPedido]) {
+                if (esDobleOriginal) {
+                  pedidosDelDiaAcumulados[claveUnicaPedido].cantidad += Math.floor(productoBase.cantidad / 2);
+                  pedidosDelDiaAcumulados[claveUnicaPedido].entregado += Math.floor(productoBase.entregado / 2);
+                  if (productoBase.celiaco) {
+                    pedidosDelDiaAcumulados[claveUnicaPedido].cantidad_celiaco += Math.floor(productoBase.cantidad / 2);
+                  }
+                  if ((productoBase.cantidad % 2) > 0) {
+                    const claveSimpleRestante = claveUnicaPedido.replace('_doble', '');
+                    if (pedidosDelDiaAcumulados[claveSimpleRestante]) {
+                        pedidosDelDiaAcumulados[claveSimpleRestante].cantidad += 1;
+                        pedidosDelDiaAcumulados[claveSimpleRestante].entregado += (productoBase.entregado % 2);
+                        if (productoBase.celiaco) pedidosDelDiaAcumulados[claveSimpleRestante].cantidad_celiaco += 1;
+                    } else {
+                        let itemSimpleRestante = { ...productoBase, cantidad: 1, entregado: (productoBase.entregado % 2), cantidad_celiaco: productoBase.celiaco ? 1 : 0, doble: false };
+                        pedidosDelDiaAcumulados[claveSimpleRestante] = itemSimpleRestante;
+                    }
+                  }
+                } else {
+                  pedidosDelDiaAcumulados[claveUnicaPedido].cantidad += productoBase.cantidad;
+                  pedidosDelDiaAcumulados[claveUnicaPedido].entregado += productoBase.entregado;
+                  if (productoBase.celiaco) {
+                    pedidosDelDiaAcumulados[claveUnicaPedido].cantidad_celiaco += productoBase.cantidad;
                   }
                 }
               } else {
-                pedidosDelDiaAcumulados[claveUnicaPedido].cantidad += productoBase.cantidad;
-                pedidosDelDiaAcumulados[claveUnicaPedido].entregado += productoBase.entregado;
-                if (productoBase.celiaco) {
-                  pedidosDelDiaAcumulados[claveUnicaPedido].cantidad_celiaco += productoBase.cantidad;
+                if (esDobleOriginal) {
+                  let itemDobleNuevo = { ...productoBase, alias: (productoBase.alias || productoBase.nombre) + " Dobles", cantidad: Math.floor(productoBase.cantidad / 2), entregado: Math.floor(productoBase.entregado / 2), cantidad_celiaco: productoBase.celiaco ? Math.floor(productoBase.cantidad / 2) : 0, doble: true };
+                  pedidosDelDiaAcumulados[claveUnicaPedido] = itemDobleNuevo;
+                  if ((productoBase.cantidad % 2) > 0) {
+                    const claveSimpleRestante = claveUnicaPedido.replace('_doble', '');
+                    let itemSimpleRestante = { ...productoBase, cantidad: 1, entregado: (productoBase.entregado % 2), cantidad_celiaco: productoBase.celiaco ? 1 : 0, doble: false };
+                    pedidosDelDiaAcumulados[claveSimpleRestante] = itemSimpleRestante;
+                  }
+                } else {
+                  let itemSimpleNuevo = { ...productoBase, cantidad_celiaco: productoBase.celiaco ? productoBase.cantidad : 0 };
+                  pedidosDelDiaAcumulados[claveUnicaPedido] = itemSimpleNuevo;
                 }
-              }
-            } else {
-              if (esDobleOriginal) {
-                let itemDobleNuevo = { ...productoBase, alias: (productoBase.alias || productoBase.nombre) + " Dobles", cantidad: Math.floor(productoBase.cantidad / 2), entregado: Math.floor(productoBase.entregado / 2), cantidad_celiaco: productoBase.celiaco ? Math.floor(productoBase.cantidad / 2) : 0, doble: true };
-                pedidosDelDiaAcumulados[claveUnicaPedido] = itemDobleNuevo;
-                if ((productoBase.cantidad % 2) > 0) {
-                  const claveSimpleRestante = claveUnicaPedido.replace('_doble', '');
-                  let itemSimpleRestante = { ...productoBase, cantidad: 1, entregado: (productoBase.entregado % 2), cantidad_celiaco: productoBase.celiaco ? 1 : 0, doble: false };
-                  pedidosDelDiaAcumulados[claveSimpleRestante] = itemSimpleRestante;
-                }
-              } else {
-                let itemSimpleNuevo = { ...productoBase, cantidad_celiaco: productoBase.celiaco ? productoBase.cantidad : 0 };
-                pedidosDelDiaAcumulados[claveUnicaPedido] = itemSimpleNuevo;
               }
             }
-          }
-        });
-      }
+          });
+        }
     });
 
+    Promise.all(updatePromises).then(() => {
+      // console.log("[Freidora] All Firestore updates for vistoFreidora completed for this snapshot.");
+    });
+
+    if (anyNewFreidoraItemFoundGlobal) {
+      playNotificationSoundFreidora();
+    }
+    previousRelevantOrderProductIdsRef.current = currentSnapshotRelevantProductIds;
+
+    // Mark initial load as done after the first snapshot has been processed,
+    // regardless of whether it contained orders or not.
+    if (!initialLoadFreidoraDoneRef.current) {
+      initialLoadFreidoraDoneRef.current = true;
+      console.log("[Freidora] Initial processing pass complete. Ready for new order sounds. Snapshot size: " + snapshot.size);
+    }
+
     const arrayPedidosProcesados = Object.values(pedidosDelDiaAcumulados);
-    
     arrayPedidosProcesados.forEach((pedido) => {
-      // Guardar la cantidad original antes de restar los entregados para la UI
-      pedido.cantidad_original_pedido = pedido.cantidad; 
-      // La cantidad a mostrar como "pendiente" es la original menos lo entregado
-      pedido.cantidad = Math.max(0, pedido.cantidad - pedido.entregado); 
+      pedido.cantidad_original_pedido = pedido.cantidad;
+      pedido.cantidad = Math.max(0, pedido.cantidad - pedido.entregado);
 
       let claveTotal = `${pedido.id}`;
       if (pedido.doble) claveTotal += "_doble";
 
       if (productosTotalesAcumulados[claveTotal]) {
-        productosTotalesAcumulados[claveTotal].cantidad += pedido.cantidad; // Sumar cantidad pendiente
+        productosTotalesAcumulados[claveTotal].cantidad += pedido.cantidad;
         productosTotalesAcumulados[claveTotal].entregado += pedido.entregado;
         productosTotalesAcumulados[claveTotal].cantidad_celiaco += pedido.cantidad_celiaco || 0;
       } else {
@@ -225,17 +309,18 @@ useEffect(() => {
           id: pedido.id,
           nombre: pedido.nombre,
           alias: pedido.alias,
-          cantidad: pedido.cantidad, // Cantidad pendiente
+          cantidad: pedido.cantidad,
           entregado: pedido.entregado,
           cantidad_celiaco: pedido.cantidad_celiaco || 0,
           doble: pedido.doble,
         };
       }
     });
-    
+
     setPedidos(arrayPedidosProcesados);
     setPedidosTotales(productosTotalesAcumulados);
     setLoading(false);
+
   }, (error) => {
     console.error("Error al escuchar los pedidos del día: ", error);
     setError("Ocurrió un error al obtener los pedidos.");
@@ -399,6 +484,7 @@ const tarjetaProductoClases =
           </div>
         </div>
       </div>
+      <audio ref={audioRef} src="/musica/level-up.mp3" preload="auto" />
     </>
   );
 };
