@@ -1,5 +1,5 @@
 // --- ProductCard.jsx (Resaltado Azul Corregido) ---
-import React, { useState, useEffect, memo, useRef } from "react"; // Añadir useRef
+import React, { memo } from "react";
 import { doc, updateDoc, getDoc } from "firebase/firestore";
 import { db } from "../../firebase/firebase";
 import dayjs from "dayjs";
@@ -14,78 +14,77 @@ dayjs.extend(customParseFormat);
 
 // eslint-disable-next-line react/display-name
 const ProductCard = memo(({ product }) => {
-    // Estado para manejar expiración del resaltado: Map<orderLineId, expiryTimestamp>
-    const [highlightExpiryMap, setHighlightExpiryMap] = useState(new Map());
-    // Ref para evitar que el intervalo acceda a un estado obsoleto en su callback
-    const expiryMapRef = useRef(highlightExpiryMap);
-    expiryMapRef.current = highlightExpiryMap; // Mantener ref actualizada
-
-    // Efecto 1: Detectar nuevas órdenes y añadir su expiración al mapa
-    useEffect(() => {
-        const now = Date.now();
-        let mapChanged = false;
-        // Usar una copia para evitar mutaciones directas antes de setear el estado
-        const nextMap = new Map(highlightExpiryMap);
-
-        // Añadir nuevas órdenes al mapa de expiración
-        product.orders.forEach(order => {
-            if (order.isNew && !nextMap.has(order.orderLineId)) {
-                nextMap.set(order.orderLineId, now + 5000); // Expira en 5 segundos
-                mapChanged = true;
-                console.log(`[Highlight ${product.id}] Añadido ${order.orderLineId} con expiración.`);
-            }
-        });
-
-        // Limpiar del mapa las órdenes que ya no existen en la prop
-        const currentOrderIds = new Set(product.orders.map(o => o.orderLineId));
-        nextMap.forEach((expiry, orderLineId) => {
-            if (!currentOrderIds.has(orderLineId)) {
-                nextMap.delete(orderLineId);
-                mapChanged = true;
-                console.log(`[Highlight ${product.id}] Eliminada orden desaparecida ${orderLineId} del mapa.`);
-            }
-        });
-
-        // Solo actualizar estado si hubo cambios
-        if (mapChanged) {
-             console.log(`[Highlight ${product.id}] Actualizando estado expiryMap.`);
-            setHighlightExpiryMap(nextMap);
+    // --- Lógica de Click y Cálculos (sin cambios) ---
+    const handleOrderClick = async (order) => {
+        if (!order.idPedido || !order.orderLineId) {
+            console.error("ID no definido en orden:", order);
+            return;
         }
-        // Depende solo de las órdenes que llegan como prop
-    }, [product.orders, product.id]); // Añadido product.id por si se usa en logs
+        const pedidoRef = doc(db, "pedidos", order.idPedido);
+        try {
+            const pedidoSnap = await getDoc(pedidoRef);
+            if (!pedidoSnap.exists()) {
+                console.error("Pedido no existe:", order.idPedido);
+                return;
+            }
+            const pedidoData = pedidoSnap.data();
+            let productoEncontrado = false;
+            let cambioRealizado = false;
 
-    // Efecto 2: Intervalo para comprobar y eliminar expiraciones
-    useEffect(() => {
-        const intervalId = setInterval(() => {
-            const now = Date.now();
-            // Acceder al mapa más reciente a través de la ref
-            const currentMap = expiryMapRef.current;
-            const nextMap = new Map(currentMap); // Trabajar sobre una copia
-            let changed = false;
+            const productosActualizados = pedidoData.productos.map((prod, index) => {
+                const currentLineId = `${order.idPedido}-${prod.id}-${prod.uniqueId || index}`;
+                if (currentLineId === order.orderLineId) {
+                    productoEncontrado = true;
+                    let updatedProd = { ...prod }; // Copia para modificar
 
-            nextMap.forEach((expiryTimestamp, orderLineId) => {
-                if (now >= expiryTimestamp) {
-                    nextMap.delete(orderLineId);
-                    changed = true;
-                    console.log(`[Highlight Interval ${product.id}] Expirado y eliminado ${orderLineId}`);
+                    // Guardamos los estados originales para comparar si hubo cambios
+                    const originalNuevoCocina = prod.nuevoCocina;
+                    const originalListo = prod.listo;
+                    const originalEntregado = prod.entregado;
+
+                    if (updatedProd.nuevoCocina === 0 || updatedProd.nuevoCocina === undefined) {
+                        // Escenario 1: Primer clic en un ítem "nuevo" (azul)
+                        updatedProd.nuevoCocina = 1;
+                        // 'listo' permanece como está (debería ser false)
+                        // 'entregado' permanece como está (debería ser 0 o el valor inicial)
+                        console.log(`[ProductCard Click] Pedido ${order.idPedido}, Producto ${prod.id}: nuevoCocina -> 1. listo: ${updatedProd.listo}, entregado: ${updatedProd.entregado}`);
+                    } else if (updatedProd.nuevoCocina === 1) {
+                        // Escenario 2: Clic en un ítem ya "visto" (no azul)
+                        updatedProd.listo = !updatedProd.listo; // Invertir 'listo'
+
+                        if (updatedProd.listo === true) {
+                            updatedProd.entregado = 1; // Si 'listo' es true, 'entregado' es 1
+                            console.log(`[ProductCard Click] Pedido ${order.idPedido}, Producto ${prod.id}: listo -> TRUE, entregado -> 1.`);
+                        } else {
+                            // Si 'listo' es false, 'entregado' vuelve a 0 (o estado no entregado)
+                            updatedProd.entregado = 0; 
+                            console.log(`[ProductCard Click] Pedido ${order.idPedido}, Producto ${prod.id}: listo -> FALSE, entregado -> 0.`);
+                        }
+                    }
+
+                    // Comprobar si realmente hubo un cambio en los campos relevantes
+                    if (updatedProd.nuevoCocina !== originalNuevoCocina ||
+                        updatedProd.listo !== originalListo ||
+                        updatedProd.entregado !== originalEntregado) {
+                        cambioRealizado = true;
+                    }
+                    return updatedProd;
                 }
+                return prod;
             });
 
-            // Actualizar estado solo si algo cambió
-            if (changed) {
-                console.log(`[Highlight Interval ${product.id}] Actualizando estado por expiración.`);
-                setHighlightExpiryMap(nextMap);
+            if (productoEncontrado && cambioRealizado) {
+                await updateDoc(pedidoRef, { productos: productosActualizados });
+                console.log(`Order line ${order.orderLineId} status updated (nuevoCocina/listo/entregado) in Firestore.`);
+            } else if (!productoEncontrado) {
+                console.warn("Línea de pedido no encontrada para actualizar:", order.orderLineId);
+            } else { // productoEncontrado pero !cambioRealizado
+                console.log(`Order line ${order.orderLineId}: No effective change to update in Firestore.`);
             }
-        }, 1000); // Comprobar cada segundo
-
-        // Limpiar intervalo al desmontar
-        return () => clearInterval(intervalId);
-        // Este efecto solo necesita ejecutarse una vez para establecer el intervalo
-    }, [product.id]); // Añadido product.id por si se usa en logs
-
-
-    // --- Lógica de Click y Cálculos (sin cambios) ---
-    const handleOrderClick = async (order) => { /* ... código original ... */ if (!order.idPedido || !order.orderLineId) { console.error("ID no definido en orden:", order); return; } const pedidoRef = doc(db, "pedidos", order.idPedido); try { const pedidoSnap = await getDoc(pedidoRef); if (!pedidoSnap.exists()) { console.error("Pedido no existe:", order.idPedido); return; } const pedidoData = pedidoSnap.data(); let productoEncontrado = false; let cambioRealizado = false; const productosActualizados = pedidoData.productos.map((prod, index) => { const currentLineId = `${order.idPedido}-${prod.id}-${prod.uniqueId || index}`; if (currentLineId === order.orderLineId) { productoEncontrado = true; if (prod.listo !== !prod.listo) { cambioRealizado = true; } return { ...prod, listo: !prod.listo }; } return prod; }); if (productoEncontrado && cambioRealizado) { await updateDoc(pedidoRef, { productos: productosActualizados }); console.log(`Order line ${order.orderLineId} status toggled in Firestore.`); } else if (!productoEncontrado) { console.warn("Línea de pedido no encontrada para actualizar 'listo':", order.orderLineId); } } catch (error) { console.error("Error actualizando estado 'listo':", error); } };
+        } catch (error) {
+            console.error("Error actualizando estado del pedido:", error);
+        }
+    };
     const listosCount = product.orders.reduce((count, order) => count + (order.producto?.listo ? (order.cantidad ?? 1) : 0), 0);
     const totalPedidosCount = product.pedidos;
 
@@ -114,8 +113,8 @@ const ProductCard = memo(({ product }) => {
                                 let rowClasses = [baseRowColor, "border-t", baseBorder];
                                 let textColor = baseTextColor;
 
-                                // Comprobar si la fila debe estar resaltada en azul
-                                const isHighlightedBlue = highlightExpiryMap.has(order.orderLineId);
+                                // Comprobar si la fila debe estar resaltada en azul basado en nuevoCocina
+                                const isHighlightedBlue = order.producto?.nuevoCocina === 0;
 
                                 if (order.producto?.listo) {
                                     rowClasses = ["bg-[#52be80]", "border-t", baseBorder]; textColor = "text-white";
@@ -123,9 +122,8 @@ const ProductCard = memo(({ product }) => {
                                     rowClasses = ["bg-red-500", "border-t", "border-red-300"]; rowClasses = rowClasses.filter(c => c !== 'animate-blink'); textColor = "text-white";
                                 } else if (order.needsCookingAlert) {
                                     rowClasses = ["bg-yellow-300", "border-t", baseBorder]; rowClasses.push("animate-blink"); textColor = "text-gray-800";
-                                // *** CAMBIO AQUÍ: Usar el estado del mapa de expiración ***
                                 } else if (isHighlightedBlue) {
-                                    rowClasses = ["bg-blue-200", "border-t", baseBorder]; rowClasses = rowClasses.filter(c => c !== 'animate-blink'); textColor = "text-blue-800";
+                                    rowClasses = ["bg-blue-200", "border-t", baseBorder]; textColor = "text-blue-800";
                                 }
                                 // Interacción
                                 if (!order.producto?.listo) {

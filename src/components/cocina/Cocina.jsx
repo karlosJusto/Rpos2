@@ -55,7 +55,6 @@ const Cocina = () => {
   const [cocinaProducts, setCocinaProducts] = useState([]);
   const [productsData, setProductsData] = useState([]);
   const [saladsData, setSaladsData] = useState([]);
-  const [selectedDate, setSelectedDate] = useState(new Date());
   const [currentPedidosMap, setCurrentPedidosMap] = useState(new Map());
   const [productosStockMap, setProductosStockMap] = useState(new Map());
   const [currentTimeTick, setCurrentTimeTick] = useState(Date.now());
@@ -65,12 +64,14 @@ const Cocina = () => {
   const [pedidosDelTurnoState, setPedidosDelTurnoState] = useState([]);
 
   // --- States for Integrated Header ---
+  const [selectedDate, setSelectedDate] = useState(new Date()); // Moved UP - Must be before modalSelectedDate
   const [showOffcanvas, setShowOffcanvas] = useState(false);
   const [showSumarModal, setShowSumarModal] = useState(false);
   const [numeroASumar, setNumeroASumar] = useState('');
   const [modalSelectedDate, setModalSelectedDate] = useState(dayjs(selectedDate));
   const [showDateModal, setShowDateModal] = useState(false);
   const [datosCliente, setDatosCliente] = useState({
+    // ... (datosCliente state remains the same)
     cliente: 'AAgenerico',
     telefono: '000000000',
     fechahora: dayjs().minute(Math.floor(dayjs().minute() / 15) * 15).second(0).millisecond(0).format('DD/MM/YYYY HH:mm'),
@@ -82,6 +83,9 @@ const Cocina = () => {
 
   // --- Refs for Integrated Header ---
   const pedidoRapidoRef = useRef();
+  const audioRef = useRef(null); // Ref for the audio element
+  const previousPedidosDelTurnoIdsRef = useRef(new Set()); // Ref to store previous order IDs for the current turn
+  const initialLoadDoneRef = useRef(false); // Ref to track if initial load for "today" is done
 
   // --- Context (Original from Cocina, plus additions for Header) ---
   const {
@@ -92,6 +96,13 @@ const Cocina = () => {
     pedidosConOrigenUno,
     setNumeroBarra
   } = useContext(dataContext);
+
+  // --- Sound Playback Function ---
+  const playNotificationSound = useCallback(() => {
+    if (audioRef.current) {
+      audioRef.current.play().catch(error => console.warn("Error playing notification sound:", error));
+    }
+  }, []);
 
   // --- Effect for Periodic Tick (Original from Cocina) ---
   useEffect(() => {
@@ -246,10 +257,47 @@ const Cocina = () => {
 
     const unsubscribe = onSnapshot(pedidosRef, (querySnapshot) => {
       console.log(`[Effect A] Snapshot received (${querySnapshot.size} docs). Filtering for date: ${selectedDateStr}`);
-      const incomingPedidosMap = new Map();
       const allPedidosRaw = [];
-      querySnapshot.forEach((doc) => { allPedidosRaw.push({ id: doc.id, ...doc.data() }); });
+      const updatePromises = [];
 
+      querySnapshot.forEach((pedidoDocSnapshot) => {
+        const pedidoData = { id: pedidoDocSnapshot.id, ...pedidoDocSnapshot.data() };
+        let needsFirestoreUpdate = false;
+        let processedProductos = pedidoData.productos;
+
+        if (pedidoData.productos && Array.isArray(pedidoData.productos)) {
+          processedProductos = pedidoData.productos.map(p => {
+            // console.log(`[Effect A] Procesando producto para pedido ${pedidoDocSnapshot.id}:`, JSON.stringify(p)); // Log original, se puede mantener si es útil
+            // Solo inicializar nuevoCocina si es undefined, el producto NO está listo Y ES HOY.
+            if (isToday && p.nuevoCocina === undefined && p.listo !== true) {
+              console.log(`[Effect A - HOY] Producto (ID: ${p.id}, Nombre: ${p.nombre || 'N/A'}) en pedido ${pedidoDocSnapshot.id} no está listo y nuevoCocina es undefined. Inicializando nuevoCocina a 0.`);
+              needsFirestoreUpdate = true;
+              return { ...p, nuevoCocina: 0 }; // Initialize to 0
+            } else if (p.nuevoCocina === undefined && p.listo !== true && !isToday) {
+              console.log(`[Effect A - NO HOY] Producto (ID: ${p.id}, Nombre: ${p.nombre || 'N/A'}) en pedido ${pedidoDocSnapshot.id} no está listo y nuevoCocina es undefined. NO se inicializa nuevoCocina porque no es el día actual.`);
+            } else if (p.nuevoCocina === undefined && p.listo === true) {
+              console.log(`[Effect A] Producto (ID: ${p.id}, Nombre: ${p.nombre || 'N/A'}) en pedido ${pedidoDocSnapshot.id} YA ESTÁ LISTO. No se inicializa nuevoCocina.`);
+            }
+            return p;
+          });
+        } else {
+          processedProductos = []; // Should not happen with proper schema
+          console.warn(`[Effect A] Pedido ${pedidoData.id} has missing or invalid 'productos' array.`);
+        }
+
+        if (needsFirestoreUpdate) {
+          // console.log(`[Effect A] Pedido ${pedidoDocSnapshot.id} NECESITA actualización en Firestore para nuevoCocina.`); // Log original
+          const pedidoRef = doc(db, 'pedidos', pedidoDocSnapshot.id);
+          // No need to push to updatePromises and wait, onSnapshot will re-trigger.
+          // The local 'processedProductos' will be used for the current render.
+          updateDoc(pedidoRef, { productos: processedProductos })
+            .then(() => {
+              console.log(`[Effect A] ÉXITO: Firestore actualizado para nuevoCocina en pedido ${pedidoDocSnapshot.id} (SOLO SI isToday era true).`);
+            })
+            .catch(err => console.error(`[Effect A] Error initializing nuevoCocina for ${pedidoDocSnapshot.id}`, err));
+        }
+        allPedidosRaw.push({ ...pedidoData, productos: processedProductos });
+      });
       const pedidosDelTurno = allPedidosRaw.filter((pedido) => {
         if (!pedido.fechahora || typeof pedido.fechahora !== 'string') return false;
         const parts = pedido.fechahora.split(' ');
@@ -267,6 +315,46 @@ const Cocina = () => {
       });
       console.log(`[Effect A] ${pedidosDelTurno.length} orders found for date ${selectedDateStr} / shift.`);
       setPedidosDelTurnoState(pedidosDelTurno);
+
+      // --- Logic for New Order Sound Alert ---
+      if (isToday) {
+        const currentTurnoPedidoIds = new Set(pedidosDelTurno.map(p => p.id));
+        let newOrderForProductCardFound = false;
+
+        if (initialLoadDoneRef.current) { // Only check for new orders after initial load for "today"
+          for (const pedido of pedidosDelTurno) {
+            if (!previousPedidosDelTurnoIdsRef.current.has(pedido.id)) {
+              // This is a new pedido ID for the current turn/date
+              // Now check if it contains any product relevant to ProductCards
+              if (pedido.productos && Array.isArray(pedido.productos)) {
+                const hasRelevantProduct = pedido.productos.some(prod => {
+                  const targetProdId = prod.id === 48 ? 41 : prod.id; // Handle product 48 mapping
+                  // Check if this product ID exists in cocinaProducts and is not product 48 itself (which is filtered out from display)
+                  return cocinaProducts.some(cp => cp.id === targetProdId && cp.id !== 48);
+                });
+                if (hasRelevantProduct) {
+                  newOrderForProductCardFound = true;
+                  break;
+                }
+              }
+            }
+          }
+        }
+
+        if (newOrderForProductCardFound) {
+          console.log("[Effect A] New order with ProductCard items detected. Playing sound.");
+          playNotificationSound();
+        }
+
+        previousPedidosDelTurnoIdsRef.current = currentTurnoPedidoIds;
+        if (!initialLoadDoneRef.current && (querySnapshot.size > 0 || pedidosDelTurno.length > 0)) { // Mark initial load as done after the first run for "today"
+            initialLoadDoneRef.current = true;
+        }
+      } else { // If not today, reset flags for when user switches back to today
+        previousPedidosDelTurnoIdsRef.current = new Set();
+        initialLoadDoneRef.current = false;
+      }
+      // --- End of Sound Alert Logic ---
 
       const validProductIds = new Set(cocinaProducts.map(product => product.id));
       const aggregatedProducts = {};
@@ -306,19 +394,16 @@ const Cocina = () => {
                return;
             }
             const orderLineId = `${pedido.id}-${originalProdId}-${prod.uniqueId || index}`;
-            const isNew = !currentPedidosMap.has(orderLineId);
-            incomingPedidosMap.set(orderLineId, true);
 
             const orderData = {
               idPedido: pedido.id,
               idProducto: originalProdId,
               orderLineId: orderLineId,
-              producto: { ...prod, listo: prod.listo ?? false },
+              producto: { ...prod, listo: prod.listo ?? false, nuevoCocina: prod.nuevoCocina ?? 0 }, // Pass nuevoCocina
               hora: pedido.fechahora,
               nombre: pedido.cliente || 'Sin nombre',
               cantidad: (originalProdId === 48) ? ((prod.cantidad || 1) * 0.5) : (prod.cantidad || 1),
               descripcion: pedido.observaciones || "",
-              isNew: isNew,
               needsCookingAlert: false,
               isOverdue: false,
             };
@@ -335,7 +420,6 @@ const Cocina = () => {
 
       console.log("[Effect A] Setting BASE productsData state:", finalBaseData.length, "items");
       setProductsData(finalBaseData);
-      setCurrentPedidosMap(incomingPedidosMap);
       setIsLoadingPedidosAndProcessing(false);
 
     }, (error) => {
@@ -348,7 +432,7 @@ const Cocina = () => {
       console.log("[Effect A] Cleaning up listener.");
       unsubscribe();
     };
-  }, [selectedDateStr, cocinaProducts, productosStockMap, isToday, getTurnoActual, isLoadingCocina, isLoadingProductosStock]); // Original dependencies
+  }, [selectedDateStr, cocinaProducts, productosStockMap, isToday, getTurnoActual, isLoadingCocina, isLoadingProductosStock, db]); // Added db to dependencies as it's used in doc()
 
   // --- EFFECT B: Cálculo de mostrarBarra (Original from Cocina, with original console.logs) ---
   useEffect(() => {
@@ -414,12 +498,27 @@ const Cocina = () => {
         });
 
         const originalOrderIds = product.orders.map(o => o.orderLineId).join(',');
+        // MODIFICACIÓN: Cambiar la lógica de ordenación para priorizar la hora
         updatedOrders.sort((a, b) => {
+            const timeA = dayjs(a.hora, "DD/MM/YYYY HH:mm", true);
+            const timeB = dayjs(b.hora, "DD/MM/YYYY HH:mm", true);
+
+            // 1. Ordenar principalmente por hora
+            if (timeA.isValid() && timeB.isValid()) {
+                const timeDiff = timeA.diff(timeB);
+                if (timeDiff !== 0) return timeDiff; // Si las horas son diferentes, ordenar por hora
+            } else {
+                // Manejar fechas inválidas - poner inválidas al final
+                if (timeA.isValid() && !timeB.isValid()) return -1;
+                if (!timeA.isValid() && timeB.isValid()) return 1;
+                // Si ambas son inválidas o las horas son iguales, pasar a la ordenación secundaria
+            }
+
+            // 2. Ordenar secundariamente por urgencia (si las horas son iguales)
             if (a.isOverdue && !b.isOverdue) return -1; if (!a.isOverdue && b.isOverdue) return 1;
             if (a.needsCookingAlert && !b.needsCookingAlert) return -1; if (!a.needsCookingAlert && b.needsCookingAlert) return 1;
-            const timeA = dayjs(a.hora, "DD/MM/YYYY HH:mm", true); const timeB = dayjs(b.hora, "DD/MM/YYYY HH:mm", true);
-            if (timeA.isValid() && timeB.isValid()) return timeA.diff(timeB);
-            if (timeA.isValid() && !timeB.isValid()) return -1; if (!timeA.isValid() && timeB.isValid()) return 1; return 0;
+
+            return 0; // Si las horas y la urgencia son iguales
         });
         const newOrderIds = updatedOrders.map(o => o.orderLineId).join(',');
 
@@ -625,6 +724,9 @@ const Cocina = () => {
       </Modal>
 
       <PedidoRapido ref={pedidoRapidoRef} datosCliente={datosCliente} />
+      
+      {/* Audio element for notifications - ensure the path is correct */}
+      <audio ref={audioRef} src="/musica/level-up.mp3" preload="auto" />
     </div>
   );
 };

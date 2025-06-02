@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from 'react'; // <-- Import useRef
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, useLocation } from "react-router-dom"; // Import useLocation
 import Home from "./components/home/Home";
 import Login from "./components/login/Login";
 import LoginJefe from "./components/login/LoginJefe";
@@ -52,41 +52,22 @@ import OperativaTienda from './components/dashboard/dashComponents/OperativaTien
 // import HeaderFinal from "./components/cocina/components/HeaderFinal.jsx";
 
 function App() {
-  const initEffectRan = useRef(false);
   // Log cuando la función del componente App se ejecuta (es decir, cada vez que se renderiza)
   console.log("App.jsx: La función del componente App se está ejecutando (render).");
 
-  // useEffect for initializing calendars, preventing StrictMode double run
-  useEffect(() => {
-    console.log("App.jsx: useEffect[initDailyCalendars] - INICIO DEL EFECTO / MONTAJE.");
+  // Usamos un componente interno para acceder a useLocation, ya que App está fuera de BrowserRouter
+  const AppContent = () => {
+    const location = useLocation();
+    const rutaActual = location.pathname;
 
-    // Check if we are in development and if the effect has already run once
-    if (import.meta.env.MODE === 'development' && initEffectRan.current) {
-       console.log("App.jsx: useEffect[initDailyCalendars] - Re-ejecución por StrictMode detectada, omitiendo lógica de initDailyCalendars.");
-       return; // Skip the second run in development Strict Mode
-    }
+    // Determinar si se debe renderizar SonidoOnChange
+    const mostrarSonidoGlobal = !['/cocina', '/freidora'].includes(rutaActual);
+    console.log(`App.jsx: Ruta actual: ${rutaActual}, ¿Mostrar sonido global?: ${mostrarSonidoGlobal}`);
 
-    // Run the initialization logic
-    console.log("App.jsx: useEffect[initDailyCalendars] - Ejecutando initDailyCalendars...");
-    initDailyCalendars();
-
-    // Mark that the effect's core logic has run
-    initEffectRan.current = true;
-
-    return () => {
-      console.log("App.jsx: useEffect[initDailyCalendars] - LIMPIEZA DEL EFECTO / DESMONTAJE.");
-      // No specific cleanup needed for initDailyCalendars itself,
-      // but we keep the structure. We don't reset the ref here
-      // for a one-time initialization.
-    };
-  }, []); // Empty dependency array ensures it runs only on initial mount
-
-  return (
-    // DataProvider envuelve todo
-    <DataProvider>
-    <SonidoOnChange />
-      <GlobalOrderListener />
-      <BrowserRouter>
+    return (
+      <>
+        {mostrarSonidoGlobal && <SonidoOnChange />}
+        <GlobalOrderListener />
         <Routes>
           {/* Rutas Públicas */}
           <Route path="/" element={<Home />} />
@@ -129,6 +110,41 @@ function App() {
           {/* <Route path="*" element={<NotFound />} /> */}
 
         </Routes>
+      </>
+    );
+  };
+
+  const initEffectRan = useRef(false);
+  // useEffect for initializing calendars, preventing StrictMode double run
+  useEffect(() => {
+    console.log("App.jsx: useEffect[initDailyCalendars] - INICIO DEL EFECTO / MONTAJE.");
+
+    // Check if we are in development and if the effect has already run once
+    if (import.meta.env.MODE === 'development' && initEffectRan.current) {
+       console.log("App.jsx: useEffect[initDailyCalendars] - Re-ejecución por StrictMode detectada, omitiendo lógica de initDailyCalendars.");
+       return; // Skip the second run in development Strict Mode
+    }
+
+    // Run the initialization logic
+    console.log("App.jsx: useEffect[initDailyCalendars] - Ejecutando initDailyCalendars...");
+    initDailyCalendars();
+
+    // Mark that the effect's core logic has run
+    initEffectRan.current = true;
+
+    return () => {
+      console.log("App.jsx: useEffect[initDailyCalendars] - LIMPIEZA DEL EFECTO / DESMONTAJE.");
+      // No specific cleanup needed for initDailyCalendars itself,
+      // but we keep the structure. We don't reset the ref here
+      // for a one-time initialization.
+    };
+  }, []); // Empty dependency array ensures it runs only on initial mount
+
+  return (
+    // DataProvider envuelve todo
+    <DataProvider>
+      <BrowserRouter>
+        <AppContent /> {/* Renderiza el contenido que depende de la ubicación */}
       </BrowserRouter>
   </DataProvider>
   );
