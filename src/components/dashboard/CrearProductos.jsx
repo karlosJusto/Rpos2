@@ -25,13 +25,12 @@ const CrearProductos = ({ productoEditarProp, modoEdicionProp, onSave, onClose }
     descripcion: "",
     celiaco: false,
     vegetariano: false,
-    vegano: false,
-    freidora: false,
-    productoDoble: false,
-    botonCeliaco: false,
-    mediaRacion: false,
-    sabores: false,
-    cocina: false,
+    vegano: false, // boolean
+    freidora: false, // boolean
+    productoDoble: false, // boolean
+    botonCeliaco: false, // boolean
+    sabores: false, // boolean
+    cocina: false, // boolean
     promocion: false,
     imagen: null,
     imagenRpos: null,
@@ -60,7 +59,6 @@ const CrearProductos = ({ productoEditarProp, modoEdicionProp, onSave, onClose }
         freidora: productoEditar.hasOwnProperty('freidora') ? (productoEditar.freidora === "1" || productoEditar.freidora === true) : initialProductFormState.freidora,
         productoDoble: productoEditar.hasOwnProperty('productoDoble') ? (productoEditar.productoDoble === "1" || productoEditar.productoDoble === true) : initialProductFormState.productoDoble,
         botonCeliaco: productoEditar.hasOwnProperty('botonCeliaco') ? (productoEditar.botonCeliaco === "1" || productoEditar.botonCeliaco === true) : initialProductFormState.botonCeliaco,
-        mediaRacion: productoEditar.hasOwnProperty('half') ? (productoEditar.half === 1 || productoEditar.half === "1") : initialProductFormState.mediaRacion,
         sabores: productoEditar.hasOwnProperty('sabores') ? productoEditar.sabores === "1" : initialProductFormState.sabores,
         cocina: productoEditar.hasOwnProperty('cocina') ? (productoEditar.cocina === "1" || productoEditar.cocina === true) : initialProductFormState.cocina,
         promocion: productoEditar.hasOwnProperty('promocion') ? (productoEditar.promocion === "1" || productoEditar.promocion === true) : initialProductFormState.promocion,
@@ -217,8 +215,6 @@ const CrearProductos = ({ productoEditarProp, modoEdicionProp, onSave, onClose }
       description: producto.descripcion,
       description_half: producto.descripcionBreve,
       gluten_free: producto.celiaco ? "1" : "0",
-      //half: producto.mediaRacion ? "1" : "0",
-      //half_price: precioNumerico ? precioNumerico - 6 : 0, // Reconsiderar esta lógica
       id_product: idDocYProd,
       imagen: imagenUrl,
       imagen_rpos: imagenRposUrl,
@@ -232,7 +228,7 @@ const CrearProductos = ({ productoEditarProp, modoEdicionProp, onSave, onClose }
       vegetarian: producto.vegetariano ? "1" : "0",
       visible: producto.visible ? 1 : 0,
       cocina: !!producto.cocina,
-      promocion: producto.promocion ? "1" : "0",
+      promocion: !!producto.promocion, // Ensure it's saved as a boolean
       freidora: !!producto.freidora,
       productoDoble: producto.productoDoble ? "1" : "0",
       botonCeliaco: !!producto.botonCeliaco,
@@ -352,8 +348,8 @@ const CrearProductos = ({ productoEditarProp, modoEdicionProp, onSave, onClose }
         {[
           { name: "visible", label: "Visible" }, { name: "celiaco", label: "Celiaco" },
           { name: "vegetariano", label: "Vegetariano" }, { name: "vegano", label: "Vegano" },
-          { name: "freidora", label: "Freidora" }, { name: "cocina", label: "Cocina" },
-          { name: "mediaRacion", label: "Media Ración" },
+          { name: "freidora", label: "Freidora" }, { name: "cocina", label: "Cocina" }, // Ensure these are boolean in state
+          { name: "promocion", label: "Promoción" }, // Changed from mediaRacion
           { name: "productoDoble", label: "Producto Doble" },
            { name: "botonCeliaco", label: "Check Celiaco" },
         ].map((campo) => (
