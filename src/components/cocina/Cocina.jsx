@@ -631,7 +631,7 @@ const Cocina = () => {
           <div className='w-[8vw] h-[10vh] bg-gray-700 rounded-xl shadow-md'> <div className="flex justify-center items-center h-1/2 cursor-pointer" onClick={sumarUno}> <p className="text-white text-center text-[1.8vw] font-nunito border-b-4">+1</p> </div> <div className="flex justify-center items-center h-1/2 cursor-pointer" onClick={sumaMedio}> <h1 className="text-white text-center text-[1.8vw] font-nunito">+1/2</h1> </div> </div>
           <div className='w-[8vw] h-[10vh] bg-gray-700 rounded-xl shadow-md'> <div className="flex justify-center items-center h-1/2 cursor-pointer" onClick={restarUno}> <p className="text-white text-center text-[1.8vw] font-nunito border-b-4">-1</p> </div> <div className="flex justify-center items-center h-1/2 cursor-pointer" onClick={restaMedio}> <h1 className="text-white text-center text-[1.8vw] font-nunito">-1/2</h1> </div> </div>
           <div className={`w-[8vw] h-[10vh] ${libres < 0 ? 'bg-[#cb4335]' : 'bg-[#f2ac02]'} flex flex-col justify-center items-center rounded-xl shadow-md`}>
-            <h1 className="text-white text-center text-[2.5vw] font-nunito">{libres ?? '-'}</h1>
+            <h1 className="text-white text-center text-[2.5vw] font-nunito">{libres}</h1>
             <p className="text-white text-center text-[0.85vw] font-nunito mt-[0.90vh]">Libres</p>
           </div>
           <div className='w-[8vw] h-[10vh] bg-gray-400 opacity-50 flex flex-col justify-center items-center rounded-xl shadow-md'> <h1 className="text-white text-center text-[2vw] font-nunito"></h1> <h1 className="text-white text-center text-[2w] font-nunito"></h1> </div>

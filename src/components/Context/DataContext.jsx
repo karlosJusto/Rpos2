@@ -76,6 +76,58 @@ const DataProvider = ({ children }) => {
     return () => unsubscribe();
   }, [dateToPass]); // Se ejecuta al montar y se mantiene suscrito
 
+  // Función interna para agrupar pedidos y calcular pollos por bloques de 15 minutos
+  const agruparYCalcularPollosPorBloques = (pedidosDelContexto) => {
+    const bloques = {};
+    pedidosDelContexto.forEach((pedido) => {
+      if (typeof pedido.fechahora !== 'string' || !pedido.fechahora.includes(' ')) {
+        // console.warn(`[DataContext][agruparPorBloques] Pedido ${pedido.id || pedido.NumeroPedido} con fechahora inválida: ${pedido.fechahora}`);
+        return; 
+      }
+      const fechaHora = dayjs(pedido.fechahora, 'DD/MM/YYYY HH:mm', true);
+      if (!fechaHora.isValid()) {
+          // console.warn(`[DataContext][agruparPorBloques] Pedido ${pedido.id || pedido.NumeroPedido} con fechahora no parseable: ${pedido.fechahora}`);
+          return; 
+      }
+
+      const hora = fechaHora.format('HH:mm');
+      if (!bloques[hora]) {
+        bloques[hora] = {
+          cantidadProductosId1: 0, // Pollos enteros
+          cantidadProductosId2: 0, // Medios pollos
+        };
+      }
+      if (pedido.productos && Array.isArray(pedido.productos)) {
+          pedido.productos.forEach((producto) => {
+              if (producto.id === 1) bloques[hora].cantidadProductosId1 += (Number(producto.cantidad) || 0);
+              if (producto.id === 2) bloques[hora].cantidadProductosId2 += (Number(producto.cantidad) || 0);
+              // IDs 39 y 40 también cuentan como 0.5 pollos si es necesario
+              if (producto.id === 39 || producto.id === 40) bloques[hora].cantidadProductosId2 += (Number(producto.cantidad) || 0); // Asumiendo que 39 y 40 son equivalentes a medio pollo
+          });
+      }
+    });
+    return bloques;
+  };
+
+  // useEffect para calcular totalbloquesAntesdelas18 y totalProductosDespuesDeLas18
+  useEffect(() => {
+    console.log("[LIBRES] Hook de cálculo de totales (Antes/Después 18h) activado. Dependencia: pedidos.");
+    if (pedidos && pedidos.length >= 0) { // >= 0 para que se ejecute incluso si pedidos está vacío y ponga los totales a 0
+      const bloquesPedidos = agruparYCalcularPollosPorBloques(pedidos);
+
+      const nuevosTotalProductosDespuesDeLas18 = Object.keys(bloquesPedidos)
+        .filter(bloque => { const horaBloque = dayjs(bloque, 'HH:mm', true); return horaBloque.isValid() && horaBloque.hour() >= 18; })
+        .reduce((total, bloque) => total + (bloquesPedidos[bloque].cantidadProductosId1 || 0) + ((bloquesPedidos[bloque].cantidadProductosId2 || 0) / 2), 0);
+
+      const nuevosTotalbloquesAntesdelas18 = Object.keys(bloquesPedidos)
+        .filter(bloque => { const horaBloque = dayjs(bloque, 'HH:mm', true); return horaBloque.isValid() && horaBloque.hour() < 18; })
+        .reduce((total, bloque) => total + (bloquesPedidos[bloque].cantidadProductosId1 || 0) + ((bloquesPedidos[bloque].cantidadProductosId2 || 0) / 2), 0);
+
+      // console.log(`[LIBRES] Nuevos totales calculados: Antes18=${nuevosTotalbloquesAntesdelas18}, Despues18=${nuevosTotalProductosDespuesDeLas18}`);
+      setTotalProductosDespuesDeLas18(nuevosTotalProductosDespuesDeLas18);
+      setTotalbloquesAntesdelas18(nuevosTotalbloquesAntesdelas18);
+    }
+  }, [pedidos]); // Dependencia: el estado 'pedidos' del DataContext
 
 
 
@@ -99,37 +151,110 @@ const DataProvider = ({ children }) => {
 
   useEffect(() => {
     // console.log("NUMERO BARRASSSSSSSSSSSSSSSS: "+numeroBarra); // Para depuración
+    console.log("[LIBRES] Hook de cálculo de 'libres' activado. Dependencias: numeroBarra, totalProductosDespuesDeLas18, totalbloquesAntesdelas18, isNumeroBarraInitialized.");
     const calcularLibres = () => {
+      console.log("[LIBRES] Dentro de calcularLibres().");
       // setLoading(true); // Comentado según la última versión, si se necesita, gestionar globalmente
       const currentTime = dayjs().locale('es').tz('Europe/Madrid');
       const antesDelas6pm = currentTime.hour() < 18;
       let libresCalculados;
-
+      // debugger // Eliminado
+      console.log(`[LIBRES] Valores para cálculo: numeroBarra = ${numeroBarra}, totalbloquesAntesdelas18 = ${totalbloquesAntesdelas18}, totalProductosDespuesDeLas18 = ${totalProductosDespuesDeLas18}`);
       if (antesDelas6pm) {
         libresCalculados = numeroBarra - totalbloquesAntesdelas18;
+        console.log(`[LIBRES] Cálculo para ANTES de las 6 PM: ${numeroBarra} - ${totalbloquesAntesdelas18} = ${libresCalculados}`);
       } else {
         libresCalculados = numeroBarra - totalProductosDespuesDeLas18;
+        console.log(`[LIBRES] Cálculo para DESPUÉS de las 6 PM: ${numeroBarra} - ${totalProductosDespuesDeLas18} = ${libresCalculados}`);
       }
       
       // Actualizar 'libres' solo si el valor ha cambiado
       setLibres(currentLibres => {
+        // debugger // Eliminado
         if (libresCalculados !== currentLibres) {
+          console.log(`[LIBRES] setLibres: valor cambió de ${currentLibres} a ${libresCalculados}. Actualizando estado.`);
           return libresCalculados;
         }
+        console.log(`[LIBRES] setLibres: valor no cambió (${libresCalculados}). Estado 'libres' se mantiene en ${currentLibres}.`);
         return currentLibres;
       });
       // setLoading(false); // Comentado
     };
 
     calcularLibres();  // Llamamos a la función de cálculo de 'libres'
-    
+
     // Solo guardar si numeroBarra ha sido inicializado desde Firestore/listener
     if (isNumeroBarraInitialized) {
+      console.log("[LIBRES] isNumeroBarraInitialized es true. Llamando a guardarEstadisticasDiarias().");
       guardarEstadisticasDiarias();
+    } else {
+      console.log("[LIBRES] isNumeroBarraInitialized es false. Omitiendo guardarEstadisticasDiarias().");
     }
    
   // eslint-disable-next-line react-hooks/exhaustive-deps
 }, [numeroBarra, totalProductosDespuesDeLas18, totalbloquesAntesdelas18, isNumeroBarraInitialized]);
+
+// useEffect para calcular y actualizar mostrarBarra
+useEffect(() => {
+  console.log("[MOSTRAR_BARRA] Hook de cálculo de 'mostrarBarra' activado. Dependencias: pedidos, numeroBarra.");
+
+  if (!pedidos) {
+    console.log("[MOSTRAR_BARRA] 'pedidos' no está definido. Omitiendo cálculo.");
+    return;
+  }
+
+  const getTurnoActualContext = () => {
+    const now = dayjs().locale('es').tz('Europe/Madrid');
+    const today = now.startOf('day'); // Referencia al inicio del día de hoy
+    let startTime, endTime;
+
+    // Lógica de turnos consistente con Cocina.jsx:
+    // Mañana: 00:01:00 hasta 18:00:00 inclusive
+    // Tarde: 18:00:01 hasta 23:59:59 inclusive
+    const horaLimiteTardeInicio = today.hour(18).minute(0).second(0).millisecond(1); // 18:00:00.001
+
+    if (now.isBefore(horaLimiteTardeInicio)) { // Turno de mañana
+      startTime = today.hour(0).minute(1).second(0).millisecond(0);
+      endTime = today.hour(18).minute(0).second(0).millisecond(0);
+    } else { // Turno de tarde
+      startTime = horaLimiteTardeInicio;
+      endTime = today.hour(23).minute(59).second(59).millisecond(999);
+    }
+    return { startTime, endTime };
+  };
+
+  const { startTime, endTime } = getTurnoActualContext();
+
+  const pedidosDelTurnoActual = pedidos.filter((pedido) => {
+    if (!pedido.fechahora || typeof pedido.fechahora !== 'string') return false;
+    // Asumimos que fechahora ya está en formato 'DD/MM/YYYY HH:mm' y representa la hora de Madrid
+    const orderDateTime = dayjs(pedido.fechahora, 'DD/MM/YYYY HH:mm', 'es', true).tz('Europe/Madrid', true);
+    if (!orderDateTime.isValid()) return false;
+    
+    return orderDateTime.isBetween(startTime, endTime, null, '[]');
+  });
+
+  const pollosEntregadosCalculados = pedidosDelTurnoActual.reduce((totalEntregados, pedido) => {
+    if (!pedido.productos || !Array.isArray(pedido.productos)) return totalEntregados;
+    
+    return totalEntregados + pedido.productos.reduce((sumaEntregadosProducto, producto) => {
+      const entregadoValor = Number(producto.entregado) || 0;
+      if (producto.id === 1) return sumaEntregadosProducto + entregadoValor; // Pollo entero
+      if (producto.id === 2) return sumaEntregadosProducto + (entregadoValor * 0.5); // Medio pollo
+      return sumaEntregadosProducto;
+    }, 0);
+  }, 0);
+
+  const currentNumeroBarra = parseFloat(numeroBarra) || 0;
+  const nuevoMostrarBarra = currentNumeroBarra - pollosEntregadosCalculados;
+
+  // Actualizar 'mostrarBarra' solo si el valor ha cambiado para evitar bucles
+  setMostrarBarra(currentVal => {
+    if (nuevoMostrarBarra !== currentVal) return nuevoMostrarBarra;
+    return currentVal;
+  });
+ console.log(`[MOSTRAR_BARRA] Calculado: ${currentNumeroBarra} (enBarra) - ${pollosEntregadosCalculados} (entregadosTurno) = ${nuevoMostrarBarra}. Pedidos en turno: ${pedidosDelTurnoActual.length}`);
+}, [pedidos, numeroBarra, setMostrarBarra]); // setMostrarBarra es estable, pero se incluye por completitud
 
 // Listener para cambios en 'enbarra' (y otros campos si es necesario) desde Firestore
 useEffect(() => {
@@ -144,8 +269,10 @@ useEffect(() => {
         // Actualiza numeroBarra en el estado solo si es diferente
         setNumeroBarra(currentNumeroBarra => {
           if (data.enbarra !== currentNumeroBarra) {
+            console.log(`[LIBRES] Listener Firestore 'estadisticas_diarias': 'enbarra' (${data.enbarra}) es diferente de numeroBarra actual (${currentNumeroBarra}). Actualizando.`);
             return data.enbarra;
           }
+          console.log(`[LIBRES] Listener Firestore 'estadisticas_diarias': 'enbarra' (${data.enbarra}) no cambió. numeroBarra se mantiene en ${currentNumeroBarra}.`);
           return currentNumeroBarra;
         });
       } else {
@@ -156,7 +283,7 @@ useEffect(() => {
       }
     } else {
       // El documento no existe. Esto es normal al inicio de un nuevo día antes del login.
-      // Login.jsx se encargará de crear el documento con enbarra: 0.
+      // Login.jsx se encargará de crear el documento con enbarra: 0 si es necesario.
       // numeroBarra ya es 0 por useState(0).
       console.log(`DataContext: Documento estadisticas_diarias para ${fechaActualFormateada} no existe aún.`);
     }
@@ -183,26 +310,31 @@ useEffect(() => {
 
  // Función para guardar los datos de estadisticas_diarias
  const guardarEstadisticasDiarias = async () => {
+  console.log("[LIBRES] Dentro de guardarEstadisticasDiarias().");
   try {
     const fecha = obtenerFechaFormateada();
     const docRef = doc(db, "estadisticas_diarias", fecha);
     
     const docSnap = await getDoc(docRef); // Verificar si el documento existe
 
+    const enBarraActual = numeroBarra; // Usar el valor actual de numeroBarra del estado
+    const libresMananaCalc = enBarraActual - totalbloquesAntesdelas18;
+    const libresTardeCalc = enBarraActual - totalProductosDespuesDeLas18;
+    console.log(`[LIBRES] guardarEstadisticasDiarias - Valores a guardar: enbarra=${enBarraActual}, libresManana=${libresMananaCalc}, libresTarde=${libresTardeCalc}, vm=${totalbloquesAntesdelas18}, vt=${totalProductosDespuesDeLas18}, vd=${totalbloquesAntesdelas18+totalProductosDespuesDeLas18}`);
+
     if (docSnap.exists()) { // Solo actualizar si el documento ya existe
       await updateDoc(docRef, {
-        enbarra: numeroBarra,
-        libresManana:numeroBarra-totalbloquesAntesdelas18,
-        libresTarde: numeroBarra-totalProductosDespuesDeLas18,
+        enbarra: enBarraActual,
+        libresManana: libresMananaCalc,
+        libresTarde: libresTardeCalc,
         vm: totalbloquesAntesdelas18,
         vt: totalProductosDespuesDeLas18,
         vd: totalbloquesAntesdelas18+totalProductosDespuesDeLas18,
       });
-      // console.log("Datos de estadísticas diarias actualizados para el día", fecha); // Para depuración
+      console.log("[LIBRES] guardarEstadisticasDiarias - Datos actualizados para el día", fecha);
     } else {
-      // Si el documento no existe, Login.jsx es responsable de crearlo.
-      // No se actualiza aquí para evitar conflictos con la lógica de creación de Login.jsx.
-      console.warn(`DataContext: Intento de actualizar estadisticas_diarias para ${fecha}, pero el documento no existe. Login.jsx debería haberlo creado.`);
+      // Si el documento no existe, Login.jsx (o la lógica de inicio de sesión) es responsable de crearlo.
+      console.warn(`[LIBRES] guardarEstadisticasDiarias - Documento ${fecha} no existe. Login.jsx debería crearlo si es un nuevo día.`);
     }
 
   } catch (e) {
