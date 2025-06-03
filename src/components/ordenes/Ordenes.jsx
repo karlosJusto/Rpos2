@@ -670,15 +670,9 @@ const Ordenes = () => {
     return total + entregadosPorBloque;
   }, 0);
 
-  // Calcula mostrarBarra asegurándote de que numeroBarra sea numérico
-  const numeroBarraActual = !isNaN(parseFloat(numeroBarra)) ? parseFloat(numeroBarra) : 0;
-  // Actualiza mostrarBarra solo si el cálculo es diferente al valor actual
-  const nuevoMostrarBarra = numeroBarraActual - pollosEntregados;
-  if (nuevoMostrarBarra !== mostrarBarra) {
-      setMostrarBarra(nuevoMostrarBarra);
-  }
-
-
+  // El cálculo de mostrarBarra ahora se realiza centralmente en DataContext.
+  // Ordenes.jsx simplemente consume el valor de mostrarBarra del contexto.
+  // console.log("[Ordenes] mostrarBarra del contexto:", mostrarBarra);
 
 
 

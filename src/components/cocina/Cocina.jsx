@@ -434,34 +434,10 @@ const Cocina = () => {
     };
   }, [selectedDateStr, cocinaProducts, productosStockMap, isToday, getTurnoActual, isLoadingCocina, isLoadingProductosStock, db]); // Added db to dependencies as it's used in doc()
 
-  // --- EFFECT B: Cálculo de mostrarBarra (Original from Cocina, with original console.logs) ---
+  // --- EFFECT B: Cálculo de mostrarBarra ahora se maneja centralmente en DataContext ---
   useEffect(() => {
-    console.log("[Effect B] Recalculando mostrarBarra debido a cambio en numeroBarra o pedidosDelTurnoState."); // Original console.log
-
-    const pollosEntregadosCalculados = pedidosDelTurnoState.reduce((totalEntregados, pedido) => {
-      if (!pedido.productos || !Array.isArray(pedido.productos)) {
-          return totalEntregados;
-      }
-      const entregadosEnPedido = pedido.productos.reduce((sumaEntregadosProducto, producto) => {
-          const entregadoValor = producto.entregado || 0;
-          if (producto.id === 1) {
-              return sumaEntregadosProducto + entregadoValor;
-          } else if (producto.id === 2) {
-              return sumaEntregadosProducto + (entregadoValor * 0.5);
-          }
-          return sumaEntregadosProducto;
-      }, 0);
-      return totalEntregados + entregadosEnPedido;
-    }, 0);
-    console.log(`[Effect B] Pollos Entregados Calculados: ${pollosEntregadosCalculados}`); // Original console.log
-
-    const currentNumeroBarra = parseFloat(numeroBarra) || 0;
-    const nuevoMostrarBarra = currentNumeroBarra - pollosEntregadosCalculados;
-    console.log(`[Effect B] Actualizando mostrarBarra: ${currentNumeroBarra} - ${pollosEntregadosCalculados} = ${nuevoMostrarBarra}`); // Original console.log
-    if (setMostrarBarra && mostrarBarra !== nuevoMostrarBarra) { // Avoid re-set if value is same
-        setMostrarBarra(nuevoMostrarBarra);
-    }
-  }, [numeroBarra, pedidosDelTurnoState, setMostrarBarra, mostrarBarra]); // Original dependencies (mostrarBarra added here is ok to prevent needless re-set from context)
+    console.log("[Cocina - Effect B] mostrarBarra ahora se consume del DataContext. Valor actual:", mostrarBarra);
+  }, [mostrarBarra]);
 
   // --- EFFECT C: Time-Dependent Flags & Sorting (Original from Cocina, with original console.logs) ---
   useEffect(() => {

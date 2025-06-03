@@ -196,10 +196,19 @@ const DataProvider = ({ children }) => {
 
 // useEffect para calcular y actualizar mostrarBarra
 useEffect(() => {
-  console.log("[MOSTRAR_BARRA] Hook de cálculo de 'mostrarBarra' activado. Dependencias: pedidos, numeroBarra.");
+  console.log("[MOSTRAR_BARRA] Hook de cálculo de 'mostrarBarra' activado. Dependencias: pedidos, numeroBarra, dateToPass.");
 
   if (!pedidos) {
     console.log("[MOSTRAR_BARRA] 'pedidos' no está definido. Omitiendo cálculo.");
+    // Si pedidos no está, mostrarBarra debería ser igual a numeroBarra o 0 si numeroBarra tampoco está.
+    setMostrarBarra(parseFloat(numeroBarra) || 0);
+    return;
+  }
+
+  const esHoyReal = !dateToPass || dayjs(dateToPass).isSame(dayjs().tz('Europe/Madrid'), 'day');
+
+  if (!isNumeroBarraInitialized && !esHoyReal) {
+    console.log("[MOSTRAR_BARRA] numeroBarra no inicializado para día específico. Omitiendo cálculo hasta que numeroBarra se cargue para dateToPass.");
     return;
   }
 
@@ -223,18 +232,23 @@ useEffect(() => {
     return { startTime, endTime };
   };
 
-  const { startTime, endTime } = getTurnoActualContext();
+  let pedidosFiltradosParaMostrarBarra;
 
-  const pedidosDelTurnoActual = pedidos.filter((pedido) => {
-    if (!pedido.fechahora || typeof pedido.fechahora !== 'string') return false;
-    // Asumimos que fechahora ya está en formato 'DD/MM/YYYY HH:mm' y representa la hora de Madrid
-    const orderDateTime = dayjs(pedido.fechahora, 'DD/MM/YYYY HH:mm', 'es', true).tz('Europe/Madrid', true);
-    if (!orderDateTime.isValid()) return false;
-    
-    return orderDateTime.isBetween(startTime, endTime, null, '[]');
-  });
+  if (esHoyReal) {
+    const { startTime, endTime } = getTurnoActualContext();
+    pedidosFiltradosParaMostrarBarra = pedidos.filter((pedido) => {
+      if (!pedido.fechahora || typeof pedido.fechahora !== 'string') return false;
+      const orderDateTime = dayjs(pedido.fechahora, 'DD/MM/YYYY HH:mm', 'es', true).tz('Europe/Madrid', true);
+      if (!orderDateTime.isValid()) return false;
+      return orderDateTime.isBetween(startTime, endTime, null, '[]');
+    });
+  } else {
+    // Para un día específico (pasado o futuro), consideramos todos los pedidos de ese día.
+    // 'pedidos' ya está filtrado por dateToPass.
+    pedidosFiltradosParaMostrarBarra = pedidos;
+  }
 
-  const pollosEntregadosCalculados = pedidosDelTurnoActual.reduce((totalEntregados, pedido) => {
+  const pollosEntregadosCalculados = pedidosFiltradosParaMostrarBarra.reduce((totalEntregados, pedido) => {
     if (!pedido.productos || !Array.isArray(pedido.productos)) return totalEntregados;
     
     return totalEntregados + pedido.productos.reduce((sumaEntregadosProducto, producto) => {
@@ -253,15 +267,21 @@ useEffect(() => {
     if (nuevoMostrarBarra !== currentVal) return nuevoMostrarBarra;
     return currentVal;
   });
- console.log(`[MOSTRAR_BARRA] Calculado: ${currentNumeroBarra} (enBarra) - ${pollosEntregadosCalculados} (entregadosTurno) = ${nuevoMostrarBarra}. Pedidos en turno: ${pedidosDelTurnoActual.length}`);
-}, [pedidos, numeroBarra, setMostrarBarra]); // setMostrarBarra es estable, pero se incluye por completitud
+ console.log(`[MOSTRAR_BARRA] Calculado para ${esHoyReal ? 'HOY' : dayjs(dateToPass).format('DD-MM-YYYY')}: ${currentNumeroBarra} (enBarra) - ${pollosEntregadosCalculados} (entregados) = ${nuevoMostrarBarra}. Pedidos considerados: ${pedidosFiltradosParaMostrarBarra.length}`);
+}, [pedidos, numeroBarra, dateToPass, setMostrarBarra, isNumeroBarraInitialized]);
 
 // Listener para cambios en 'enbarra' (y otros campos si es necesario) desde Firestore
 useEffect(() => {
-  const fechaActualFormateada = obtenerFechaFormateada();
-  const docRef = doc(db, 'estadisticas_diarias', fechaActualFormateada);
-  let initialSnapshotProcessed = false;
+  const fechaParaEstadisticas = dateToPass
+    ? dayjs(dateToPass).tz('Europe/Madrid').format('DD-MM-YYYY')
+    : obtenerFechaFormateada(); // Current day if dateToPass is null
 
+  console.log(`[LIBRES] Listener Firestore: Configurando para fecha ${fechaParaEstadisticas}`);
+  const docRef = doc(db, 'estadisticas_diarias', fechaParaEstadisticas);
+  let initialSnapshotProcessed = false;
+  setIsNumeroBarraInitialized(false); // Reset for new date/listener
+
+  // Asegurarse de que numeroBarra se establezca a un valor inicial antes de que el snapshot llegue
   const unsubscribe = onSnapshot(docRef, (docSnapshot) => {
     if (docSnapshot.exists()) {
       const data = docSnapshot.data();
@@ -269,43 +289,44 @@ useEffect(() => {
         // Actualiza numeroBarra en el estado solo si es diferente
         setNumeroBarra(currentNumeroBarra => {
           if (data.enbarra !== currentNumeroBarra) {
-            console.log(`[LIBRES] Listener Firestore 'estadisticas_diarias': 'enbarra' (${data.enbarra}) es diferente de numeroBarra actual (${currentNumeroBarra}). Actualizando.`);
+            console.log(`[LIBRES] Listener Firestore 'estadisticas_diarias' (${fechaParaEstadisticas}): 'enbarra' (${data.enbarra}) es diferente de numeroBarra actual (${currentNumeroBarra}). Actualizando.`);
             return data.enbarra;
           }
-          console.log(`[LIBRES] Listener Firestore 'estadisticas_diarias': 'enbarra' (${data.enbarra}) no cambió. numeroBarra se mantiene en ${currentNumeroBarra}.`);
+          console.log(`[LIBRES] Listener Firestore 'estadisticas_diarias' (${fechaParaEstadisticas}): 'enbarra' (${data.enbarra}) no cambió. numeroBarra se mantiene en ${currentNumeroBarra}.`);
           return currentNumeroBarra;
         });
       } else {
-        console.warn(`DataContext: El campo 'enbarra' no se encontró en el documento ${fechaActualFormateada}, aunque el documento existe.`);
-        // Si el campo no existe pero el documento sí, podría ser un estado inicial.
-        // Si se desea, se podría establecer numeroBarra a 0 aquí, pero Login.jsx debería manejar la creación inicial.
-        // setNumeroBarra(0); 
+        console.warn(`DataContext: El campo 'enbarra' no se encontró en el documento ${fechaParaEstadisticas}, aunque el documento existe. Usando numeroBarra = 0.`);
+        setNumeroBarra(0);
       }
     } else {
       // El documento no existe. Esto es normal al inicio de un nuevo día antes del login.
       // Login.jsx se encargará de crear el documento con enbarra: 0 si es necesario.
-      // numeroBarra ya es 0 por useState(0).
-      console.log(`DataContext: Documento estadisticas_diarias para ${fechaActualFormateada} no existe aún.`);
+      console.log(`DataContext: Documento estadisticas_diarias para ${fechaParaEstadisticas} no existe aún. Usando numeroBarra = 0.`);
+      setNumeroBarra(0);
     }
 
     // Marcar como inicializado después del primer procesamiento del snapshot (o intento)
     if (!initialSnapshotProcessed) {
       setIsNumeroBarraInitialized(true);
       initialSnapshotProcessed = true;
+      console.log(`[LIBRES] Listener Firestore: isNumeroBarraInitialized establecido a true para ${fechaParaEstadisticas}.`);
     }
 
   }, (error) => {
-    console.error("Error en el listener de estadisticas_diarias en DataContext:", error);
+    console.error(`Error en el listener de estadisticas_diarias para ${fechaParaEstadisticas} en DataContext:`, error);
+    setNumeroBarra(0); // Default to 0 on error
     // Incluso si hay un error, marcamos como inicializado para no bloquear otras lógicas indefinidamente.
     if (!initialSnapshotProcessed) {
       setIsNumeroBarraInitialized(true);
       initialSnapshotProcessed = true;
+      console.log(`[LIBRES] Listener Firestore: isNumeroBarraInitialized establecido a true (DESPUÉS DE ERROR) para ${fechaParaEstadisticas}.`);
     }
   });
 
   return () => unsubscribe(); // Limpiar el listener al desmontar
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-}, []); // Se ejecuta solo una vez al montar para establecer el listener
+  
+}, [dateToPass]); // Dependencia en dateToPass para re-suscribir cuando cambie la fecha
 
 
  // Función para guardar los datos de estadisticas_diarias
@@ -313,7 +334,7 @@ useEffect(() => {
   console.log("[LIBRES] Dentro de guardarEstadisticasDiarias().");
   try {
     const fecha = obtenerFechaFormateada();
-    const docRef = doc(db, "estadisticas_diarias", fecha);
+    const docRef = doc(db, "estadisticas_diarias", fecha); // Siempre guarda para el día actual
     
     const docSnap = await getDoc(docRef); // Verificar si el documento existe
 
@@ -334,7 +355,7 @@ useEffect(() => {
       console.log("[LIBRES] guardarEstadisticasDiarias - Datos actualizados para el día", fecha);
     } else {
       // Si el documento no existe, Login.jsx (o la lógica de inicio de sesión) es responsable de crearlo.
-      console.warn(`[LIBRES] guardarEstadisticasDiarias - Documento ${fecha} no existe. Login.jsx debería crearlo si es un nuevo día.`);
+      console.warn(`[LIBRES] guardarEstadisticasDiarias - Documento para HOY (${fecha}) no existe. Login.jsx debería crearlo. No se guardará nada desde aquí.`);
     }
 
   } catch (e) {
@@ -349,6 +370,51 @@ const obtenerFechaFormateada = () => {
   return fechaFormateada;
 };
 
+// Modificación del useEffect que calcula 'libres'
+useEffect(() => {
+  console.log("[LIBRES] Hook de cálculo de 'libres' activado. Deps: numeroBarra, totals, isNumeroBarraInitialized, dateToPass.");
+  const calcularLibres = () => {
+    console.log("[LIBRES] Dentro de calcularLibres().");
+
+    const esHoyReal = !dateToPass || dayjs(dateToPass).isSame(dayjs().tz('Europe/Madrid'), 'day');
+    let libresCalculados;
+
+    if (esHoyReal) {
+      // Logic for today: use current time to determine shift
+      const currentTime = dayjs().locale('es').tz('Europe/Madrid');
+      const antesDelas6pm = currentTime.hour() < 18;
+      libresCalculados = antesDelas6pm
+        ? numeroBarra - totalbloquesAntesdelas18
+        : numeroBarra - totalProductosDespuesDeLas18;
+      console.log(`[LIBRES] Cálculo para HOY (${antesDelas6pm ? 'MAÑANA' : 'TARDE'}): ${numeroBarra} - ${antesDelas6pm ? totalbloquesAntesdelas18 : totalProductosDespuesDeLas18} = ${libresCalculados}`);
+    } else {
+      // Logic for a specific past/future day selected via dateToPass:
+      // Calculate libres based on total orders for the entire selected day.
+      libresCalculados = numeroBarra - (totalbloquesAntesdelas18 + totalProductosDespuesDeLas18);
+      console.log(`[LIBRES] Cálculo para DÍA ESPECÍFICO (${dayjs(dateToPass).format('DD-MM-YYYY')}): ${numeroBarra} - (${totalbloquesAntesdelas18} + ${totalProductosDespuesDeLas18}) = ${libresCalculados}`);
+    }
+
+    setLibres(currentLibres => {
+      if (libresCalculados !== currentLibres) {
+        console.log(`[LIBRES] setLibres: valor cambió de ${currentLibres} a ${libresCalculados}. Actualizando estado.`);
+        return libresCalculados;
+      }
+      console.log(`[LIBRES] setLibres: valor no cambió (${libresCalculados}). Estado 'libres' se mantiene en ${currentLibres}.`);
+      return currentLibres;
+    });
+  };
+
+  if (isNumeroBarraInitialized) { // Solo calcular si numeroBarra (para la fecha actual o dateToPass) ha sido cargado/intentado cargar.
+    calcularLibres();
+  } else {
+    console.log("[LIBRES] isNumeroBarraInitialized es false. Omitiendo calcularLibres(). 'libres' podría no estar actualizado para la fecha seleccionada.");
+  }
+
+  const esHoyParaGuardar = !dateToPass || dayjs(dateToPass).isSame(dayjs().tz('Europe/Madrid'), 'day');
+  if (isNumeroBarraInitialized && esHoyParaGuardar) { // Solo guardar si estamos en el día actual y numeroBarra está inicializado
+    guardarEstadisticasDiarias();
+  }
+}, [numeroBarra, totalProductosDespuesDeLas18, totalbloquesAntesdelas18, isNumeroBarraInitialized, dateToPass, setLibres]);
 
 
    /*useEffect(() => { // Bloque de código comentado por el usuario
