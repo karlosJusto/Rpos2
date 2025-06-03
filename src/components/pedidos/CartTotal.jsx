@@ -512,12 +512,15 @@ const CartTotal = ({ datosCliente, setDatosCliente, orderToEdit }) => { // order
       } else {
         pedidoId = await getNextId();
         console.log(`Creando nuevo pedido en Firestore con ID: ${pedidoId}`);
+        const newOrderCreationToken = Math.random().toString(36).substring(2, 10); // Token único para esta creación
         const pedidoData = {
            NumeroPedido: pedidoId, cliente: clienteData.cliente, telefono: clienteData.telefono,
            localidad: clienteData.localidad, celiaco: clienteData.celiaco, idCliente: clienteId,
            fechahora: horaPedidoParaGuardar, observaciones: clienteData.observaciones, pagado: clienteData.pagado,
            productos: mappedProducts, total_pedido: totalPedidoCalculado.toFixed(2), paraOtroDia: esParaOtroDia,
            empleado: empleadoNombre || "No identificado",
+           orderCreationToken: newOrderCreationToken, // <-- Token añadido aquí
+           webListenerProcessed: false, // <-- Inicializar explícitamente
            origen: orderToEdit?.origen ?? 0, // Si orderToEdit es clientInfo (sin origen), será 0.
            fechahora_realizado: nowString,
         };

@@ -9,6 +9,7 @@ import {
   getDoc, // Para leer un documento específico
   updateDoc, // Para actualizar un documento
   runTransaction, // Importante para usar transacciones
+  serverTimestamp, // Para marcar el tiempo de procesamiento
 } from 'firebase/firestore';
 
 // --- Helper Function: Convert HH:mm to minutes ---
@@ -60,7 +61,7 @@ const GlobalOrderListener = () => {
           const newOrderData = change.doc.data();
           const orderId = change.doc.id;
           const timestamp = Date.now(); // Hora actual en milisegundos
-          console.log(`%GLOBAL[Listener ${timestamp}] ---> DETECTADO 'added' PARA DOC ID: ${orderId}`, 'color: blue; font-weight: bold;'); // Log específico
+          console.log(`%cGLOBAL[Listener ${timestamp}] ---> DETECTADO 'added' PARA DOC ID: ${orderId} (Token: ${newOrderData.orderCreationToken || 'N/A'})`, 'color: blue; font-weight: bold;');
           const callId = Math.random().toString(36).substring(7); // ID único para esta llamada
 
           // Modificado: No procesar pedidos con origen 0 (online) aquí, ya que se manejan desde la app.
@@ -69,7 +70,7 @@ const GlobalOrderListener = () => {
             console.log(`%c[Listener] ---> PEDIDO CON ORIGEN ${newOrderData.origen} [${orderId}] (Num: ${newOrderData.NumeroPedido || 'N/A'}) DETECTADO. Procesando...`, 'color: orange; font-weight: bold;');
             handleFirestoreUpdateLikeCartTotal(newOrderData, orderId, callId); // Pasar el callId
           } else {
-            console.log(`%c[Listener] ---> PEDIDO ONLINE [${orderId}] (Num: ${newOrderData.NumeroPedido || 'N/A'}, Origen: 0) DETECTADO. IGNORADO para actualización de calendario desde web.`, 'color: gray;');
+            console.log(`%c[Listener] ---> PEDIDO CON ORIGEN ${newOrderData.origen} [${orderId}] (Num: ${newOrderData.NumeroPedido || 'N/A'}) DETECTADO. IGNORADO por este listener.`, 'color: gray;');
           }
         }
         // Ignorar cambios 'modified' o 'removed' para esta lógica
@@ -93,27 +94,64 @@ const GlobalOrderListener = () => {
    * Sobreescribe el array 'intervals' completo.
    */
   const handleFirestoreUpdateLikeCartTotal = async (order, orderId,callId) => {
-    // debugger; // Comentado o eliminado para producción
-    const logPrefix = `[UpdateCal][${orderId}][Call ${callId}]`; // Usar callId en logs
-    console.log(`${logPrefix} Iniciando procesamiento.`);
+    // El orderCreationToken es para trazabilidad. La lógica de "solo uno procesa"
+    // se basa en la transacción sobre `webListenerProcessed`.
+    // No hay una "coincidencia de instancia" directa entre CartTotal y un listener global específico
+    // que pueda determinar quién procesa sin una transacción.
+    const logPrefix = `[UpdateCal][${orderId}][Token:${order.orderCreationToken || 'N/A'}][Call ${callId}]`;
+    console.log(`${logPrefix} Iniciando intento de procesamiento.`);
 
-    let canProcessCalendars = true; // Bandera para controlar si se procesan los calendarios
     const pedidoDocRef = doc(db, "pedidos", orderId);
+    let canProceedWithProcessing = false;
 
-    // --- 0. Verificar si el pedido ya ha sido procesado por este listener ---
+    // --- 0. ATOMICALLY CHECK AND MARK AS PROCESSED ---
+    // This transaction attempts to "claim" the order for processing.
+    // Only one listener instance should succeed.
     try {
-        const pedidoSnap = await getDoc(pedidoDocRef);
-        if (pedidoSnap.exists() && pedidoSnap.data().webListenerProcessed === true) {
-            console.log(`${logPrefix} Pedido ya marcado como 'webListenerProcessed'. Omitiendo procesamiento y marcado.`);
-            return; // Salir si ya está marcado como procesado
-        }
-        // Si no existe el campo, es false, o el documento no existe (raro para 'added'), continuar.
+        await runTransaction(db, async (transaction) => {
+            const transLogPrefixClaim = `${logPrefix} [ClaimTrans]`;
+            console.log(`${transLogPrefixClaim} Attempting to get pedidoDocRef: ${pedidoDocRef.path}`);
+            const pedidoSnap = await transaction.get(pedidoDocRef);
+
+            if (!pedidoSnap.exists()) {
+                // This is unlikely for an 'added' event that triggered this,
+                // but good to handle. It means the doc was deleted very quickly.
+                console.warn(`${transLogPrefixClaim} Pedido ${orderId} NOT FOUND during claim transaction. Aborting this attempt.`);
+                throw new Error(`Pedido ${orderId} no encontrado.`);
+            }
+
+            const pedidoData = pedidoSnap.data();
+            const currentFlagVal = pedidoData.webListenerProcessed;
+            const processedAt = pedidoData.webListenerProcessedAt ? new Date(pedidoData.webListenerProcessedAt.seconds * 1000).toISOString() : "N/A";
+
+            console.log(`${transLogPrefixClaim} Read from DB. OrderId: ${orderId}. Current webListenerProcessed: ${currentFlagVal} (type: ${typeof currentFlagVal}), ProcessedAt: ${processedAt}`);
+
+            if (currentFlagVal === true) {
+                console.log(`${transLogPrefixClaim} Flag is TRUE. Order already processed or being processed by another instance. This instance will NOT claim.`);
+                // canProceedWithProcessing remains false
+            } else {
+                // This instance claims the order.
+                console.log(`${transLogPrefixClaim} Flag is FALSE or UNDEFINED. This instance WILL ATTEMPT TO CLAIM order ${orderId}.`);
+                transaction.update(pedidoDocRef, {
+                    webListenerProcessed: true,
+                    webListenerProcessedAt: serverTimestamp(), // Mark with server time
+                });
+                canProceedWithProcessing = true;
+                console.log(`${transLogPrefixClaim} Order ${orderId} SUCCESSFULLY CLAIMED by this instance. Staged update: webListenerProcessed: true.`);
+            }
+        });
     } catch (error) {
-        console.error(`${logPrefix} Error al verificar 'webListenerProcessed' para el pedido. Continuando con precaución:`, error);
-        // Considerar si retornar aquí para evitar doble procesamiento si la lectura falla.
-        // Por ahora, se continúa.
+        console.error(`${logPrefix} Error durante la transacción para reclamar el pedido ${orderId}. No se procesará por esta instancia. Error:`, error.message);
+        return; // Important to exit if the claim fails
     }
 
+    if (!canProceedWithProcessing) {
+        console.log(`${logPrefix} Esta instancia no procesará el pedido ${orderId} (ya reclamado o error en reclamación). Finalizando.`);
+        return; // Exit if this instance did not claim the order
+    }
+
+    console.log(`${logPrefix} Procesamiento principal iniciado para el pedido ${orderId} (reclamado).`);
+    let canProcessCalendars = true; // Bandera para controlar si se procesan los calendarios
     try {
         // --- 1. Parsear Fecha y Hora del Pedido ---
         const fechahoraPedido = order.fechahora; // Formato esperado "DD/MM/YYYY HH:MM"
@@ -275,21 +313,8 @@ const GlobalOrderListener = () => {
             console.log(`${logPrefix} No se procesaron calendarios debido a validaciones previas fallidas o falta de productos.`);
         }
 
-        // --- 5. Marcar el pedido como procesado por este listener ---
-        // Esto se hace después de que todas las actualizaciones de calendario se hayan intentado.
-        try {
-            console.log(`${logPrefix} Marcando pedido como 'webListenerProcessed: true'.`);
-            await updateDoc(pedidoDocRef, {
-                webListenerProcessed: true,
-                // Opcional: añadir un timestamp de cuándo fue procesado por el listener
-                // webListenerProcessedAt: serverTimestamp() // Necesitarías importar serverTimestamp
-            });
-            console.log(`${logPrefix} Pedido marcado exitosamente como 'webListenerProcessed: true'.`);
-        } catch (markError) {
-            console.error(`${logPrefix} ERROR CRÍTICO: No se pudo marcar el pedido como 'webListenerProcessed' después del procesamiento de calendarios:`, markError);
-            // Este es un problema porque el pedido podría ser reprocesado en el futuro.
-        }
-
+        // --- 5. Marcar el pedido como procesado ---
+        // Esta acción ahora se realiza de forma atómica al inicio de la función, en la transacción de reclamación.
         console.log(`${logPrefix} Procesamiento general finalizado.`);
 
     } catch (generalError) {
