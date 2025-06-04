@@ -148,7 +148,6 @@ const Ordenes = () => {
                 const productoCantidadEnPedido = Number(productoEnPedido.cantidad) || 0;
                 let idProductoParaStockGlobal = productoEnPedido.id?.toString(); 
                 let cantidadParaStockGlobal = productoCantidadEnPedido;
-                debugger
                 // Modificar la lógica para incluir IDs 39 y 40 para restaurar stock al ID 1 (pollo entero)
                 if ([2, 39, 40].includes(productoEnPedido.id)) {
                     idProductoParaStockGlobal = '1'; 

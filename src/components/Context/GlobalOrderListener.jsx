@@ -65,8 +65,8 @@ const GlobalOrderListener = () => {
           const callId = Math.random().toString(36).substring(7); // ID único para esta llamada
 
           // Modificado: No procesar pedidos con origen 0 (online) aquí, ya que se manejan desde la app.
-          // Este listener podría procesar otros orígenes si fuera necesario en el futuro.
-          if (newOrderData.origen !== 1) {
+          // Este listener DEBE procesar solo origen 1 (online) para actualizar calendarios.
+          if (newOrderData.origen === 0) { // <-- Changed condition to process ONLY origin 1
             console.log(`%c[Listener] ---> PEDIDO CON ORIGEN ${newOrderData.origen} [${orderId}] (Num: ${newOrderData.NumeroPedido || 'N/A'}) DETECTADO. Procesando...`, 'color: orange; font-weight: bold;');
             handleFirestoreUpdateLikeCartTotal(newOrderData, orderId, callId); // Pasar el callId
           } else {
@@ -104,45 +104,64 @@ const GlobalOrderListener = () => {
     const pedidoDocRef = doc(db, "pedidos", orderId);
     let canProceedWithProcessing = false;
 
+    const MAX_CLAIM_RETRIES = 3;
+    const CLAIM_RETRY_DELAY_MS = 5000; // 5 segundos
+
     // --- 0. ATOMICALLY CHECK AND MARK AS PROCESSED ---
     // This transaction attempts to "claim" the order for processing.
     // Only one listener instance should succeed.
-    try {
-        await runTransaction(db, async (transaction) => {
-            const transLogPrefixClaim = `${logPrefix} [ClaimTrans]`;
-            console.log(`${transLogPrefixClaim} Attempting to get pedidoDocRef: ${pedidoDocRef.path}`);
-            const pedidoSnap = await transaction.get(pedidoDocRef);
+    for (let attempt = 1; attempt <= MAX_CLAIM_RETRIES; attempt++) {
+        try {
+            await runTransaction(db, async (transaction) => {
+                const transLogPrefixClaim = `${logPrefix} [ClaimTransAttempt-${attempt}]`;
+                console.log(`${transLogPrefixClaim} Attempting to get pedidoDocRef: ${pedidoDocRef.path}`);
+                const pedidoSnap = await transaction.get(pedidoDocRef);
 
-            if (!pedidoSnap.exists()) {
-                // This is unlikely for an 'added' event that triggered this,
-                // but good to handle. It means the doc was deleted very quickly.
-                console.warn(`${transLogPrefixClaim} Pedido ${orderId} NOT FOUND during claim transaction. Aborting this attempt.`);
-                throw new Error(`Pedido ${orderId} no encontrado.`);
-            }
+                if (!pedidoSnap.exists()) {
+                    // This can happen if the listener picks up the event slightly before the doc is fully queryable by the transaction.
+                    console.warn(`${transLogPrefixClaim} Pedido ${orderId} NOT FOUND during claim transaction. This attempt will fail.`);
+                    throw new Error(`Pedido ${orderId} no encontrado.`); // This error will be caught by the outer catch
+                }
 
-            const pedidoData = pedidoSnap.data();
-            const currentFlagVal = pedidoData.webListenerProcessed;
-            const processedAt = pedidoData.webListenerProcessedAt ? new Date(pedidoData.webListenerProcessedAt.seconds * 1000).toISOString() : "N/A";
+                const pedidoData = pedidoSnap.data();
+                const currentFlagVal = pedidoData.webListenerProcessed;
+                const processedAt = pedidoData.webListenerProcessedAt ? new Date(pedidoData.webListenerProcessedAt.seconds * 1000).toISOString() : "N/A";
 
-            console.log(`${transLogPrefixClaim} Read from DB. OrderId: ${orderId}. Current webListenerProcessed: ${currentFlagVal} (type: ${typeof currentFlagVal}), ProcessedAt: ${processedAt}`);
+                console.log(`${transLogPrefixClaim} Read from DB. OrderId: ${orderId}. Current webListenerProcessed: ${currentFlagVal} (type: ${typeof currentFlagVal}), ProcessedAt: ${processedAt}`);
 
-            if (currentFlagVal === true) {
-                console.log(`${transLogPrefixClaim} Flag is TRUE. Order already processed or being processed by another instance. This instance will NOT claim.`);
-                // canProceedWithProcessing remains false
+                if (currentFlagVal === true) {
+                    console.log(`${transLogPrefixClaim} Flag is TRUE. Order already processed or being processed by another instance. This instance will NOT claim.`);
+                    // canProceedWithProcessing remains false, and we'll exit the loop after this successful (but non-claiming) transaction.
+                } else {
+                    // This instance claims the order.
+                    console.log(`${transLogPrefixClaim} Flag is FALSE or UNDEFINED. This instance WILL ATTEMPT TO CLAIM order ${orderId}.`);
+                    transaction.update(pedidoDocRef, {
+                        webListenerProcessed: true,
+                        webListenerProcessedAt: serverTimestamp(), // Mark with server time
+                    });
+                    canProceedWithProcessing = true; // Claim successful
+                    console.log(`${transLogPrefixClaim} Order ${orderId} SUCCESSFULLY CLAIMED by this instance. Staged update: webListenerProcessed: true.`);
+                }
+            });
+
+            // If the transaction completed (either claimed or found already processed), break the retry loop.
+            console.log(`${logPrefix} Claim transaction attempt ${attempt} completed.`);
+            break;
+
+        } catch (error) {
+            console.error(`${logPrefix} Error durante la transacción para reclamar el pedido ${orderId} (intento ${attempt}/${MAX_CLAIM_RETRIES}). Error:`, error.message);
+            
+            // Check if it's the specific "not found" error and if retries are left
+            if (error.message === `Pedido ${orderId} no encontrado.` && attempt < MAX_CLAIM_RETRIES) {
+                console.log(`${logPrefix} Reintentando reclamación en ${CLAIM_RETRY_DELAY_MS / 1000} segundos...`);
+                await new Promise(resolve => setTimeout(resolve, CLAIM_RETRY_DELAY_MS));
+                // continue to the next attempt
             } else {
-                // This instance claims the order.
-                console.log(`${transLogPrefixClaim} Flag is FALSE or UNDEFINED. This instance WILL ATTEMPT TO CLAIM order ${orderId}.`);
-                transaction.update(pedidoDocRef, {
-                    webListenerProcessed: true,
-                    webListenerProcessedAt: serverTimestamp(), // Mark with server time
-                });
-                canProceedWithProcessing = true;
-                console.log(`${transLogPrefixClaim} Order ${orderId} SUCCESSFULLY CLAIMED by this instance. Staged update: webListenerProcessed: true.`);
+                // If it's another error, or retries are exhausted for "not found"
+                console.error(`${logPrefix} Fallo final al reclamar el pedido ${orderId} después de ${attempt} intentos, o error no recuperable. No se procesará por esta instancia.`);
+                return; // Exit the function, canProceedWithProcessing will be false
             }
-        });
-    } catch (error) {
-        console.error(`${logPrefix} Error durante la transacción para reclamar el pedido ${orderId}. No se procesará por esta instancia. Error:`, error.message);
-        return; // Important to exit if the claim fails
+        }
     }
 
     if (!canProceedWithProcessing) {
@@ -295,10 +314,13 @@ const GlobalOrderListener = () => {
 
                         const newCount = currentCount + cantidadAIncrementar;
 
-                        if (maxAllowed > 0 && newCount > maxAllowed) {
-                            console.warn(`${transLogPrefix} LÍMITE EXCEDIDO para ${productKey} en intervalo ${intervalLabel}. Pedido: ${cantidadAIncrementar}, Actual: ${currentCount}, Nuevo (sin aplicar): ${newCount}, Límite: ${maxAllowed}. No se actualizará el contador.`);
+                        // Modificación: Si order.origen es 0, se omite la comprobación de límite.
+                        // Para otros orígenes, se aplica la comprobación de límite.
+                        if (order.origen !== 0 && maxAllowed > 0 && newCount > maxAllowed) {
+                            console.warn(`${transLogPrefix} LÍMITE EXCEDIDO para ${productKey} en intervalo ${intervalLabel} (Origen: ${order.origen}). Pedido: ${cantidadAIncrementar}, Actual: ${currentCount}, Nuevo (sin aplicar): ${newCount}, Límite: ${maxAllowed}. No se actualizará el contador.`);
                         } else {
-                            console.log(`${transLogPrefix} Actualizando ${productKey} en intervalo ${intervalLabel}: ${currentCount} -> ${newCount} (Max: ${maxAllowed > 0 ? maxAllowed : 'N/A'})`);
+                            // Si order.origen es 0, o si el origen no es 0 pero el límite no se excede.
+                            console.log(`${transLogPrefix} Actualizando ${productKey} en intervalo ${intervalLabel} (Origen: ${order.origen}): ${currentCount} -> ${newCount} (Max: ${maxAllowed > 0 ? maxAllowed : 'N/A'})`);
                             targetInterval.orderedCount = newCount;
                             transaction.update(calendarDocRef, { intervals: intervalsCopy });
                         }
