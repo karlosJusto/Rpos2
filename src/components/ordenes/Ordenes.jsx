@@ -46,16 +46,23 @@ const Ordenes = () => {
     // pedidosConOrigenUno, // TestHeader podría mostrar esto si se pasa como prop o calcula internamente
     setOrderBeingEdited,
     // libres, // TestHeader muestra su propio cálculo
-    pedidos, 
+    pedidos: pedidosFromContext, // Renamed to avoid confusion with local state
     dateToPass, // Del DataContext, usado por la barra de búsqueda de Órdenes
     setDateToPass, // Del DataContext
     // numeroBarra, // TestHeader usa su propia base
     // setNumeroBarra, 
     totalProductosDespuesDeLas18, // Usado por la barra de búsqueda de Órdenes
     totalbloquesAntesdelas18, // Usado por la barra de búsqueda de Órdenes
-    // mostrarBarra, // TestHeader tiene su propio 'numeroEnBarra'
     setCart 
   } = useContext(dataContext);
+
+  const [displayPedidos, setDisplayPedidos] = useState(pedidosFromContext || []);
+
+  useEffect(() => {
+    // Keep local displayPedidos in sync with context, ensuring it's always an array
+    setDisplayPedidos(pedidosFromContext || []);
+  }, [pedidosFromContext]);
+
 
   const navigate = useNavigate();
 
@@ -236,12 +243,53 @@ const Ordenes = () => {
   };
 
   const handleClickProductoEntregado = async (numeroPedido, productoClickeado, maxCantidad, indiceProductoEnPedido) => {
-    const pedidoLocal = pedidos.find(p => p.NumeroPedido === numeroPedido);
-    if (!pedidoLocal) {
-      console.error('No se encontró el pedido local con NumeroPedido:', numeroPedido);
-      return;
-    }
+    // Optimistic update
+    setDisplayPedidos(currentDisplayPedidos =>
+      currentDisplayPedidos.map(p => {
+        if (p.NumeroPedido !== numeroPedido) return p;
 
+        let productFoundAndUpdated = false; // To ensure we only update the first match if items are ambiguous
+        const updatedProductos = p.productos.map(prodInState => {
+          if (productFoundAndUpdated) return prodInState;
+
+          // Determine if prodInState is the productoClickeado
+          let isMatch = false;
+          if (productoClickeado.id_cart && prodInState.id_cart === productoClickeado.id_cart) {
+            isMatch = true;
+          } else if (productoClickeado.uniqueId && prodInState.uniqueId === productoClickeado.uniqueId &&
+                     prodInState.id === productoClickeado.id && prodInState.alias === productoClickeado.alias) {
+            isMatch = true;
+          } else if (!productoClickeado.id_cart && !productoClickeado.uniqueId) { // Fallback to full attribute match
+            if (
+              prodInState.id === productoClickeado.id &&
+              prodInState.alias === productoClickeado.alias &&
+              isEqual(prodInState.opciones || {}, productoClickeado.opciones || {}) &&
+              prodInState.tostado === productoClickeado.tostado &&
+              prodInState.troceado === productoClickeado.troceado &&
+              prodInState.sinsalsa === productoClickeado.sinsalsa &&
+              prodInState.extrasalsa === productoClickeado.extrasalsa &&
+              prodInState.celiaco === productoClickeado.celiaco
+            ) {
+              isMatch = true;
+            }
+          }
+
+          if (isMatch) {
+            productFoundAndUpdated = true;
+            const entregadoActual = prodInState.entregado || 0;
+            let nuevoEntregado = entregadoActual + 1;
+            if (nuevoEntregado > maxCantidad) {
+              nuevoEntregado = 0;
+            }
+            return { ...prodInState, entregado: nuevoEntregado };
+          }
+          return prodInState;
+        });
+        return { ...p, productos: updatedProductos };
+      })
+    );
+
+    // Proceed with Firestore update
     const numeroPedidoStr = numeroPedido.toString();
     const pedidoRef = doc(db, 'pedidos', numeroPedidoStr);
 
@@ -315,6 +363,8 @@ const Ordenes = () => {
       });
     } catch (error) {
       console.error(`Error al actualizar producto en pedido ${numeroPedidoStr} en Firestore:`, error);
+      // Revert optimistic update on error by resetting to the context's state
+      setDisplayPedidos(pedidosFromContext || []);
     }
   };
 
@@ -378,7 +428,7 @@ const Ordenes = () => {
     return bloques;
   };
 
-  const bloquesPedidos = agruparPorBloques15Minutos(pedidos || []);
+  const bloquesPedidos = agruparPorBloques15Minutos(displayPedidos || []);
   
   const [searchTerm, setSearchTerm] = useState('');
   const handleSearchChange = (e) => setSearchTerm(e.target.value);
@@ -558,7 +608,7 @@ const Ordenes = () => {
                       })}
                       {todosCompletados && (
                         <>
-                          <GenerarQRCodeInvisible numeroPedido={pedido.NumeroPedido} />
+                          {/* <GenerarQRCodeInvisible numeroPedido={pedido.NumeroPedido} />*/}
                           <ImprimirPedidoCompleto numeroPedido={pedido.NumeroPedido} />
                         </>
                       )}
