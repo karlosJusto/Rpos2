@@ -1,40 +1,27 @@
 // --- Cocina.jsx ---
 import React, { useEffect, useState, useRef, useCallback, useContext } from 'react';
-// Asegúrate que estas rutas son correctas para tu proyecto:
-import ProductCard from './components/ProductCard'; 
+import ProductCard from './components/ProductCard';
 import SaladTypeCard from './components/SaladTypeCard';
 import { db } from '../firebase/firebase';
 import {
   collection,
   doc,
   onSnapshot,
-  // setDoc, // No se usa directamente aquí para estadísticas en Cocina
   updateDoc,
   getDoc
 } from 'firebase/firestore';
 import dayjs from 'dayjs';
 import isBetween from 'dayjs/plugin/isBetween';
 import customParseFormat from 'dayjs/plugin/customParseFormat';
-import { dataContext } from '../Context/DataContext'; // Se mantiene como en tu original
+import { dataContext } from '../Context/DataContext';
 import isEqual from 'lodash/isEqual';
 
-// Importar el nuevo TestHeader
-import TestHeader from '../ordenes/TestHeader'; // Ajusta la ruta si TestHeader.js no está en el mismo directorio
+// Asegúrate que la ruta a TestHeader sea correcta desde Cocina.jsx
+import TestHeader from '../ordenes/TestHeader';
 
-// Los siguientes imports eran de la cabecera original de Cocina y ahora son manejados por TestHeader o no son necesarios aquí.
-// import RelojDistinto from './components/RelojDistinto';
-// import PedidoRapido from '../ordenes/PedidoRapido';
-// import { Offcanvas, Button, Nav, Modal, Form } from 'react-bootstrap';
-// import { Link } from 'react-router-dom';
-// import { DemoContainer, DemoItem } from '@mui/x-date-pickers/internals/demo';
-// import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
-// import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
-// import { StaticDatePicker } from '@mui/x-date-pickers/StaticDatePicker';
-// import { createTheme, ThemeProvider } from '@mui/material/styles';
 import 'dayjs/locale/es';
 import timezone from 'dayjs/plugin/timezone';
 import utc from 'dayjs/plugin/utc';
-
 
 dayjs.extend(isBetween);
 dayjs.extend(customParseFormat);
@@ -42,47 +29,44 @@ dayjs.extend(utc);
 dayjs.extend(timezone);
 dayjs.locale('es');
 
-
-const formatDate = (date) => {
-  if (!date || !(date instanceof Date) || isNaN(date.getTime())) {
-      const d = dayjs(date);
-      return d.isValid() ? d.format('DD/MM/YYYY') : dayjs().format('DD/MM/YYYY');
-  }
-  return dayjs(date).format('DD/MM/YYYY');
+const formatDate = (dateInput) => {
+  // Si dateInput es null (para "hoy" desde el contexto), o undefined, usar la fecha actual.
+  // Si dateInput ya es un objeto Date o un string parseable por dayjs, se usará.
+  const dateToFormat = dateInput || new Date();
+  const d = dayjs(dateToFormat);
+  return d.isValid() ? d.format('DD/MM/YYYY') : dayjs().format('DD/MM/YYYY');
 };
 
 const SALADS_COLLECTION_NAME = 'ensaladas';
 
 const Cocina = () => {
-  // --- Estados Originales de Cocina.jsx ---
   const [cocinaProducts, setCocinaProducts] = useState([]);
   const [productsData, setProductsData] = useState([]);
   const [saladsData, setSaladsData] = useState([]);
-  // currentPedidosMap no se usa, si sigue sin usarse, considerar eliminar.
-  // const [currentPedidosMap, setCurrentPedidosMap] = useState(new Map()); 
   const [productosStockMap, setProductosStockMap] = useState(new Map());
   const [currentTimeTick, setCurrentTimeTick] = useState(Date.now());
   const [isLoadingCocina, setIsLoadingCocina] = useState(true);
   const [isLoadingProductosStock, setIsLoadingProductosStock] = useState(true);
   const [isLoadingPedidosAndProcessing, setIsLoadingPedidosAndProcessing] = useState(true);
-  // pedidosDelTurnoState solo se setea pero no parece usarse para renderizar. Si no se usa, considerar eliminar.
   const [pedidosDelTurnoState, setPedidosDelTurnoState] = useState([]);
 
-  // selectedDate se mantiene para la lógica del cuerpo de Cocina
-  const [selectedDate, setSelectedDate] = useState(new Date()); 
+  // ELIMINAMOS el estado local [selectedDate, setSelectedDate]
+  // const [selectedDate, setSelectedDate] = useState(new Date());
 
   const audioRef = useRef(null);
   const previousPedidosDelTurnoIdsRef = useRef(new Set());
   const initialLoadDoneRef = useRef(false);
 
-  // Contexto: Se mantiene como en tu original. TestHeader es autónomo.
+  // Usamos dateToPass y setDateToPass del DataContext
   const {
-    libres,
-    mostrarBarra,
-    numeroBarra,
-    setMostrarBarra, // Si TestHeader es el display, esto podría no ser necesario aquí
-    pedidosConOrigenUno,
-    setNumeroBarra // TestHeader maneja su propia base. Esto afectaría 'estadisticas_diarias' si el context lo hace
+    libres, // Se mantiene si se usa en Cocina, aunque TestHeader también lo calcula
+    mostrarBarra, // Se mantiene si se usa
+    numeroBarra, // Se mantiene si se usa
+    setMostrarBarra,
+    pedidosConOrigenUno, // Se mantiene si se usa
+    setNumeroBarra,
+    dateToPass, // <--- Fecha global del contexto
+    setDateToPass  // <--- Función para actualizar la fecha global del contexto
   } = useContext(dataContext);
 
   const playNotificationSound = useCallback(() => {
@@ -109,15 +93,15 @@ const Cocina = () => {
           const { stock, ...restOfData } = doc.data();
           productos.push({ id: id, ...restOfData });
         } else {
-          console.warn(`[Cocina Fetch] ID no numérico omitido en 'cocina': ${doc.id}`); 
+          console.warn(`[Cocina Fetch] ID no numérico omitido en 'cocina': ${doc.id}`);
         }
       });
       productos.sort((a, b) => (a.orden ?? a.id) - (b.orden ?? b.id));
-      console.log("[Cocina Fetch] Setting cocinaProducts state:", productos); 
+      console.log("[Cocina Fetch] Setting cocinaProducts state:", productos);
       setCocinaProducts(productos);
       setIsLoadingCocina(false);
     }, (error) => {
-      console.error("Error fetching cocina products:", error); 
+      console.error("Error fetching cocina products:", error);
       setIsLoadingCocina(false);
     });
     return () => unsubscribeCocina();
@@ -126,9 +110,9 @@ const Cocina = () => {
   useEffect(() => {
     setIsLoadingProductosStock(true);
     const productosRef = collection(db, 'productos');
-    console.log("Setting up listener for 'productos' stock..."); 
+    console.log("Setting up listener for 'productos' stock...");
     const unsubscribeProductos = onSnapshot(productosRef, (querySnapshot) => {
-      console.log("'productos' snapshot received:", querySnapshot.size, "docs for stock"); 
+      console.log("'productos' snapshot received:", querySnapshot.size, "docs for stock");
       const stockMap = new Map();
       querySnapshot.forEach((doc) => {
         const id = parseInt(doc.id, 10);
@@ -136,47 +120,47 @@ const Cocina = () => {
         if (!isNaN(id) && data.stock !== undefined && typeof data.stock === 'number') {
           stockMap.set(id, data.stock);
         } else {
-          console.warn(`[Productos Stock] Doc ID ${doc.id} omitido. ID no numérico o 'stock' inválido/faltante. Stock: ${data.stock}`); 
+          console.warn(`[Productos Stock] Doc ID ${doc.id} omitido. ID no numérico o 'stock' inválido/faltante. Stock: ${data.stock}`);
         }
       });
-      console.log("[Productos Stock] Setting productosStockMap state:", stockMap); 
+      console.log("[Productos Stock] Setting productosStockMap state:", stockMap);
       setProductosStockMap(stockMap);
       setIsLoadingProductosStock(false);
     }, (error) => {
-      console.error("Error fetching productos stock:", error); 
+      console.error("Error fetching productos stock:", error);
       setIsLoadingProductosStock(false);
     });
     return () => unsubscribeProductos();
   }, []);
-  
+
   const getTurnoActual = useCallback(() => {
-    const now = dayjs().tz('Europe/Madrid'); // Usando dayjs para consistencia
+    const now = dayjs().tz('Europe/Madrid');
     const today = now.startOf('day');
     let startTime, endTime;
-    // Lógica de turnos: Mañana hasta 18:00:00, Tarde desde 18:00:01
-    const horaLimiteTardeInicio = today.hour(18).minute(0).second(0).millisecond(1); 
+    const horaLimiteTardeInicio = today.hour(18).minute(0).second(0).millisecond(1);
 
-    if (now.isBefore(horaLimiteTardeInicio)) { // Turno de mañana
-      startTime = today.hour(0).minute(1).second(0).millisecond(0); // Desde 00:01:00
-      endTime = today.hour(18).minute(0).second(0).millisecond(0);   // Hasta 18:00:00
-    } else { // Turno de tarde
-      startTime = horaLimiteTardeInicio;                             // Desde 18:00:01
-      endTime = today.hour(23).minute(59).second(59).millisecond(999);// Hasta 23:59:59
+    if (now.isBefore(horaLimiteTardeInicio)) {
+      startTime = today.hour(0).minute(1).second(0).millisecond(0);
+      endTime = today.hour(18).minute(0).second(0).millisecond(0);
+    } else {
+      startTime = horaLimiteTardeInicio;
+      endTime = today.hour(23).minute(59).second(59).millisecond(999);
     }
     return { startTime, endTime };
   }, []);
 
-  const selectedDateStr = formatDate(selectedDate);
-  const todayStr = formatDate(new Date());
-  const isToday = selectedDateStr === todayStr;
-  const showSupervisionHeader = selectedDateStr !== todayStr; // Para el banner de MODO SUPERVISIÓN en el cuerpo
+  // selectedDateStr, isToday y showSupervisionHeader ahora dependen de dateToPass (del contexto)
+  const selectedDateStr = formatDate(dateToPass); // dateToPass es null para hoy, formatDate lo manejará
+  const isToday = !dateToPass; // Si dateToPass es null, es hoy
+  const showSupervisionHeader = !!dateToPass; // Mostrar si dateToPass tiene un valor (no es null)
 
-  const handleCloseSupervision = () => { 
-    setSelectedDate(new Date());
-    // console.log("[Cocina] Exiting supervision mode, returning to today."); 
+
+  const handleCloseSupervision = () => {
+    // setSelectedDate(new Date()); // Ya no se usa el estado local
+    setDateToPass(null); // Actualiza el contexto para volver a "hoy"
+    console.log("[Cocina] Exiting supervision mode, returning to today via context.");
   };
 
-  // --- EFFECT A: Listener de Pedidos y Agregación para UI (Restaurado a tu lógica original de fetch y filtrado) ---
   useEffect(() => {
     if (isLoadingCocina || isLoadingProductosStock) {
       console.log("[Effect A] Waiting for base data...");
@@ -194,13 +178,12 @@ const Cocina = () => {
     }
 
     setIsLoadingPedidosAndProcessing(true);
-    const pedidosRef = collection(db, 'pedidos'); // Fetch de todos los pedidos
-    console.log("[Effect A] Setting up listener / Re-running due to Date, Products, Stock...");
+    const pedidosRef = collection(db, 'pedidos');
+    console.log(`[Effect A] Setting up listener / Re-running due to Date (from context: ${selectedDateStr}), Products, Stock...`);
 
     const unsubscribe = onSnapshot(pedidosRef, (querySnapshot) => {
       console.log(`[Effect A] Snapshot received (${querySnapshot.size} docs). Filtering for date: ${selectedDateStr}`);
       const allPedidosRaw = [];
-      // const updatePromises = []; // No se usa en tu lógica original
 
       querySnapshot.forEach((pedidoDocSnapshot) => {
         const pedidoData = { id: pedidoDocSnapshot.id, ...pedidoDocSnapshot.data() };
@@ -212,7 +195,7 @@ const Cocina = () => {
             if (isToday && p.nuevoCocina === undefined && p.listo !== true) {
               console.log(`[Effect A - HOY] Producto (ID: ${p.id}, Nombre: ${p.nombre || 'N/A'}) en pedido ${pedidoDocSnapshot.id} no está listo y nuevoCocina es undefined. Inicializando nuevoCocina a 0.`);
               needsFirestoreUpdate = true;
-              return { ...p, nuevoCocina: 0 }; 
+              return { ...p, nuevoCocina: 0 };
             } else if (p.nuevoCocina === undefined && p.listo !== true && !isToday) {
               console.log(`[Effect A - NO HOY] Producto (ID: ${p.id}, Nombre: ${p.nombre || 'N/A'}) en pedido ${pedidoDocSnapshot.id} no está listo y nuevoCocina es undefined. NO se inicializa nuevoCocina porque no es el día actual.`);
             } else if (p.nuevoCocina === undefined && p.listo === true) {
@@ -221,7 +204,7 @@ const Cocina = () => {
             return p;
           });
         } else {
-          processedProductos = []; 
+          processedProductos = [];
           console.warn(`[Effect A] Pedido ${pedidoData.id} has missing or invalid 'productos' array.`);
         }
 
@@ -235,39 +218,36 @@ const Cocina = () => {
         }
         allPedidosRaw.push({ ...pedidoData, productos: processedProductos });
       });
-      
-      // Filtrado tal como lo tenías: primero por fecha string, luego por turno si es hoy
+
       const pedidosDelTurno = allPedidosRaw.filter((pedido) => {
         if (!pedido.fechahora || typeof pedido.fechahora !== 'string') return false;
         const parts = pedido.fechahora.split(' ');
         if (parts.length !== 2) return false;
         const [fechaPedido, horaPedido] = parts;
         if (!/^\d{2}\/\d{2}\/\d{4}$/.test(fechaPedido) || !/^\d{2}:\d{2}$/.test(horaPedido)) return false;
-        
-        if (fechaPedido !== selectedDateStr) return false; // Filtro por fecha seleccionada
-        
-        if (isToday) { // Si es hoy, aplicar filtro de turno
+
+        if (fechaPedido !== selectedDateStr) return false;
+
+        if (isToday) {
           const { startTime, endTime } = getTurnoActual();
           const orderDateTime = dayjs(`${fechaPedido} ${horaPedido}`, 'DD/MM/YYYY HH:mm', 'es', true).tz('Europe/Madrid',true);
           if (!orderDateTime.isValid()) return false;
           return orderDateTime.isBetween(startTime, endTime, null, '[]');
         }
-        return true; // Si no es hoy, pero la fecha coincide, incluirlo
+        return true;
       });
       console.log(`[Effect A] ${pedidosDelTurno.length} orders found for date ${selectedDateStr} / shift.`);
-      setPedidosDelTurnoState(pedidosDelTurno); // Seteas este estado, aunque no parezca usarse directamente para renderizar luego
+      setPedidosDelTurnoState(pedidosDelTurno);
 
-      // --- Logic for New Order Sound Alert (mantenida de tu original) ---
       if (isToday) {
         const currentTurnoPedidoIds = new Set(pedidosDelTurno.map(p => p.id));
         let newOrderForProductCardFound = false;
-
-        if (initialLoadDoneRef.current) { 
+        if (initialLoadDoneRef.current) {
           for (const pedido of pedidosDelTurno) {
             if (!previousPedidosDelTurnoIdsRef.current.has(pedido.id)) {
               if (pedido.productos && Array.isArray(pedido.productos)) {
                 const hasRelevantProduct = pedido.productos.some(prod => {
-                  const targetProdId = prod.id === 48 ? 41 : prod.id; 
+                  const targetProdId = prod.id === 48 ? 41 : prod.id;
                   return cocinaProducts.some(cp => cp.id === targetProdId && cp.id !== 48);
                 });
                 if (hasRelevantProduct) {
@@ -278,25 +258,21 @@ const Cocina = () => {
             }
           }
         }
-
         if (newOrderForProductCardFound) {
           console.log("[Effect A] New order with ProductCard items detected. Playing sound.");
           playNotificationSound();
         }
-
         previousPedidosDelTurnoIdsRef.current = currentTurnoPedidoIds;
         if (!initialLoadDoneRef.current && (querySnapshot.size > 0 || pedidosDelTurno.length > 0)) {
             initialLoadDoneRef.current = true;
         }
-      } else { 
+      } else {
         previousPedidosDelTurnoIdsRef.current = new Set();
         initialLoadDoneRef.current = false;
       }
-      // --- End of Sound Alert Logic ---
 
       const validProductIds = new Set(cocinaProducts.map(product => product.id));
       const aggregatedProducts = {};
-
       cocinaProducts.forEach((product) => {
         const stockFromProductos = productosStockMap.get(product.id);
         const finalStock = (stockFromProductos !== undefined && typeof stockFromProductos === 'number')
@@ -315,14 +291,12 @@ const Cocina = () => {
           pedido.productos.forEach((prod, index) => {
             const originalProdId = prod.id;
             let targetProdId = originalProdId;
-            let quantityForHeader = Number(prod.cantidad) || 0; // Asegurar que es número
+            let quantityForHeader = Number(prod.cantidad) || 0;
             let quantityFactorForTotal = 1.0;
-
             if (originalProdId === 48) {
               targetProdId = 41;
               quantityFactorForTotal = 0.5;
             }
-
             if (typeof targetProdId !== 'number' || !validProductIds.has(targetProdId)) {
                console.warn(`[Effect A] Target product ID ${targetProdId} (for original ID ${originalProdId}) not in 'cocina'. Skipping order line.`);
                return;
@@ -332,12 +306,11 @@ const Cocina = () => {
                return;
             }
             const orderLineId = `${pedido.id}-${originalProdId}-${prod.uniqueId || index}`;
-
             const orderData = {
               idPedido: pedido.id,
               idProducto: originalProdId,
               orderLineId: orderLineId,
-              producto: { ...prod, listo: prod.listo ?? false, nuevoCocina: prod.nuevoCocina ?? 0 }, 
+              producto: { ...prod, listo: prod.listo ?? false, nuevoCocina: prod.nuevoCocina ?? 0 },
               hora: pedido.fechahora,
               nombre: pedido.cliente || 'Sin nombre',
               cantidad: (originalProdId === 48) ? (quantityForHeader * 0.5) : quantityForHeader,
@@ -370,19 +343,17 @@ const Cocina = () => {
       console.log("[Effect A] Cleaning up listener.");
       unsubscribe();
     };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedDateStr, cocinaProducts, productosStockMap, isToday, getTurnoActual, isLoadingCocina, isLoadingProductosStock, playNotificationSound]); // playNotificationSound añadido a deps
+  }, [selectedDateStr, cocinaProducts, productosStockMap, isToday, getTurnoActual, isLoadingCocina, isLoadingProductosStock, playNotificationSound]);
+
 
   useEffect(() => {
-    console.log("[Cocina - Effect B] mostrarBarra (del DataContext) valor actual:", mostrarBarra); // Este log se mantiene como estaba
+    console.log("[Cocina - Effect B] mostrarBarra (del DataContext) valor actual:", mostrarBarra);
   }, [mostrarBarra]);
 
   useEffect(() => {
     if (isLoadingPedidosAndProcessing || !productsData || productsData.length === 0) { return; }
-
     const now = dayjs(currentTimeTick);
     let flagsOrOrderChanged = false;
-
     const updatedProductsData = productsData.map(product => {
         let productFlagsChanged = false;
         const updatedOrders = product.orders.map(order => {
@@ -391,7 +362,6 @@ const Cocina = () => {
             const nombreProdLower = order.producto?.nombre ? order.producto.nombre.toLowerCase() : '';
             const productId = order.idProducto;
             let alertTimeWindowMins = 0;
-
             if (nombreProdLower.includes('codillo') || nombreProdLower.includes('costilla') || productId === 48) {
                 alertTimeWindowMins = 30;
             } else if (nombreProdLower.includes('chorizo') || nombreProdLower.includes('morcilla')) {
@@ -409,25 +379,22 @@ const Cocina = () => {
             }
             return { ...order, needsCookingAlert: newNeedsCookingAlert, isOverdue: newIsOverdue };
         });
-
         const originalOrderIds = product.orders.map(o => o.orderLineId).join(',');
         updatedOrders.sort((a, b) => {
             const timeA = dayjs(a.hora, "DD/MM/YYYY HH:mm", 'es', true).tz('Europe/Madrid',true);
             const timeB = dayjs(b.hora, "DD/MM/YYYY HH:mm", 'es', true).tz('Europe/Madrid',true);
-
             if (timeA.isValid() && timeB.isValid()) {
                 const timeDiff = timeA.diff(timeB);
-                if (timeDiff !== 0) return timeDiff; 
+                if (timeDiff !== 0) return timeDiff;
             } else {
                 if (timeA.isValid() && !timeB.isValid()) return -1;
                 if (!timeA.isValid() && timeB.isValid()) return 1;
             }
             if (a.isOverdue && !b.isOverdue) return -1; if (!a.isOverdue && b.isOverdue) return 1;
             if (a.needsCookingAlert && !b.needsCookingAlert) return -1; if (!a.needsCookingAlert && b.needsCookingAlert) return 1;
-            return 0; 
+            return 0;
         });
         const newOrderIds = updatedOrders.map(o => o.orderLineId).join(',');
-
         if (productFlagsChanged || originalOrderIds !== newOrderIds) {
             flagsOrOrderChanged = true;
             return { ...product, orders: updatedOrders };
@@ -435,58 +402,58 @@ const Cocina = () => {
             return product;
         }
     });
-
     if (flagsOrOrderChanged) {
-        console.log("[Effect C] Flags or order changed, updating productsData state."); 
+        console.log("[Effect C] Flags or order changed, updating productsData state.");
         setProductsData(updatedProductsData);
     }
-  }, [currentTimeTick, productsData, isLoadingPedidosAndProcessing]); 
+  }, [currentTimeTick, productsData, isLoadingPedidosAndProcessing]);
 
-  const todayDocId = selectedDateStr.replace(/\//g, '-'); // Usar selectedDateStr que es de Cocina
+  const todayDocId = formatDate(dateToPass).replace(/\//g, '-'); // Usa dateToPass del contexto
+
   useEffect(() => {
     const saladsRef = doc(db, SALADS_COLLECTION_NAME, todayDocId);
-    console.log(`[Salads Display Effect] Subscribing to ${SALADS_COLLECTION_NAME}/${todayDocId}`); 
+    console.log(`[Salads Display Effect] Subscribing to ${SALADS_COLLECTION_NAME}/${todayDocId}`);
 
     const unsubscribe = onSnapshot(saladsRef, (docSnapshot) => {
       if (docSnapshot.exists()) {
-        console.log(`[Salads Display Effect] Data received for ${todayDocId}:`, docSnapshot.data()); 
+        console.log(`[Salads Display Effect] Data received for ${todayDocId}:`, docSnapshot.data());
         const data = docSnapshot.data();
-        setSaladsData([data]); 
+        setSaladsData([data]);
       } else {
-        console.log(`[Salads Display Effect] Document ${todayDocId} does not exist yet.`); 
+        console.log(`[Salads Display Effect] Document ${todayDocId} does not exist yet.`);
         setSaladsData([]);
       }
     }, (error) => {
-        console.error(`[Salads Display Effect] Error fetching salads data for ${todayDocId}:`, error); 
+        console.error(`[Salads Display Effect] Error fetching salads data for ${todayDocId}:`, error);
         setSaladsData([]);
     });
     return () => {
-        console.log(`[Salads Display Effect] Unsubscribing from ${todayDocId}`); 
+        console.log(`[Salads Display Effect] Unsubscribing from ${todayDocId}`);
         unsubscribe();
     };
-  }, [todayDocId]); 
+  }, [todayDocId]);
 
   const updateSaladCount = async (type, size, amount) => {
     const sizeKey = size.toLowerCase().startsWith('grande') ? 'grandes' : 'pequenas';
     const currentAmount = parseInt(amount, 10);
     if (isNaN(currentAmount)) {
-        console.error(`[Update Salad Count] Invalid amount received: ${amount}`); 
+        console.error(`[Update Salad Count] Invalid amount received: ${amount}`);
         return;
     }
     const newAmount = Math.max(0, currentAmount);
-    const saladsRef = doc(db, SALADS_COLLECTION_NAME, todayDocId);
+    const saladsRef = doc(db, SALADS_COLLECTION_NAME, todayDocId); // todayDocId ya usa dateToPass
     const updatePath = `${type}.${sizeKey}.preparadas`;
-    console.log(`[Update Salad Count] Updating ${updatePath} to ${newAmount} in ${todayDocId}`); 
+    console.log(`[Update Salad Count] Updating ${updatePath} to ${newAmount} in ${todayDocId}`);
     try {
       const docSnap = await getDoc(saladsRef);
       if (docSnap.exists()) {
           await updateDoc(saladsRef, { [updatePath]: newAmount });
-          console.log(`[Update Salad Count] ${updatePath} updated successfully.`); 
+          console.log(`[Update Salad Count] ${updatePath} updated successfully.`);
       } else {
-          console.warn(`[Update Salad Count] Document ${todayDocId} does not exist. Cannot update preparadas count.`); 
+          console.warn(`[Update Salad Count] Document ${todayDocId} does not exist. Cannot update preparadas count.`);
       }
     } catch (error) {
-      console.error(`Error updating ${updatePath}:`, error); 
+      console.error(`Error updating ${updatePath}:`, error);
     }
   };
 
@@ -503,19 +470,19 @@ const Cocina = () => {
 
   return (
     <div className="h-screen flex flex-col bg-gray-100">
-      
-      <TestHeader /> {/* <--- NUEVO HEADER INTEGRADO AQUÍ ---> */}
-      
+
+      <TestHeader /> {/* TestHeader ya usa la fecha del contexto */}
+
       <div className="flex-grow overflow-auto pt-[12vh] flex flex-col">
 
-        {/* Banner de Modo Supervisión (original de Cocina) */}
+        {/* Banner de Modo Supervisión, ahora usa `showSupervisionHeader` y `selectedDateStr` derivados del contexto */}
         {showSupervisionHeader && (
           <div className="text-[#75adab] bg-gray-700 px-4 py-2 flex justify-between items-center text-sm mb-4 mx-auto max-w-3xl rounded shrink-0" >
             <span className='font-nunito text-center flex-grow font-bold'>MODO SUPERVISIÓN DE COCINA ({selectedDateStr})</span>
-            <button 
-              onClick={handleCloseSupervision} 
-              className="text-[#75adab] hover:text-yellow-700 font-bold text-lg leading-none" 
-              aria-label="Volver al día actual" 
+            <button
+              onClick={handleCloseSupervision} // Ahora llama a setDateToPass(null)
+              className="text-[#75adab] hover:text-yellow-700 font-bold text-lg leading-none"
+              aria-label="Volver al día actual"
               title="Volver al día actual"
             >
                 &times;
@@ -546,7 +513,7 @@ const Cocina = () => {
             )}
 
             {saladsData.length > 0 && saladsData[0] && (
-              <div className="p-6 bg-white mt-2 shrink-0"> {/* Ajustado -mt-5 a mt-2 por si acaso */}
+              <div className="p-6 bg-white mt-2 shrink-0">
                 <div className="flex flex-wrap md:flex-nowrap">
                   {saladsData[0].ensaladas && (
                     <div className="w-full md:w-1/2 p-2">
@@ -564,7 +531,7 @@ const Cocina = () => {
           </div>
         )}
       </div>
-      
+
       <audio ref={audioRef} src="/musica/level-up.mp3" preload="auto" />
     </div>
   );

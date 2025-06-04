@@ -1,8 +1,9 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { db } from '../firebase/firebase'; // Ajusta la ruta
-import { 
-  doc, getDoc, updateDoc, setDoc, collection, onSnapshot, 
-  serverTimestamp 
+import React, { useState, useEffect, useRef, useContext } from 'react';
+import { dataContext } from '../Context/DataContext';
+import { db } from '../firebase/firebase';
+import {
+  doc, getDoc, updateDoc, setDoc, collection, onSnapshot,
+  serverTimestamp
 } from 'firebase/firestore';
 
 import dayjs from 'dayjs';
@@ -11,12 +12,11 @@ import timezone from 'dayjs/plugin/timezone';
 import customParseFormat from 'dayjs/plugin/customParseFormat';
 import 'dayjs/locale/es';
 
-import PedidoRapido from './PedidoRapido'; // Ajusta la ruta
-import RelojDistinto from './RelojDistinto'; // Ajusta la ruta
+import PedidoRapido from './PedidoRapido';
+import RelojDistinto from './RelojDistinto';
 
-// Imports para Offcanvas y Modal de calendario
 import { Modal, Button, Offcanvas, Nav } from 'react-bootstrap';
-import { Link } from 'react-router-dom'; // Para los enlaces del Offcanvas
+import { Link } from 'react-router-dom';
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { StaticDatePicker } from '@mui/x-date-pickers/StaticDatePicker';
@@ -30,24 +30,21 @@ dayjs.locale('es');
 const COLLECTION_ESTADISTICAS = 'estadisticas_diarias2';
 const COLLECTION_PEDIDOS = 'pedidos';
 
-const SpinnerIcon = () => (
-  <svg className="animate-spin h-8 w-8 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-  </svg>
-);
-
-const TestHeader = () => {
+// Se añade la nueva prop 'mostrarElementosDeOrdenes'
+const TestHeader = ({ mostrarElementosDeOrdenes }) => {
   const [numeroEnBarra, setNumeroEnBarra] = useState(0);
   const [numeroLibres, setNumeroLibres] = useState(0);
   const [ventasManana, setVentasManana] = useState(0);
   const [ventasTarde, setVentasTarde] = useState(0);
   const [ventasDia, setVentasDia] = useState(0);
+  const [onlineOrdersCount, setOnlineOrdersCount] = useState(0);
 
   const [isPageLoading, setIsPageLoading] = useState(true);
   const [isActionInProgress, setIsActionInProgress] = useState(false);
   const [isListenerUpdating, setIsListenerUpdating] = useState(false);
   const [error, setError] = useState(null);
+
+  const { dateToPass, setDateToPass } = useContext(dataContext);
 
   const pedidoRapidoRef = useRef(null);
   const datosClienteParaPedidoHeader = {
@@ -55,18 +52,15 @@ const TestHeader = () => {
     observaciones: 'Pedido Rapido (Header)',
   };
 
-  const [dateToPass, setDateToPass] = useState(null);
   const [showCalendarModal, setShowCalendarModal] = useState(false);
   const [selectedDateModal, setSelectedDateModal] = useState(dayjs());
 
-  const [showOffcanvasMenu, setShowOffcanvasMenu] = useState(false); 
+  const [showOffcanvasMenu, setShowOffcanvasMenu] = useState(false);
   const toggleOffcanvasMenu = () => setShowOffcanvasMenu((prev) => !prev);
-
 
   const esHoy = !dateToPass;
   const currentSalesRef = useRef({ vm: 0, vt: 0, vd: 0, totalPollosEntregados: 0 });
   const isMountedRef = useRef(false);
-
 
   const divStyleCalendarButton = esHoy
     ? 'w-[8vw] h-[10vh] bg-[#f2ac02]'
@@ -83,108 +77,89 @@ const TestHeader = () => {
     };
   }, []);
 
-
   useEffect(() => {
     let pedidosUnsubscribe = () => {};
     let statsUnsubscribe = () => {};
-    
-    console.log("TestHeader: useEffect for dateToPass triggered. New date:", dateToPass ? dateToPass.format("DD/MM/YYYY") : "Today");
+
+    console.log("TestHeader: useEffect for dateToPass (from context) triggered. New date:", dateToPass ? dayjs(dateToPass).format("DD/MM/YYYY") : "Today");
     setIsPageLoading(true);
-    setIsListenerUpdating(false); 
+    setIsListenerUpdating(false);
     setError(null);
-    // Resetear ventas y contadores para la nueva fecha
-    setNumeroEnBarra(0); 
+    setNumeroEnBarra(0);
     setNumeroLibres(0);
     setVentasManana(0);
     setVentasTarde(0);
     setVentasDia(0);
+    setOnlineOrdersCount(0);
     currentSalesRef.current = { vm: 0, vt: 0, vd: 0, totalPollosEntregados: 0 };
 
-    const diaObjetivo = (dateToPass || dayjs()).tz('Europe/Madrid');
+    const diaObjetivo = (dateToPass ? dayjs(dateToPass) : dayjs()).tz('Europe/Madrid');
     const dynamicDocIdEstadisticas = diaObjetivo.format('DD-MM-YYYY');
     const docRefEstadisticas = doc(db, COLLECTION_ESTADISTICAS, dynamicDocIdEstadisticas);
 
-    console.log(`TestHeader: Setting up listeners for diaObjetivo: ${diaObjetivo.format("DD/MM/YYYY")}. Stats Doc ID: ${dynamicDocIdEstadisticas}`);
-
-    pedidosUnsubscribe = onSnapshot(collection(db, COLLECTION_PEDIDOS), 
+    pedidosUnsubscribe = onSnapshot(collection(db, COLLECTION_PEDIDOS),
       (pedidosSnapshot) => {
-        console.log(`TestHeader: Pedidos CALLBACK EJECUTADO para ${diaObjetivo.format("DD/MM/YYYY")}. Documentos en snapshot: ${pedidosSnapshot.size}`);
-        if (!isMountedRef.current) {
-          console.log("TestHeader: Pedidos listener - unmounted, returning.");
-          return;
-        }
-        if (isMountedRef.current) setIsListenerUpdating(true); 
-
+        if (!isMountedRef.current) return;
+        setIsListenerUpdating(true);
         let acumuladoVM_dia = 0, acumuladoVT_dia = 0, acumuladoPollosEntregados_dia = 0;
+        let currentOnlineOrders = 0;
         pedidosSnapshot.forEach(pedidoDoc => {
           const pedidoData = pedidoDoc.data();
           if (pedidoData.fechahora && Array.isArray(pedidoData.productos) && pedidoData.productos.length > 0) {
             const fechaPedido = dayjs(pedidoData.fechahora, "DD/MM/YYYY HH:mm", 'es', true).tz('Europe/Madrid', true);
             if (fechaPedido.isValid() && fechaPedido.isSame(diaObjetivo, 'day')) {
-              let pollosEquivalentesVM_VT_estePedido = 0; 
-              let pollosEquivalentesEntregados_estePedido = 0; 
-
+              let pollosEquivalentesVM_VT_estePedido = 0;
+              let pollosEquivalentesEntregados_estePedido = 0;
               pedidoData.productos.forEach((producto) => {
                 const cantidadTotal = Number(producto.cantidad) || 0;
-                const cantidadEntregada = Number(producto.entregado) || 0; 
-
+                const cantidadEntregada = Number(producto.entregado) || 0;
                 let valorEquivalentePolloPorUnidad = 0;
                 if (producto.id === 1) valorEquivalentePolloPorUnidad = 1;
                 else if ([2, 39, 40].includes(producto.id)) valorEquivalentePolloPorUnidad = 0.5;
-                
                 pollosEquivalentesVM_VT_estePedido += cantidadTotal * valorEquivalentePolloPorUnidad;
                 pollosEquivalentesEntregados_estePedido += cantidadEntregada * valorEquivalentePolloPorUnidad;
               });
-              
               if (fechaPedido.hour() < 18) acumuladoVM_dia += pollosEquivalentesVM_VT_estePedido;
               else acumuladoVT_dia += pollosEquivalentesVM_VT_estePedido;
               acumuladoPollosEntregados_dia += pollosEquivalentesEntregados_estePedido;
+              if (pedidoData.origen === 1) currentOnlineOrders++;
             }
           }
         });
         const acumuladoVD_dia = acumuladoVM_dia + acumuladoVT_dia;
         currentSalesRef.current = { vm: acumuladoVM_dia, vt: acumuladoVT_dia, vd: acumuladoVD_dia, totalPollosEntregados: acumuladoPollosEntregados_dia };
-        
         if (isMountedRef.current) {
-          setVentasManana(acumuladoVM_dia); setVentasTarde(acumuladoVT_dia); setVentasDia(acumuladoVD_dia);
+          setVentasManana(acumuladoVM_dia);
+          setVentasTarde(acumuladoVT_dia);
+          setVentasDia(acumuladoVD_dia);
+          setOnlineOrdersCount(currentOnlineOrders);
           setDoc(docRefEstadisticas, {
               vm: acumuladoVM_dia, vt: acumuladoVT_dia, vd: acumuladoVD_dia,
               lastSalesCalcTimestamp: serverTimestamp()
           }, { merge: true })
-          .catch(e => {
-              console.error(`TestHeader: Error updating sales in stats for ${dynamicDocIdEstadisticas} from pedidos listener:`, e);
-              if(isMountedRef.current) {
-                  setIsListenerUpdating(false);
-                  if(isPageLoading) setIsPageLoading(false); 
-              }
-          });
+          .catch(e => console.error(`TestHeader: Error updating sales in stats:`, e))
+          .finally(() => { if(isMountedRef.current) setIsListenerUpdating(false); });
         } else {
           if(isMountedRef.current) setIsListenerUpdating(false);
         }
-      }, 
+      },
       (error) => {
-        console.error(`TestHeader: Pedidos LISTENER ERROR para ${diaObjetivo.format("DD/MM/YYYY")}:`, error);
-        if (isMountedRef.current) { 
-          setError(`TestHeader: Error escuchando pedidos: ${error.message}`); 
-          setIsListenerUpdating(false); 
+        console.error(`TestHeader: Pedidos LISTENER ERROR:`, error);
+        if (isMountedRef.current) {
+          setError(`Error escuchando pedidos: ${error.message}`);
+          setIsListenerUpdating(false);
           if (isPageLoading) setIsPageLoading(false);
         }
       }
     );
-    console.log(`TestHeader: Pedidos listener attachment initiated for ${diaObjetivo.format("DD/MM/YYYY")}`);
 
-
-    statsUnsubscribe = onSnapshot(docRefEstadisticas, 
+    statsUnsubscribe = onSnapshot(docRefEstadisticas,
       (statsSnap) => {
-        console.log(`TestHeader: Stats CALLBACK EJECUTADO para ${dynamicDocIdEstadisticas}. Documento existe: ${statsSnap.exists()}`);
-        if (!isMountedRef.current) {
-          console.log("TestHeader: Stats listener - unmounted, returning.");
-          return;
-        }
+        if (!isMountedRef.current) return;
         let enbarra_base_from_db = 0, libres_base_from_db = 0;
         if (statsSnap.exists()) {
           const statsData = statsSnap.data();
-          enbarra_base_from_db = statsData.enbarra_base ?? 0; 
+          enbarra_base_from_db = statsData.enbarra_base ?? 0;
           libres_base_from_db = statsData.libres_base ?? 0;
         }
         const salesToUse = currentSalesRef.current;
@@ -194,40 +169,31 @@ const TestHeader = () => {
           if (ventasManana !== (salesToUse.vm || 0)) setVentasManana(salesToUse.vm || 0);
           if (ventasTarde !== (salesToUse.vt || 0)) setVentasTarde(salesToUse.vt || 0);
           if (ventasDia !== (salesToUse.vd || 0)) setVentasDia(salesToUse.vd || 0);
-          
-          if (isPageLoading) {
-              console.log("TestHeader: Stats listener setting isPageLoading to false.");
-              setIsPageLoading(false); 
-          }
-          console.log("TestHeader: Stats listener setting isListenerUpdating to false.");
-          setIsListenerUpdating(false); 
-        }
-      }, 
-      (error) => {
-        console.error(`TestHeader: Stats LISTENER ERROR para ${dynamicDocIdEstadisticas}:`, error);
-        if (isMountedRef.current) {
-          setError(`TestHeader: Error escuchando estadísticas: ${error.message}`);
-          setNumeroEnBarra( (statsSnap?.data()?.enbarra_base ?? 0) - 0);
-          setNumeroLibres( (statsSnap?.data()?.libres_base ?? 0) - (currentSalesRef.current.vd || 0) ); 
           if (isPageLoading) setIsPageLoading(false);
-          setIsListenerUpdating(false); 
+          if (isListenerUpdating) setIsListenerUpdating(false); // Puede que ya esté en false por el listener de pedidos
+        }
+      },
+      (error) => {
+        console.error(`TestHeader: Stats LISTENER ERROR:`, error);
+        if (isMountedRef.current) {
+          setError(`Error escuchando estadísticas: ${error.message}`);
+          if (isPageLoading) setIsPageLoading(false);
+          if (isListenerUpdating) setIsListenerUpdating(false);
         }
       }
     );
-    console.log(`TestHeader: Stats listener attachment initiated for ${dynamicDocIdEstadisticas}`);
 
     return () => {
-      console.log(`TestHeader: Cleaning up listeners for previous diaObjetivo (was: ${diaObjetivo.format("DD/MM/YYYY")})`);
       if (typeof pedidosUnsubscribe === 'function') pedidosUnsubscribe();
       if (typeof statsUnsubscribe === 'function') statsUnsubscribe();
     };
-  }, [dateToPass]);
+  }, [dateToPass]); // No es necesario setDateToPass como dependencia aquí
 
   const modificarBarraYLibresParalelo = async (cantidadModificar) => {
-    if (isActionInProgress || isListenerUpdating) { return; }
-    if (!esHoy || isPageLoading) { return; }
+    if (isActionInProgress || isListenerUpdating) return;
+    if (!esHoy || isPageLoading) return;
     setIsActionInProgress(true);
-    const diaOperacion = (dateToPass || dayjs()).tz('Europe/Madrid');
+    const diaOperacion = (dateToPass ? dayjs(dateToPass) : dayjs()).tz('Europe/Madrid');
     const docIdOperacion = diaOperacion.format('DD-MM-YYYY');
     const docRefEstadisticasOperacion = doc(db, COLLECTION_ESTADISTICAS, docIdOperacion);
     try {
@@ -252,15 +218,15 @@ const TestHeader = () => {
   };
 
   const handlePedidoRapidoClick = async (idProductoOriginal) => {
-    if (isActionInProgress || isListenerUpdating) { return; }
-    if (!esHoy || isPageLoading || !pedidoRapidoRef.current) { return; }
+    if (isActionInProgress || isListenerUpdating) return;
+    if (!esHoy || isPageLoading || !pedidoRapidoRef.current) return;
     setIsActionInProgress(true);
     try {
       await pedidoRapidoRef.current.hacerPedidoRapido(idProductoOriginal);
     } catch (error) {
       setError(`TestHeader: Fallo al procesar pedido rápido. ${error.message}`);
     } finally {
-      if (isMountedRef.current) setIsActionInProgress(false); 
+      if (isMountedRef.current) setIsActionInProgress(false);
     }
   };
 
@@ -276,46 +242,44 @@ const TestHeader = () => {
   const triggerPedidoRapido1P = () => handlePedidoRapidoClick(1);
   const triggerPedidoRapidoMedioP = () => handlePedidoRapidoClick(2);
 
-  const handleShowCalendarModal = () => { setSelectedDateModal(dateToPass || dayjs()); setShowCalendarModal(true); };
+  const handleShowCalendarModal = () => {
+    setSelectedDateModal(dateToPass ? dayjs(dateToPass) : dayjs());
+    setShowCalendarModal(true);
+  };
   const handleCloseCalendarModal = () => setShowCalendarModal(false);
   const handleDateChangeModal = (newDate) => setSelectedDateModal(newDate);
-  
-  const handleAcceptDateModal = () => { 
+
+  const handleAcceptDateModal = () => {
     const newSelectedDayjs = selectedDateModal || dayjs();
-    const newDateToPassValue = newSelectedDayjs.isSame(dayjs(), 'day') ? null : newSelectedDayjs;
-    
+    const newDateToPassValue = newSelectedDayjs.isSame(dayjs(), 'day') ? null : newSelectedDayjs.toDate();
     const currentTargetDayFormatted = dateToPass ? dayjs(dateToPass).format('YYYY-MM-DD') : dayjs().format('YYYY-MM-DD');
     const newTargetDayFormatted = newDateToPassValue ? dayjs(newDateToPassValue).format('YYYY-MM-DD') : dayjs().format('YYYY-MM-DD');
-
     if (currentTargetDayFormatted !== newTargetDayFormatted) {
         setDateToPass(newDateToPassValue);
     }
-    handleCloseCalendarModal(); 
+    handleCloseCalendarModal();
   };
 
   const handleGoToToday = () => {
-    if (dateToPass !== null) { 
+    if (dateToPass !== null) {
         setDateToPass(null);
     }
   };
 
-  const showProcessingIndicator = isPageLoading || isActionInProgress || isListenerUpdating;
-  const buttonsEffectivelyDisabled = !esHoy || showProcessingIndicator;
-  
+  const buttonsEffectivelyDisabled = !esHoy;
+
   const clickableDivStyleClasses = (isButtonEsHoy = esHoy) => {
       if (!isButtonEsHoy) return "opacity-50 cursor-not-allowed";
-      // Si es hoy pero está procesando, aplicar clase para indicar no interactividad visualmente
-      if (showProcessingIndicator && isButtonEsHoy) return "opacity-50 cursor-not-allowed"; 
-      return "cursor-pointer"; 
+      return "cursor-pointer";
   };
-  
-  if (error && !showProcessingIndicator) {
+
+  if (error) {
     return (
       <div className="p-4 text-center">
         <h1 className="text-red-600 text-2xl">Error en TestHeader</h1>
         <p className="text-red-500">{error}</p>
-        <button 
-          onClick={() => { setError(null); setDateToPass(prev => prev ? dayjs(prev) : null); }}
+        <button
+          onClick={() => { setError(null); setDateToPass(dateToPass ? dayjs(dateToPass).toDate() : null); }}
           className="mt-4 px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
         >
           Reintentar
@@ -328,155 +292,155 @@ const TestHeader = () => {
     <>
       <PedidoRapido ref={pedidoRapidoRef} datosCliente={datosClienteParaPedidoHeader} />
       <div className="w-full relative">
-        
-        {showProcessingIndicator && (
-          <div className="absolute inset-0 flex justify-center items-center bg-black bg-opacity-25 z-30 pointer-events-none">
-            <SpinnerIcon />
-          </div>
-        )}
-
-        <div className={`grid grid-cols-12 gap-2 w-full fixed top-0 bg-white p-2 z-20 h-[12vh] items-center ${showProcessingIndicator ? 'filter blur-sm' : ''}`}>
+        {/* Barra principal (amarilla) - Siempre visible */}
+        <div className={`grid grid-cols-12 gap-2 w-full fixed top-0 bg-white p-2 z-20 h-[12vh] items-center`}>
+          {/* ... contenido de la barra amarilla (botones, contadores, calendario, etc.) ... */}
           <div className="flex w-full gap-2 col-span-2 sm:col-span-1">
-            <div 
+            <div
                 className={`w-1/2 h-[10vh] bg-[#f2ac02] flex justify-center items-center rounded-xl shadow-md ${clickableDivStyleClasses()}`}
-                onClick={!buttonsEffectivelyDisabled && esHoy ? toggleOffcanvasMenu : undefined}
+                onClick={esHoy ? toggleOffcanvasMenu : undefined}
             >
               <svg width="2.3vw" height="2.3vw" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M20 7L4 7" stroke="#FFFFFF" strokeWidth="1.5" strokeLinecap="round"/><path d="M20 12L4 12" stroke="#FFFFFF" strokeWidth="1.5" strokeLinecap="round"/><path d="M20 17L4 17" stroke="#FFFFFF" strokeWidth="1.5" strokeLinecap="round"/></svg>
             </div>
             <div className="w-1/2 h-[10vh] bg-[#f2ac02] flex flex-col justify-center items-center rounded-xl shadow-md">
               <svg fill="#FFFFFF" height="2vw" width="2vw" viewBox="0 0 512 512"><path d="M499.2,409.6H12.8c-7.074,0-12.8,5.726-12.8,12.8s5.726,12.8,12.8,12.8h486.4c7.074,0,12.8-5.726,12.8-12.8 S506.274,409.6,499.2,409.6z"/><path d="M460.8,76.8H51.2c-14.14,0-25.6,11.46-25.6,25.6v256c0,14.14,11.46,25.6,25.6,25.6h409.6c14.14,0,25.6-11.46,25.6-25.6 v-256C486.4,88.26,474.94,76.8,460.8,76.8z M460.8,358.4H51.2v-256h409.6V358.4z"/><path d="M353.57,164.233c-4.813-6.673-12.544-10.633-20.77-10.633H194.441l-61.688-24.678c-6.528-2.654-14.012,0.546-16.64,7.125 c-2.628,6.554,0.572,14.003,7.134,16.623l55.953,22.383V256c0,14.14,11.46,25.6,25.6,25.6h102.4 c11.017,0,20.804-7.049,24.286-17.502l25.6-76.8C359.689,179.49,358.383,170.906,353.57,164.233z M307.2,256H204.8v-76.8h128 L307.2,256z"/><circle cx="204.8" cy="307.2" r="25.6"/><circle cx="307.2" cy="307.2" r="25.6"/></svg>
-              <p className="text-white text-[0.90vw] text-center bg-green-700 rounded-md py-1 px-3 mt-2">0</p>
+              <p className="text-white text-[0.90vw] text-center bg-green-700 rounded-md py-1 px-3 mt-2">
+                {onlineOrdersCount}
+              </p>
             </div>
           </div>
 
           <div className={`w-[8vw] h-[10vh] bg-[#f2ac02] rounded-xl shadow-md col-span-1 ${clickableDivStyleClasses()}`}>
-            <div className={`flex justify-center items-center h-1/2 ${clickableDivStyleClasses()}`} onClick={!buttonsEffectivelyDisabled && esHoy ? triggerPedidoRapido1P : undefined}>
+            <div className={`flex justify-center items-center h-1/2 ${clickableDivStyleClasses()}`} onClick={esHoy ? triggerPedidoRapido1P : undefined}>
               <button type='button' className="text-white text-center text-[1.8vw] font-nunito border-b-4 border-white" disabled={buttonsEffectivelyDisabled}>1P</button>
             </div>
-            <div className={`flex justify-center items-center h-1/2 ${clickableDivStyleClasses()}`} onClick={!buttonsEffectivelyDisabled && esHoy ? triggerPedidoRapidoMedioP : undefined}>
+            <div className={`flex justify-center items-center h-1/2 ${clickableDivStyleClasses()}`} onClick={esHoy ? triggerPedidoRapidoMedioP : undefined}>
               <button type='button' className="text-white text-center text-[1.8vw] font-nunito" disabled={buttonsEffectivelyDisabled}>1/2P</button>
             </div>
           </div>
-          
+
           <div className={`w-[8vw] h-[10vh] bg-gray-700 rounded-xl shadow-md col-span-1 ${clickableDivStyleClasses()}`}>
-            <div className={`flex justify-center items-center h-1/2 ${clickableDivStyleClasses()}`} onClick={!buttonsEffectivelyDisabled && esHoy ? restarCinco : undefined}>
+            <div className={`flex justify-center items-center h-1/2 ${clickableDivStyleClasses()}`} onClick={esHoy ? restarCinco : undefined}>
               <button type='button' className="text-white text-center text-[1.8vw] font-nunito border-b-4 border-gray-500" disabled={buttonsEffectivelyDisabled}>-5</button>
             </div>
-            <div className={`flex justify-center items-center h-1/2 ${clickableDivStyleClasses()}`} onClick={!buttonsEffectivelyDisabled && esHoy ? restarCuatro : undefined}>
+            <div className={`flex justify-center items-center h-1/2 ${clickableDivStyleClasses()}`} onClick={esHoy ? restarCuatro : undefined}>
               <button type='button' className="text-white text-center text-[1.8vw] font-nunito" disabled={buttonsEffectivelyDisabled}>-4</button>
             </div>
           </div>
           <div className={`w-[8vw] h-[10vh] bg-gray-700 rounded-xl shadow-md col-span-1 ${clickableDivStyleClasses()}`}>
-            <div className={`flex justify-center items-center h-1/2 ${clickableDivStyleClasses()}`} onClick={!buttonsEffectivelyDisabled && esHoy ? sumarCinco : undefined}>
+            <div className={`flex justify-center items-center h-1/2 ${clickableDivStyleClasses()}`} onClick={esHoy ? sumarCinco : undefined}>
               <button type='button' className="text-white text-center text-[1.8vw] font-nunito border-b-4 border-gray-500" disabled={buttonsEffectivelyDisabled}>+5</button>
             </div>
-            <div className={`flex justify-center items-center h-1/2 ${clickableDivStyleClasses()}`} onClick={!buttonsEffectivelyDisabled && esHoy ? sumarCuatro : undefined}>
+            <div className={`flex justify-center items-center h-1/2 ${clickableDivStyleClasses()}`} onClick={esHoy ? sumarCuatro : undefined}>
               <button type='button' className="text-white text-center text-[1.8vw] font-nunito" disabled={buttonsEffectivelyDisabled}>+4</button>
             </div>
           </div>
-          
+
            <div className={`w-[8vw] h-[10vh] ${numeroEnBarra < 0 ? 'bg-[#cb4335]' : 'bg-gray-500'} flex flex-col justify-center items-center rounded-xl shadow-md col-span-1`}>
             <h1 className="text-white text-center text-[2.5vw] font-nunito">
-              {isPageLoading ? '...' : (numeroEnBarra % 1 === 0 ? numeroEnBarra : numeroEnBarra.toFixed(1))}
+              {(numeroEnBarra % 1 === 0 ? numeroEnBarra : numeroEnBarra.toFixed(1))}
             </h1>
             <p className="text-white text-center text-[0.85vw] font-nunito mt-[0.90vh] ">En barra</p>
           </div>
 
           <div className={`w-[8vw] h-[10vh] bg-gray-700 rounded-xl shadow-md col-span-1 ${clickableDivStyleClasses()}`}>
-            <div className={`flex justify-center items-center h-1/2 ${clickableDivStyleClasses()}`} onClick={!buttonsEffectivelyDisabled && esHoy ? sumarUno : undefined}>
+            <div className={`flex justify-center items-center h-1/2 ${clickableDivStyleClasses()}`} onClick={esHoy ? sumarUno : undefined}>
               <button type='button' className="text-white text-center text-[1.8vw] font-nunito border-b-4 border-gray-500" disabled={buttonsEffectivelyDisabled}>+1</button>
             </div>
-            <div className={`flex justify-center items-center h-1/2 ${clickableDivStyleClasses()}`} onClick={!buttonsEffectivelyDisabled && esHoy ? sumaMedio : undefined}>
+            <div className={`flex justify-center items-center h-1/2 ${clickableDivStyleClasses()}`} onClick={esHoy ? sumaMedio : undefined}>
               <button type='button' className="text-white text-center text-[1.8vw] font-nunito" disabled={buttonsEffectivelyDisabled}>+1/2</button>
             </div>
           </div>
           <div className={`w-[8vw] h-[10vh] bg-gray-700 rounded-xl shadow-md col-span-1 ${clickableDivStyleClasses()}`}>
-            <div className={`flex justify-center items-center h-1/2 ${clickableDivStyleClasses()}`} onClick={!buttonsEffectivelyDisabled && esHoy ? restarUno : undefined}>
+            <div className={`flex justify-center items-center h-1/2 ${clickableDivStyleClasses()}`} onClick={esHoy ? restarUno : undefined}>
               <button type='button' className="text-white text-center text-[1.8vw] font-nunito border-b-4 border-gray-500" disabled={buttonsEffectivelyDisabled}>-1</button>
             </div>
-            <div className={`flex justify-center items-center h-1/2 ${clickableDivStyleClasses()}`} onClick={!buttonsEffectivelyDisabled && esHoy ? restaMedio : undefined}>
+            <div className={`flex justify-center items-center h-1/2 ${clickableDivStyleClasses()}`} onClick={esHoy ? restaMedio : undefined}>
               <button type='button' className="text-white text-center text-[1.8vw] font-nunito" disabled={buttonsEffectivelyDisabled}>-1/2</button>
             </div>
           </div>
 
           <div className={`w-[8vw] h-[10vh] ${numeroLibres < 0 ? 'bg-[#cb4335]' : 'bg-[#f2ac02]'} flex flex-col justify-center items-center rounded-xl shadow-md col-span-1`}>
             <h1 className="text-white text-center text-[2.5vw] font-nunito">
-              {isPageLoading ? '...' : (numeroLibres % 1 === 0 ? numeroLibres : numeroLibres.toFixed(1))}
+              {(numeroLibres % 1 === 0 ? numeroLibres : numeroLibres.toFixed(1))}
             </h1>
             <p className="text-white text-center text-[0.85vw] font-nunito mt-[0.90vh]">Libres</p>
           </div>
-          
+
           <div className='w-[8vw] h-[10vh] bg-[#f2ac02] flex flex-col justify-center items-center rounded-xl shadow-md col-span-1'>
             <h1 className="text-white text-center text-[2vw] font-nunito">
-              {isPageLoading ? '...' : (ventasManana % 1 === 0 ? ventasManana : ventasManana.toFixed(1))}
+              {(ventasManana % 1 === 0 ? ventasManana : ventasManana.toFixed(1))}
             </h1>
             <h1 className="text-white text-center text-[1vw] font-nunito">VM</h1>
           </div>
           <div className='w-[8vw] h-[10vh] bg-[#f2ac02] flex flex-col justify-center items-center rounded-xl shadow-md col-span-1'>
             <h1 className="text-white text-center text-[2vw] font-nunito">
-              {isPageLoading ? '...' : (ventasTarde % 1 === 0 ? ventasTarde : ventasTarde.toFixed(1))}
+              {(ventasTarde % 1 === 0 ? ventasTarde : ventasTarde.toFixed(1))}
             </h1>
             <h1 className="text-white text-center text-[1vw] font-nunito">VT</h1>
           </div>
           <div className='w-[8vw] h-[10vh] bg-[#f2ac02] flex flex-col justify-center items-center rounded-xl shadow-md col-span-1'>
             <h1 className="text-white text-center text-[2vw] font-nunito">
-              {isPageLoading ? '...' : (ventasDia % 1 === 0 ? ventasDia : ventasDia.toFixed(1))}
+              {(ventasDia % 1 === 0 ? ventasDia : ventasDia.toFixed(1))}
             </h1>
             <h1 className="text-white text-center text-[1vw] font-nunito">VD</h1>
           </div>
-          
-          <div 
+
+          <div
             className={`${divStyleCalendarButton} flex flex-col justify-center items-center rounded-xl shadow-md col-span-1 ${clickableDivStyleClasses(true)} ${buttonsEffectivelyDisabled ? 'opacity-50 cursor-not-allowed' : ''}`}
-            onClick={!buttonsEffectivelyDisabled ? handleShowCalendarModal : undefined}
+             onClick={!buttonsEffectivelyDisabled ? handleShowCalendarModal : undefined}
           >
-            <RelojDistinto 
-              fecha={dateToPass ? dateToPass.toDate() : new Date()}
-              isToday={esHoy} 
+            <RelojDistinto
+              fecha={dateToPass ? dayjs(dateToPass).toDate() : new Date()}
+              isToday={esHoy}
             />
           </div>
         </div>
 
-        <div className={`w-full bg-gray-700 p-1 fixed flex z-10 top-[12vh] h-[6vh] items-center ${showProcessingIndicator ? 'filter blur-sm' : ''}`}>
-           <div className="flex justify-start items-center">
-            <div className="ms-3 p-1">
-              <svg width="28px" height="28px" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path fillRule="evenodd" clipRule="evenodd" d="M15 10.5C15 12.9853 12.9853 15 10.5 15C8.01472 15 6 12.9853 6 10.5C6 8.01472 8.01472 6 10.5 6C12.9853 6 15 8.01472 15 10.5ZM14.1793 15.2399C13.1632 16.0297 11.8865 16.5 10.5 16.5C7.18629 16.5 4.5 13.8137 4.5 10.5C4.5 7.18629 7.18629 4.5 10.5 4.5C13.8137 4.5 16.5 7.18629 16.5 10.5C16.5 11.8865 16.0297 13.1632 15.2399 14.1792L20.0304 18.9697L18.9697 20.0303L14.1793 15.2399Z" fill="#e5e7e9"/></svg>
+        {/* Barra secundaria (gris) - Condicionalmente visible */}
+        {mostrarElementosDeOrdenes && (
+          <div className={`w-full bg-gray-700 p-1 fixed flex z-10 top-[12vh] h-[6vh] items-center`}>
+            <div className="flex justify-start items-center">
+              <div className="ms-3 p-1">
+                <svg width="28px" height="28px" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path fillRule="evenodd" clipRule="evenodd" d="M15 10.5C15 12.9853 12.9853 15 10.5 15C8.01472 15 6 12.9853 6 10.5C6 8.01472 8.01472 6 10.5 6C12.9853 6 15 8.01472 15 10.5ZM14.1793 15.2399C13.1632 16.0297 11.8865 16.5 10.5 16.5C7.18629 16.5 4.5 13.8137 4.5 10.5C4.5 7.18629 7.18629 4.5 10.5 4.5C13.8137 4.5 16.5 7.18629 16.5 10.5C16.5 11.8865 16.0297 13.1632 15.2399 14.1792L20.0304 18.9697L18.9697 20.0303L14.1793 15.2399Z" fill="#e5e7e9"/></svg>
+              </div>
+              <div className="ms-1 w-auto bg-white rounded-md">
+                <input type="text" className="w-full h-full bg-transparent border-none outline-none px-2 text-center pl-8 min-w-[120px]" placeholder="buscar..." disabled={buttonsEffectivelyDisabled}/>
+              </div>
             </div>
-            <div className="ms-1 w-auto bg-white rounded-md">
-              <input type="text" className="w-full h-full bg-transparent border-none outline-none px-2 text-center pl-8 min-w-[120px]" placeholder="buscar..." disabled={buttonsEffectivelyDisabled}/>
+            <div className="flex justify-center w-full items-center">
+              <div className="text-white text-[1.5vh]">
+                {dateToPass ? (
+                  <div className="font-nunito text-xl flex items-center text-[#75adab] font-bold">
+                    MODO SUPERVISIÓN ({dayjs(dateToPass).format("DD/MM/YYYY")})
+                    <button
+                      onClick={handleGoToToday}
+                      className="ms-2 text-xl leading-none hover:text-yellow-400"
+                      aria-label="Volver al día actual"
+                      style={{ background: 'none', border: 'none', padding: 0, color: 'inherit', cursor: 'pointer' }}
+                      disabled={false}
+                    >
+                      &times;
+                    </button>
+                  </div>
+                ) : (
+                  <div className="font-nunito text-xl flex space-x-1 text-gray-400">
+                    <span>Prox 45 min</span><span>|</span><span className="font-nunito text-gray-400">Pollo:</span><span className="text-white font-nunito font-extrabold">0.0</span>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
-          <div className="flex justify-center w-full items-center">
-            <div className="text-white text-[1.5vh]">
-              {dateToPass ? ( 
-                <div className="font-nunito text-xl flex items-center text-[#75adab] font-bold">
-                  MODO SUPERVISIÓN ({dateToPass.format("DD/MM/YYYY")})
-                  <button 
-                    onClick={!buttonsEffectivelyDisabled ? handleGoToToday : undefined} 
-                    className="ms-2 text-xl leading-none hover:text-yellow-400" 
-                    aria-label="Volver al día actual"
-                    style={{ background: 'none', border: 'none', padding: 0, color: 'inherit', cursor: buttonsEffectivelyDisabled ? 'not-allowed' : 'pointer' }}
-                    disabled={buttonsEffectivelyDisabled}
-                  >
-                    &times; 
-                  </button>
-                </div>
-              ) : (
-                <div className="font-nunito text-xl flex space-x-1 text-gray-400">
-                  <span>Prox 45 min</span><span>|</span><span className="font-nunito text-gray-400">Pollo:</span><span className="text-white font-nunito font-extrabold">0.0</span>
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
+        )}
       </div>
 
       <Modal show={showCalendarModal} onHide={handleCloseCalendarModal} size="sm" backdrop="static" keyboard={false} centered>
         <Modal.Body className="p-0">
           <ThemeProvider theme={muiTheme}>
             <LocalizationProvider dateAdapter={AdapterDayjs} adapterLocale="es">
-              <StaticDatePicker 
-                displayStaticWrapperAs="desktop" 
-                value={selectedDateModal} 
+              <StaticDatePicker
+                displayStaticWrapperAs="desktop"
+                value={selectedDateModal}
                 onChange={handleDateChangeModal}
                 sx={{
                   '& .MuiPickersLayout-root': { minWidth: 'auto', },
@@ -499,18 +463,18 @@ const TestHeader = () => {
         </Modal.Footer>
       </Modal>
 
-      <Offcanvas 
-        show={showOffcanvasMenu} 
-        onHide={toggleOffcanvasMenu} 
-        placement="start" 
-        style={{ 
-            width: '120px', 
-            top: '12vh', 
+      <Offcanvas
+        show={showOffcanvasMenu}
+        onHide={toggleOffcanvasMenu}
+        placement="start"
+        style={{
+            width: '120px',
+            top: '12vh',
             height: 'calc(100vh - 12vh)',
-            background: '#f2ac02', 
-            borderTopRightRadius: '30px', 
-            borderBottomRightRadius: '30px', 
-            zIndex: 1045 
+            background: '#f2ac02',
+            borderTopRightRadius: '30px',
+            borderBottomRightRadius: '30px',
+            zIndex: 1045
         }}
       >
         <Offcanvas.Header closeButton>
@@ -519,10 +483,11 @@ const TestHeader = () => {
         <Offcanvas.Body>
           <Nav className="flex-column">
             <ul className="list-unstyled ms-2 flex flex-col justify-start text-center items-center gap-7">
+              {/* Links del Offcanvas */}
               <li><Link className="p-3 mt-2 hover:bg-gray-100 hover:rounded-2xl block" to={"/layout/comida"} onClick={toggleOffcanvasMenu}>
                 <svg width="40px" height="40px" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" stroke="#757575"><path d="M22 12.2039V13.725C22 17.6258 22 19.5763 20.8284 20.7881C19.6569 22 17.7712 22 14 22H10C6.22876 22 4.34315 22 3.17157 20.7881C2 19.5763 2 17.6258 2 13.725V12.2039C2 9.91549 2 8.77128 2.5192 7.82274C3.0384 6.87421 3.98695 6.28551 5.88403 5.10813L7.88403 3.86687C9.88939 2.62229 10.8921 2 12 2C13.1079 2 14.1106 2.62229 16.116 3.86687L18.116 5.10812C20.0131 6.28551 20.9616 6.87421 21.4808 7.82274" stroke="#757575" strokeWidth="1.5" strokeLinecap="round"/> <path d="M15 18H9" stroke="#757575" strokeWidth="1.5" strokeLinecap="round"/> </svg>
               </Link></li>
-              <li><Link className='p-3 hover:bg-gray-100 hover:rounded-2xl block' to={"/ordenes"} onClick={() => { toggleOffcanvasMenu(); if(window.location.pathname === "/ordenes" && !showProcessingIndicator) window.location.reload();}}>
+              <li><Link className='p-3 hover:bg-gray-100 hover:rounded-2xl block' to={"/ordenes"} onClick={() => { toggleOffcanvasMenu(); if(window.location.pathname === "/ordenes") window.location.reload();}}>
                 <svg width="40px" height="40px" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M10.5 14L17 14" stroke="#757575" strokeWidth="1.5" strokeLinecap="round"/> <path d="M7 14H7.5" stroke="#757575" strokeWidth="1.5" strokeLinecap="round"/> <path d="M7 10.5H7.5" stroke="#757575" strokeWidth="1.5" strokeLinecap="round"/> <path d="M7 17.5H7.5" stroke="#757575" strokeWidth="1.5" strokeLinecap="round"/> <path d="M10.5 10.5H17" stroke="#757575" strokeWidth="1.5" strokeLinecap="round"/> <path d="M10.5 17.5H17" stroke="#757575" strokeWidth="1.5" strokeLinecap="round"/> <path d="M8 3.5C8 2.67157 8.67157 2 9.5 2H14.5C15.3284 2 16 2.67157 16 3.5V4.5C16 5.32843 15.3284 6 14.5 6H9.5C8.67157 6 8 5.32843 8 4.5V3.5Z" stroke="#757575" strokeWidth="1.5"/> <path d="M21 16.0002C21 18.8286 21 20.2429 20.1213 21.1215C19.2426 22.0002 17.8284 22.0002 15 22.0002H9C6.17157 22.0002 4.75736 22.0002 3.87868 21.1215C3 20.2429 3 18.8286 3 16.0002V13.0002M16 4.00195C18.175 4.01406 19.3529 4.11051 20.1213 4.87889C21 5.75757 21 7.17179 21 10.0002V12.0002M8 4.00195C5.82497 4.01406 4.64706 4.11051 3.87868 4.87889C3.11032 5.64725 3.01385 6.82511 3.00174 9" stroke="#757575" strokeWidth="1.5" strokeLinecap="round"/> </svg>
               </Link></li>
               <li><Link className='p-3 hover:bg-gray-100 hover:rounded-2xl block' to={"/freidora"} onClick={toggleOffcanvasMenu}>
@@ -544,9 +509,13 @@ const TestHeader = () => {
           </Nav>
         </Offcanvas.Body>
       </Offcanvas>
-
     </>
   );
 }
+
+// Añadir un defaultProp para mostrarElementosDeOrdenes por si no se pasa
+TestHeader.defaultProps = {
+  mostrarElementosDeOrdenes: false, // O true, según lo que consideres más común
+};
 
 export default TestHeader;
