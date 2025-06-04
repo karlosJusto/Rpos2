@@ -3,449 +3,242 @@ import singluten from '../../assets/singluten.png';
 import fire_new from '../../assets/fire_new.png';
 import tijera_new from '../../assets/tijera_new.png';
 
-import Layout from '../pedidos/Layout';
 import GenerarQRCodeInvisible from './GenerarQRCodeInvisible';
+import isEqual from 'lodash/isEqual'; // Import isEqual
 
-// Importa InputGroup y Form si no lo tienes ya
 import { useState, useContext, useEffect, useRef } from 'react';
 import { dataContext } from '../Context/DataContext';
-import { doc, setDoc, updateDoc, getDoc, onSnapshot, deleteDoc, runTransaction, increment } from 'firebase/firestore';
+import { doc, updateDoc, getDoc, runTransaction, deleteDoc, increment } from 'firebase/firestore';
 import { db } from '../firebase/firebase';
 
-import { collection, getDocs, query, where } from 'firebase/firestore';
-import RelojDistinto from './RelojDistinto';
-// Asegúrate de importar InputGroup y Form
-import { Offcanvas, Button, Nav, Modal, InputGroup, Form } from 'react-bootstrap';
+// Modal, Button, Form se mantienen si los modales del CUERPO de Órdenes los usan.
+import { Button, Modal, Form } from 'react-bootstrap'; 
 
+// Link se mantiene si hay links en el CUERPO de Órdenes que no eran del offcanvas.
+// import { Link } from 'react-router-dom'; 
 
-import { Link } from 'react-router-dom';
-import { DemoContainer, DemoItem } from '@mui/x-date-pickers/internals/demo';
-import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
-import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
-import { DatePicker } from '@mui/x-date-pickers/DatePicker';
-import { MobileDatePicker } from '@mui/x-date-pickers/MobileDatePicker';
-import { DesktopDatePicker } from '@mui/x-date-pickers/DesktopDatePicker';
-import { StaticDatePicker } from '@mui/x-date-pickers/StaticDatePicker';
-import { createTheme, ThemeProvider } from '@mui/material/styles';
-
-
-import Ticket from '../pedidos/Ticket';
-import PedidoRapido from './PedidoRapido';
+// PedidoRapido lo maneja TestHeader.
+// import PedidoRapido from './PedidoRapido'; 
 import ImprimirPedidoCompleto from './ImprimirPedidoCompleto';
 
 import dayjs from 'dayjs';
-import 'dayjs/locale/es'; // Para trabajar con el locale en español
-import timezone from 'dayjs/plugin/timezone'; // Plugin para zona horaria
-import utc from 'dayjs/plugin/utc'; // Plugin para trabajar con fechas en UTC
+import 'dayjs/locale/es';
+import timezone from 'dayjs/plugin/timezone';
+import utc from 'dayjs/plugin/utc';
 import customParseFormat from 'dayjs/plugin/customParseFormat';
+import isBetween from 'dayjs/plugin/isBetween';
+
 import { useNavigate } from "react-router-dom";
 
-import SonidoOnChange from './SonidoOnChange'; // Asegúrate de importar correctamente el componente
-import HeaderFinal from '../cocina/components/HeaderFinal';
+// Importar el nuevo TestHeader
+import TestHeader from './TestHeader'; // Ajusta la ruta si es necesario
+
+dayjs.extend(utc);
+dayjs.extend(timezone);
+dayjs.extend(customParseFormat);
+dayjs.extend(isBetween);
+dayjs.locale('es');
+
 
 const Ordenes = () => {
-
-  const { pedidosConOrigenUno, setPedidosConOrigenUno, setOrderBeingEdited, libres, setLibres, pedidos,dateToPass,setDateToPass, numeroBarra,setNumeroBarra, totalProductosDespuesDeLas18, setTotalProductosDespuesDeLas18, totalbloquesAntesdelas18, setTotalbloquesAntesdelas18,loading, setLoading, mostrarBarra, setMostrarBarra, setCart } = useContext(dataContext);
+  // Estados y contexto originales de Ordenes.jsx que se mantienen
+  const {
+    // pedidosConOrigenUno, // TestHeader podría mostrar esto si se pasa como prop o calcula internamente
+    setOrderBeingEdited,
+    // libres, // TestHeader muestra su propio cálculo
+    pedidos, 
+    dateToPass, // Del DataContext, usado por la barra de búsqueda de Órdenes
+    setDateToPass, // Del DataContext
+    // numeroBarra, // TestHeader usa su propia base
+    // setNumeroBarra, 
+    totalProductosDespuesDeLas18, // Usado por la barra de búsqueda de Órdenes
+    totalbloquesAntesdelas18, // Usado por la barra de búsqueda de Órdenes
+    // mostrarBarra, // TestHeader tiene su propio 'numeroEnBarra'
+    setCart 
+  } = useContext(dataContext);
 
   const navigate = useNavigate();
 
-  // --- Estados para el modal de suma ---
-  const [showSumarModal, setShowSumarModal] = useState(false);
-  const [numeroASumar, setNumeroASumar] = useState(''); // Guardará el valor del input
-
-  // --- Funciones para el modal de suma ---
-  const handleCloseSumarModal = () => {
-    setShowSumarModal(false);
-    setNumeroASumar(''); // Limpiar input al cerrar
-  };
-  const handleShowSumarModal = () => setShowSumarModal(true); // <-- Esta función abre el modal
-
-  // Función para manejar el cambio en el input del modal de suma
-  const handleNumeroASumarChange = (e) => {
-    setNumeroASumar(e.target.value);
-  };
-
-  // Función que se ejecuta al confirmar en el modal de suma
-  const handleConfirmarSuma = () => {
-    const valorNumerico = parseFloat(numeroASumar);
-    if (!isNaN(valorNumerico)) {
-      sumarNumero(valorNumerico); // Llama a la función que suma el número
-      handleCloseSumarModal();    // Cierra el modal
-    } else {
-      alert("Por favor, introduce un número válido."); // O alguna otra validación
-    }
-  };
-  // --- Fin de Estados y Funciones para el modal de suma ---
-
-  //crear un pedido nuevo desde editar
-  const handleCreateOrder = (pedido) => {
-  const clientInfo = {
-    cliente: pedido.cliente,
-    telefono: pedido.telefono,
-    img_perfil: pedido.img_perfil,
-    // ... (comentarios explicando qué no incluir)
-  };
-
-  setCart([]); 
-  setOrderBeingEdited(clientInfo); 
-  navigate('/layout/comida');
-};
-
-
-  const handleEditOrder = (pedido) => {
-    //console.log("Iniciando edición, guardando en contexto:", pedido);
-    setOrderBeingEdited(pedido);
-    navigate('/layout/comida');
-  };
-
-  const obtenerHoraRedondeada = () => {
-    const now = dayjs();
-    const minutos = now.minute();
-    const siguienteBloque = Math.floor(minutos / 15) * 15;
-    const nuevaHora = now
-      .minute(siguienteBloque)
-      .second(0)
-      .millisecond(0);
-    return nuevaHora.isBefore(now) ? nuevaHora.add(15, 'minute') : nuevaHora;
-  };
-
-  const fechahora = obtenerHoraRedondeada().format('DD/MM/YYYY HH:mm');
-
-  dayjs.extend(utc);
-  dayjs.extend(timezone);
-  dayjs.extend(customParseFormat);
-  dayjs.locale('es');
-
-  const pedidoRapidoRef = useRef();
-
-  const handlePedidoRapido = (idProduct) => {
-    pedidoRapidoRef.current.hacerPedidoRapido(idProduct);
-  };
-
-  const [show, setShow] = useState(false);
-  const [isColorChanged, setIsColorChanged] = useState(false);
-  //const [vm, setVm] = useState(0);
-
-  const [datosCliente, setDatosCliente] = useState({
-    cliente: 'AAgenerico',
-    telefono: '000000000',
-    fechahora: fechahora,
-    observaciones: 'Pedido Rapido',
-    pagado: false,
-    celiaco: false,
-    localidad: 'Mungia',
-  });
-
-  const [selectedDate, setSelectedDate] = useState(dayjs('DD/MM/YYYY'));
-
-  const handleDateChange = (newDate) => {
-    setSelectedDate(newDate);
-  };
-
-  const handleAccept = () => {
-    setDateToPass(selectedDate);
-    setIsColorChanged(true);
-    handleCloseModal();
-  };
-
-  const divStyle = isColorChanged
-    ? 'w-[8vw] h-[10vh] bg-[#75adab]'
-    : 'w-[8vw] h-[10vh] bg-[#f2ac02]';
-
-  const [showModal, setShowModal] = useState(false);
-  const handleCloseModal = () => setShowModal(false);
-  const handleShowModal= () => setShowModal(true);
-
-  const [showModal2, setShowModal2] = useState(false);
-  const handleCloseModal2 = () => {
-    setShowModal2(false);
-    window.location.reload();
+  // Lógica y estados para los modales y funcionalidades del CUERPO de Ordenes.jsx
+  const [showTurnoModal, setShowTurnoModal] = useState(false);
+  const handleCloseTurnoModal = () => {
+    setShowTurnoModal(false);
+    window.location.reload(); 
   };
 
   useEffect(() => {
     const interval = setInterval(() => {
       const currentTime = dayjs().locale('es').tz('Europe/Madrid');
-      const targetTime = currentTime.hour(18).minute(0).second(0);
+      const targetTime = currentTime.set('hour', 18).set('minute', 0).set('second', 0); 
       if (currentTime.isSame(targetTime, 'minute')) {
-        setShowModal2(true);
+        setShowTurnoModal(true);
         clearInterval(interval);
       }
-    }, 60000);
+    }, 60000); 
     return () => clearInterval(interval);
   }, []);
 
-  const [showModal1, setShowModal1] = useState(false);
-  const handleCloseModal1 = () => setShowModal1(false);
+  const [showOptionsModal, setShowOptionsModal] = useState(false);
+  const handleCloseOptionsModal = () => setShowOptionsModal(false);
   const [pedidoSeleccionado, setPedidoSeleccionado] = useState(null);
 
-  const handleShowModal1 = (pedido) => {
-    //console.log("Pedido seleccionado para modal:", pedido);
+  const handleShowOptionsModal = (pedido) => {
     setPedidoSeleccionado(pedido);
-    setShowModal1(true);
+    setShowOptionsModal(true);
+  };
+
+  const handleCreateOrder = (pedido) => {
+    const clientInfo = {
+      cliente: pedido.cliente,
+      telefono: pedido.telefono,
+      img_perfil: pedido.img_perfil,
+    };
+    setCart([]); 
+    setOrderBeingEdited(clientInfo); 
+    navigate('/layout/comida');
+  };
+
+  const handleEditOrder = (pedido) => {
+    setOrderBeingEdited(pedido); 
+    navigate('/layout/comida');
   };
 
   const borrarOrden = async (numeroPedido) => {
+    if (!pedidoSeleccionado || pedidoSeleccionado.NumeroPedido !== numeroPedido) {
+        console.error("[Ordenes][borrarOrden] Error: No hay pedido seleccionado o no coincide.");
+        handleCloseOptionsModal();
+        return;
+    }
+
     const numeroPedidoStr = numeroPedido.toString();
     const logPrefix = `[Ordenes][borrarOrden][${numeroPedidoStr}]`;
     const pedidoRef = doc(db, "pedidos", numeroPedidoStr);
 
     try {
-      // 1. Obtener los detalles del pedido antes de eliminarlo
-      const pedidoSnap = await getDoc(pedidoRef);
-      if (!pedidoSnap.exists()) {
-        console.error(`${logPrefix} Pedido no encontrado.`);
-        handleCloseModal1();
-        return;
-      }
-      const pedidoData = pedidoSnap.data();
-      const productosDelPedido = pedidoData.productos;
-      const fechahoraPedido = pedidoData.fechahora; // Formato "DD/MM/YYYY HH:MM"
-      
-      let dailyDocumentIdForSalads = null;
-      let calendarDocIdYYYYMMDD = null;    // Para calendarios pollo/costilla/codillo, formato YYYY-MM-DD
-      let orderTimeHHMM = null;            // Para calendarios pollo/costilla/codillo, formato HH:MM
-
-      if (fechahoraPedido && typeof fechahoraPedido === 'string' && fechahoraPedido.includes(' ')) {
-        const [datePart, timePart] = fechahoraPedido.split(' '); // datePart "DD/MM/YYYY", timePart "HH:MM"
-        const [day, month, year] = datePart.split('/');
-
-        if (day && month && year && /^\d{1,2}$/.test(day) && /^\d{1,2}$/.test(month) && /^\d{4}$/.test(year)) {
-          dailyDocumentIdForSalads = `${day.padStart(2, '0')}-${month.padStart(2, '0')}-${year}`; // Formato DD-MM-YYYY
-          calendarDocIdYYYYMMDD = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;   // Formato YYYY-MM-DD
-        } else {
-          console.warn(`${logPrefix} Formato de fecha inválido en pedido: ${datePart}. No se actualizará stock diario de ensaladas.`);
+        const pedidoSnap = await getDoc(pedidoRef);
+        if (!pedidoSnap.exists()) {
+            console.error(`${logPrefix} Pedido no encontrado en Firestore.`);
+            handleCloseOptionsModal();
+            return;
         }
+        const pedidoData = pedidoSnap.data();
+        const productosDelPedido = pedidoData.productos;
+        const fechahoraPedido = pedidoData.fechahora;
 
-        if (timePart && /^\d{2}:\d{2}$/.test(timePart)) {
-          orderTimeHHMM = timePart;
-        } else {
-          console.warn(`${logPrefix} Formato de hora inválido en pedido: ${timePart}. No se actualizarán calendarios de pollo/costilla/codillo.`);
-        }
+        let dailyDocumentIdForSalads = null;
+        let calendarDocIdYYYYMMDD = null;
+        let orderTimeHHMM = null;
 
-      } else {
-        console.warn(`${logPrefix} Fecha/hora del pedido ausente o inválida. No se actualizará stock diario de ensaladas.`);
-      }
-
-      // 2. Restaurar el stock de cada producto en el pedido
-      if (productosDelPedido && productosDelPedido.length > 0) {
-        for (const productoEnPedido of productosDelPedido) {
-          const productoNombreOriginal = (productoEnPedido.nombre || productoEnPedido.alias || '');
-          const productNameLower = productoNombreOriginal.toLowerCase();
-          const productoCantidadEnPedido = Number(productoEnPedido.cantidad) || 0;
-
-          // --- PARTE 1: Restaurar stock en la colección 'productos' (para todos los ítems del pedido) ---
-          let idProductoParaStockGlobal = productoEnPedido.id.toString();
-          let cantidadParaStockGlobal = productoCantidadEnPedido;
-
-          if (productoEnPedido.id === 2) { // Caso especial: medio pollo
-            idProductoParaStockGlobal = '1'; // Afecta stock del pollo entero (ID 1)
-            cantidadParaStockGlobal = 0.5 * productoCantidadEnPedido;
-          }
-
-          if (cantidadParaStockGlobal > 0) {
-            const productRef = doc(db, 'productos', idProductoParaStockGlobal);
-            const productSnap = await getDoc(productRef);
-            if (productSnap.exists()) {
-              const currentStock = productSnap.data().stock || 0;
-              const newStock = currentStock + cantidadParaStockGlobal;
-              await updateDoc(productRef, { stock: newStock });
-              // console.log(`${logPrefix} Stock en 'productos' restaurado para ID ${idProductoParaStockGlobal}: +${cantidadParaStockGlobal}. Nuevo stock: ${newStock}`);
-            } else {
-              console.warn(`${logPrefix} Producto con ID ${idProductoParaStockGlobal} no encontrado en 'productos' al intentar restaurar stock.`);
+        if (fechahoraPedido && typeof fechahoraPedido === 'string' && fechahoraPedido.includes(' ')) {
+            const [datePart, timePart] = fechahoraPedido.split(' ');
+            const [day, month, year] = datePart.split('/');
+            if (day && month && year && /^\d{1,2}$/.test(day) && /^\d{1,2}$/.test(month) && /^\d{4}$/.test(year)) {
+                dailyDocumentIdForSalads = `${day.padStart(2, '0')}-${month.padStart(2, '0')}-${year}`;
+                calendarDocIdYYYYMMDD = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
             }
-          } else {
-            // Esto podría pasar si productoCantidadEnPedido es 0 o si es medio pollo y la cantidad es < 2 (ej. 0.5 * 1 = 0.5, si se redondeara a 0)
-            // O si el producto original tenía cantidad 0.
-            console.warn(`${logPrefix} Cantidad para stock global es 0 o inválida para producto ${productoEnPedido.nombre || productoEnPedido.id} (Cantidad original: ${productoEnPedido.cantidad}). No se actualiza 'productos'.`);
-          }
+            if (timePart && /^\d{2}:\d{2}$/.test(timePart)) {
+                orderTimeHHMM = timePart;
+            }
+        }
 
-          // --- PARTE 2: Si es ensalada, actualizar también contadores en la colección 'ensaladas' ---
-          const esEnsalada = productNameLower.includes('ensaladilla') || productNameLower.includes('ensalada');
-          if (esEnsalada) {
-            const cantidadARestarDePedidasEnsalada = productoCantidadEnPedido; // La cantidad original del ítem en el pedido
-            if (dailyDocumentIdForSalads && cantidadARestarDePedidasEnsalada > 0) {
-              const saladCollectionName = 'ensaladas';
-              const saladStockRef = doc(db, saladCollectionName, dailyDocumentIdForSalads);
-              // console.log(`${logPrefix} Intentando restaurar stock para ensalada: ${cantidadARestaurarEnsalada} unidades en ${saladStockRef.path}`);
+        if (productosDelPedido && productosDelPedido.length > 0) {
+            for (const productoEnPedido of productosDelPedido) {
+                const productoNombreOriginal = (productoEnPedido.nombre || productoEnPedido.alias || '');
+                const productNameLower = productoNombreOriginal.toLowerCase();
+                const productoCantidadEnPedido = Number(productoEnPedido.cantidad) || 0;
+                let idProductoParaStockGlobal = productoEnPedido.id?.toString(); 
+                let cantidadParaStockGlobal = productoCantidadEnPedido;
 
-              let tipoEnsaladaBase = ''; // 'ensaladas' o 'ensaladillas'
-              let tamanoEnsalada = ''; // 'grandes' o 'pequenas'
+                if (productoEnPedido.id === 2 || productoEnPedido.id === 39 || productoEnPedido.id === 40) { 
+                    idProductoParaStockGlobal = '1'; 
+                    cantidadParaStockGlobal = 0.5 * productoCantidadEnPedido;
+                }
 
-              if (productNameLower.includes('ensaladilla')) {
-                tipoEnsaladaBase = 'ensaladillas';
-              } else if (productNameLower.includes('ensalada')) { // Asegurarse que no sea ensaladilla
-                tipoEnsaladaBase = 'ensaladas';
-              }
-
-              if (productNameLower.includes('1/2') || productNameLower.includes('media')) {
-                tamanoEnsalada = 'pequenas';
-              } else {
-                tamanoEnsalada = 'grandes'; // Asumir grande si no es pequeña por defecto
-              }
-
-              let fieldPathParaDecremento = null;
-              if (tipoEnsaladaBase && tamanoEnsalada) {
-                fieldPathParaDecremento = `${tipoEnsaladaBase}.${tamanoEnsalada}.pedidas`;
-              } else {
-                console.warn(`${logPrefix} No se pudo determinar el tipo/tamaño para la ensalada: ${productNameLower}. No se actualizará contador 'pedidas' en colección 'ensaladas'.`);
-              }
-
-              if (fieldPathParaDecremento) {
-                try {
-                  await runTransaction(db, async (transaction) => {
-                    const transLogPrefix = `${logPrefix}[TransEns]`;
-                    const saladStockSnap = await transaction.get(saladStockRef);
-
-                    if (!saladStockSnap.exists()) {
-                      console.warn(`${transLogPrefix} Documento de stock de ensaladas ${saladStockRef.path} NO encontrado. No se puede decrementar 'pedidas'.`);
-                      return; 
+                if (cantidadParaStockGlobal > 0 && idProductoParaStockGlobal) {
+                    const productRef = doc(db, 'productos', idProductoParaStockGlobal);
+                    try {
+                        await updateDoc(productRef, { stock: increment(cantidadParaStockGlobal) });
+                    } catch (e) {
+                        console.warn(`${logPrefix} Producto con ID ${idProductoParaStockGlobal} no encontrado o error al restaurar stock en 'productos': `, e);
                     }
+                }
+
+                const esEnsalada = productNameLower.includes('ensaladilla') || productNameLower.includes('ensalada');
+                if (esEnsalada && dailyDocumentIdForSalads && productoCantidadEnPedido > 0) {
+                    const saladCollectionName = 'ensaladas';
+                    const saladStockRef = doc(db, saladCollectionName, dailyDocumentIdForSalads);
+                    let tipoEnsaladaBase = '';
+                    let tamanoEnsalada = '';
+
+                    if (productNameLower.includes('ensaladilla')) tipoEnsaladaBase = 'ensaladillas';
+                    else if (productNameLower.includes('ensalada')) tipoEnsaladaBase = 'ensaladas';
+
+                    if (productNameLower.includes('1/2') || productNameLower.includes('media')) tamanoEnsalada = 'pequenas';
+                    else tamanoEnsalada = 'grandes';
                     
-                    const updateData = {};
-                    updateData[fieldPathParaDecremento] = increment(-cantidadARestarDePedidasEnsalada);
-                    transaction.update(saladStockRef, updateData);
-                    // console.log(`${transLogPrefix} Contador 'pedidas' en ${dailyDocumentIdForSalads}, campo '${fieldPathParaDecremento}', decrementado en: ${cantidadARestarDePedidasEnsalada}`);
-                  });
-                } catch (e) {
-                  console.error(`${logPrefix} Error en transacción al decrementar 'pedidas' de ensaladas para ${dailyDocumentIdForSalads}:`, e);
+                    if (tipoEnsaladaBase && tamanoEnsalada) {
+                        const fieldPathParaDecremento = `${tipoEnsaladaBase}.${tamanoEnsalada}.pedidas`;
+                        try {
+                            await updateDoc(saladStockRef, { [fieldPathParaDecremento]: increment(-productoCantidadEnPedido) });
+                        } catch (e) {
+                            console.warn(`${logPrefix} Error al decrementar 'pedidas' de ensaladas para ${dailyDocumentIdForSalads} (campo: ${fieldPathParaDecremento}):`, e);
+                        }
+                    }
                 }
-              }
-            } else {
-              if (!dailyDocumentIdForSalads) console.warn(`${logPrefix} No se pudo determinar la fecha del pedido para ensalada ${productNameLower}. No se actualizará contador 'pedidas' en 'ensaladas'.`);
-              if (cantidadARestarDePedidasEnsalada <= 0) console.warn(`${logPrefix} Cantidad a restar de 'pedidas' para ensalada ${productNameLower} es cero o negativa. No se actualizará.`);
+                
+                let calendarCollectionName = null;
+                let cantidadARestarDelCalendario = 0;
+                const productoIdOriginal = productoEnPedido.id;
+
+                if (productoIdOriginal === 1 || productoIdOriginal === 2 || productoIdOriginal === 39 || productoIdOriginal === 40 || productNameLower.includes('menú pollo')) {
+                    calendarCollectionName = 'chicken_calendar_daily';
+                    cantidadARestarDelCalendario = (productoIdOriginal === 1 || productNameLower.includes('menú pollo entero')) ? productoCantidadEnPedido : 0.5 * productoCantidadEnPedido;
+                } else if (productoIdOriginal === 41 || productoIdOriginal === 48) {
+                    calendarCollectionName = 'costilla_calendar_daily';
+                    cantidadARestarDelCalendario = (productoIdOriginal === 41) ? productoCantidadEnPedido : 0.5 * productoCantidadEnPedido;
+                } else if (productoIdOriginal === 20) { 
+                    calendarCollectionName = 'codillo_calendar_daily';
+                    cantidadARestarDelCalendario = productoCantidadEnPedido;
+                }
+
+                if (calendarCollectionName && calendarDocIdYYYYMMDD && orderTimeHHMM && cantidadARestarDelCalendario > 0) {
+                    const calendarDocRef = doc(db, calendarCollectionName, calendarDocIdYYYYMMDD);
+                    try {
+                        await runTransaction(db, async (transaction) => {
+                            const calendarDocSnap = await transaction.get(calendarDocRef);
+                            if (!calendarDocSnap.exists() || !Array.isArray(calendarDocSnap.data()?.intervals)) {
+                                console.warn(`${logPrefix} Documento de calendario ${calendarDocRef.path} o 'intervals' no encontrado/inválido.`);
+                                return;
+                            }
+                            let intervalsCopy = JSON.parse(JSON.stringify(calendarDocSnap.data().intervals));
+                            const intervalIndex = intervalsCopy.findIndex(interval => interval.start === orderTimeHHMM);
+                            if (intervalIndex === -1) {
+                                console.warn(`${logPrefix} Intervalo para ${orderTimeHHMM} no encontrado en ${calendarDocRef.path}.`);
+                                return;
+                            }
+                            const currentCount = Number(intervalsCopy[intervalIndex].orderedCount) || 0;
+                            intervalsCopy[intervalIndex].orderedCount = Math.max(0, currentCount - cantidadARestarDelCalendario);
+                            transaction.update(calendarDocRef, { intervals: intervalsCopy });
+                        });
+                    } catch (e) {
+                        console.error(`${logPrefix} Error en transacción de calendario ${calendarCollectionName}:`, e);
+                    }
+                }
             }
-          }
-
-          // --- PARTE 3: Si es pollo, codillo o costilla, actualizar calendario diario ---
-          let calendarCollectionName = null;
-          let productKeyForCalendar = null; 
-          let cantidadARestarDelCalendario = 0;
-          const productoIdOriginal = productoEnPedido.id;
-
-          if (productoIdOriginal === 1 || productoIdOriginal === 2 || productoIdOriginal === 39 || productoIdOriginal === 40 || productNameLower.includes('menú pollo')) {
-            calendarCollectionName = 'chicken_calendar_daily';
-            productKeyForCalendar = 'Pollo';
-            if (productoIdOriginal === 1) { // Pollo entero
-                cantidadARestarDelCalendario = productoCantidadEnPedido;
-            } else { // 1/2 pollo o cualquier menú que incluya pollo (IDs 2, 39, 40)
-                cantidadARestarDelCalendario = 0.5 * productoCantidadEnPedido;
-            }
-          } else if (productoIdOriginal === 41 || productoIdOriginal === 48) {
-            calendarCollectionName = 'costilla_calendar_daily';
-            productKeyForCalendar = 'Costilla';
-            if (productoIdOriginal === 41) cantidadARestarDelCalendario = productoCantidadEnPedido; // Costilla entera
-            else cantidadARestarDelCalendario = 0.5 * productoCantidadEnPedido; // 1/2 costilla
-          } else if (productoIdOriginal === 50) {
-            calendarCollectionName = 'codillo_calendar_daily';
-            productKeyForCalendar = 'Codillo';
-            cantidadARestarDelCalendario = productoCantidadEnPedido;
-          }
-
-          if (calendarCollectionName && calendarDocIdYYYYMMDD && orderTimeHHMM && cantidadARestarDelCalendario > 0) {
-            const calendarDocRef = doc(db, calendarCollectionName, calendarDocIdYYYYMMDD);
-            // console.log(`${logPrefix} Intentando restar del calendario ${calendarDocRef.path} para ${productKeyForCalendar}, cantidad: ${cantidadARestarDelCalendario} a las ${orderTimeHHMM}`);
-            try {
-              await runTransaction(db, async (transaction) => {
-                const transLogPrefixCal = `${logPrefix}[TransCal][${productKeyForCalendar}]`;
-                const calendarDocSnap = await transaction.get(calendarDocRef);
-
-                if (!calendarDocSnap.exists()) {
-                  console.warn(`${transLogPrefixCal} Documento de calendario ${calendarDocRef.path} NO encontrado. No se puede restar del calendario.`);
-                  return;
-                }
-                const calendarData = calendarDocSnap.data();
-                if (!Array.isArray(calendarData?.intervals)) {
-                  console.warn(`${transLogPrefixCal} Campo 'intervals' NO es un array o falta en ${calendarDocRef.path}. No se puede restar del calendario.`);
-                  return;
-                }
-
-                let intervalsCopy = JSON.parse(JSON.stringify(calendarData.intervals));
-                let intervalFound = false;
-                let foundIntervalIndex = -1;
-
-                for (let i = 0; i < intervalsCopy.length; i++) {
-                  if (intervalsCopy[i].start === orderTimeHHMM) {
-                    intervalFound = true;
-                    foundIntervalIndex = i;
-                    break;
-                  }
-                }
-
-                if (!intervalFound) {
-                  console.warn(`${transLogPrefixCal} Intervalo para la hora ${orderTimeHHMM} no encontrado en ${calendarDocRef.path}. No se puede restar del calendario.`);
-                  return;
-                }
-
-                const targetInterval = intervalsCopy[foundIntervalIndex];
-                const currentCount = Number(targetInterval.orderedCount) || 0;
-                const newCount = currentCount - cantidadARestarDelCalendario;
-                targetInterval.orderedCount = Math.max(0, newCount); // Asegurar que no sea negativo
-
-                transaction.update(calendarDocRef, { intervals: intervalsCopy });
-                // console.log(`${transLogPrefixCal} Contador 'orderedCount' en ${calendarDocRef.path} para intervalo ${orderTimeHHMM} actualizado a ${targetInterval.orderedCount} (restando ${cantidadARestarDelCalendario}).`);
-              });
-            } catch (e) {
-              console.error(`${logPrefix} Error en transacción al restar del calendario ${calendarCollectionName} para ${productKeyForCalendar}:`, e);
-            }
-          }
         }
-      }
 
-      // 3. Eliminar el pedido
-      await deleteDoc(pedidoRef);
-      console.log(`${logPrefix} Pedido eliminado exitosamente.`);
-      handleCloseModal1();
+        await deleteDoc(pedidoRef);
+        handleCloseOptionsModal();
     } catch (error) {
-      console.error(`${logPrefix} Error al borrar el pedido: `, error);
-      handleCloseModal1(); // Cerrar el modal incluso si hay un error
+        console.error(`${logPrefix} Error general al borrar pedido:`, error);
+        handleCloseOptionsModal();
     }
   };
 
-  const toggleOffcanvas = () => setShow(!show);
-
-  const theme = createTheme({
-    palette: {
-      primary: {
-        main: '#f2ac02',
-      },
-    },
-  });
-
-  // --- NUEVA FUNCIÓN para sumar un número específico ---
-  const sumarNumero = (numero) => {
-    if (!isNaN(numero)) { // Asegurarse de que es un número
-      setNumeroBarra((prevNumero) => {
-        const prev = parseFloat(prevNumero) || 0; // Si prevNumero no es número, usa 0
-        return prev + numero;
-      });
-    }
-  };
-  // --- FIN NUEVA FUNCIÓN ---
-
-  const sumarCinco = () => sumarNumero(5);
-  const sumarCuatro = () => sumarNumero(4);
-  const restarCinco = () => sumarNumero(-5);
-  const restarCuatro = () => sumarNumero(-4);
-  const sumarUno = () => sumarNumero(1);
-  const restarUno = () => sumarNumero(-1);
-  const sumaMedio = () => sumarNumero(0.5);
-  const restaMedio = () => sumarNumero(-0.5);
-
-  // MODIFICACIÓN PRINCIPAL AQUÍ:
-  const handleClick = async (numeroPedido, productoClickeado, maxCantidad, indiceProductoEnPedido) => {
-    const pedido = pedidos.find(p => p.NumeroPedido === numeroPedido);
-    if (!pedido) {
-      console.error('No se encontró el pedido con NumeroPedido:', numeroPedido);
-      return;
-    }
-
-    // Usar el índice para obtener la referencia exacta al producto en el array local
-    // Esto es útil si necesitas manipular el estado local del producto antes o después de Firestore.
-    const productoLocal = pedido.productos[indiceProductoEnPedido];
-
-    // Verificación para asegurar que el producto clickeado y el producto en el índice coinciden (opcional pero bueno para la integridad).
-    if (!productoLocal || productoLocal.id !== productoClickeado.id /* Podrías añadir más comparaciones de opciones si fuera necesario aquí */) {
-      console.error('Error: Desajuste entre el producto clickeado y el producto encontrado en el pedido local mediante el índice:', indiceProductoEnPedido, 'Producto Clickeado:', productoClickeado);
+  const handleClickProductoEntregado = async (numeroPedido, productoClickeado, maxCantidad, indiceProductoEnPedido) => {
+    const pedidoLocal = pedidos.find(p => p.NumeroPedido === numeroPedido);
+    if (!pedidoLocal) {
+      console.error('No se encontró el pedido local con NumeroPedido:', numeroPedido);
       return;
     }
 
@@ -453,354 +246,186 @@ const Ordenes = () => {
     const pedidoRef = doc(db, 'pedidos', numeroPedidoStr);
 
     try {
-      const pedidoDoc = await getDoc(pedidoRef);
-      if (!pedidoDoc.exists()) {
-        console.error('No se encontró el pedido en Firestore:', numeroPedidoStr);
-        return;
-      }
+      await runTransaction(db, async (transaction) => {
+        const pedidoDocSnap = await transaction.get(pedidoRef);
+        if (!pedidoDocSnap.exists()) {
+          throw new Error("El documento del pedido no existe en Firestore!");
+        }
 
-      const productosFirestore = pedidoDoc.data().productos;
+        let productosFirestore = pedidoDocSnap.data().productos;
+        if (!Array.isArray(productosFirestore)) {
+            throw new Error("El campo 'productos' en Firestore no es un array o no existe.");
+        }
 
-      // IMPORTANTE: Identificar el producto correcto en Firestore.
-      // Como no tienes un `id_cart` único por línea de producto, necesitas encontrar
-      // el producto en `productosFirestore` basándote en todas las propiedades que
-      // lo hacen único (ID base + sus opciones).
-      const indiceEnFirestore = productosFirestore.findIndex(p =>
-        p.id === productoClickeado.id && // Compara el ID base
-        // === COMPLETA ESTA SECCIÓN ===
-        // Añade aquí todas las demás propiedades que diferencian las variaciones.
-        // Deben coincidir con las propiedades del objeto `productoClickeado`.
-        // Ejemplo de cómo comparar propiedades que podrían ser undefined:
-        ( (p.tostado === undefined && productoClickeado.tostado === undefined) || p.tostado === productoClickeado.tostado ) &&
-        ( (p.troceado === undefined && productoClickeado.troceado === undefined) || p.troceado === productoClickeado.troceado ) &&
-        ( (p.sinsalsa === undefined && productoClickeado.sinsalsa === undefined) || p.sinsalsa === productoClickeado.sinsalsa ) &&
-        ( (p.extrasalsa === undefined && productoClickeado.extrasalsa === undefined) || p.extrasalsa === productoClickeado.extrasalsa ) &&
-        ( (p.celiaco === undefined && productoClickeado.celiaco === undefined) || p.celiaco === productoClickeado.celiaco )
-        // ... y así sucesivamente para todas las opciones que puedan tener tus productos.
-        // Asegúrate de que la comparación maneje correctamente valores `undefined` o `null`
-        // si algunas opciones no siempre están presentes.
-      );
+        let targetIndexInFirestore = productosFirestore.findIndex(p =>
+            p.id_cart === productoClickeado.id_cart || 
+            (p.id === productoClickeado.id &&
+             p.alias === productoClickeado.alias && 
+             p.uniqueId === productoClickeado.uniqueId) 
+        );
 
-      if (indiceEnFirestore === -1) {
-        console.error('No se pudo encontrar el producto específico en Firestore. Producto clickeado:', productoClickeado, 'Productos en Firestore:', productosFirestore);
-        // Podrías intentar una búsqueda más laxa o registrar el error de forma diferente.
-        // Por ahora, si no se encuentra una coincidencia exacta, no se actualiza.
-        return;
-      }
+        if (targetIndexInFirestore === -1) {
+            targetIndexInFirestore = productosFirestore.findIndex(p =>
+                p.id === productoClickeado.id &&
+                p.alias === productoClickeado.alias && 
+                JSON.stringify(p.opciones || {}) === JSON.stringify(productoClickeado.opciones || {}) && 
+                p.tostado === (productoClickeado.tostado) && 
+                p.troceado === (productoClickeado.troceado) &&
+                p.sinsalsa === (productoClickeado.sinsalsa) &&
+                p.extrasalsa === (productoClickeado.extrasalsa) &&
+                p.celiaco === (productoClickeado.celiaco)
+            );
+        }
+        
+        if (targetIndexInFirestore === -1) {
+          console.warn(`Producto específico no encontrado por atributos en pedido ${numeroPedidoStr}. Intentando por índice local ${indiceProductoEnPedido}. Clickeado:`, productoClickeado);
+          if (productosFirestore[indiceProductoEnPedido] && productosFirestore[indiceProductoEnPedido].id === productoClickeado.id && productosFirestore[indiceProductoEnPedido].alias === productoClickeado.alias ) {
+            targetIndexInFirestore = indiceProductoEnPedido; 
+            console.log("Producto encontrado por índice local como fallback.")
+          } else {
+              console.error('No se pudo encontrar el producto específico en Firestore por atributos ni por índice local confiable. Producto clickeado:', productoClickeado, 'Productos en Firestore:', productosFirestore);
+              throw new Error('Producto no encontrado en Firestore para actualizar.');
+          }
+        }
+        
+        const productoAActualizar = productosFirestore[targetIndexInFirestore];
+        const entregadoActual = productoAActualizar.entregado || 0;
+        let nuevoEntregado = entregadoActual + 1;
+        if (nuevoEntregado > maxCantidad) {
+          nuevoEntregado = 0;
+        }
 
-      const entregadoActual = productosFirestore[indiceEnFirestore].entregado || 0;
-      let nuevoEntregado = entregadoActual + 1;
-      if (nuevoEntregado > maxCantidad) {
-        nuevoEntregado = 0;
-      }
-
-      // Crear una nueva copia del array de productos con el producto específico actualizado.
-      const productosActualizados = productosFirestore.map((p, idx) =>
-        idx === indiceEnFirestore
-          ? { ...p, entregado: nuevoEntregado } // Actualiza el producto correcto
-          : p
-      );
-
-      await updateDoc(pedidoRef, {
-        productos: productosActualizados,
+        const productosActualizados = productosFirestore.map((p, idx) =>
+          (idx === targetIndexInFirestore)
+            ? { ...p, entregado: nuevoEntregado }
+            : p
+        );
+        transaction.update(pedidoRef, { productos: productosActualizados });
       });
-      // console.log('Producto actualizado en Firestore con éxito'); // Descomentar para depuración
     } catch (error) {
-      console.error('Error al actualizar el pedido en Firestore:', error);
+      console.error(`Error al actualizar producto en pedido ${numeroPedidoStr} en Firestore:`, error);
     }
   };
 
-  const obtenerFechaFormateada = () => {
-    dayjs.locale('es');
-    const fechaFormateada = dayjs().format('DD-MM-YYYY');
-    return fechaFormateada;
-  };
-
-  const agruparPorBloques15Minutos = (pedidos) => {
+  const agruparPorBloques15Minutos = (pedidosParaAgrupar) => {
     const bloques = {};
-    pedidos.forEach((pedido) => {
-      const fechaHora = dayjs(pedido.fechahora, 'DD/MM/YYYY HH:mm');
+    if (!pedidosParaAgrupar) return bloques;
+
+    pedidosParaAgrupar.forEach((pedido) => {
+      if (!pedido.fechahora || typeof pedido.fechahora !== 'string' || !pedido.fechahora.includes(' ')) return;
+      const fechaHora = dayjs(pedido.fechahora, 'DD/MM/YYYY HH:mm', 'es', true).tz('Europe/Madrid', true); 
+      if(!fechaHora.isValid()) return;
+
       const hora = fechaHora.format('HH:mm');
       if (!bloques[hora]) {
         bloques[hora] = {
           pedidos: [],
           cantidadProductos: 0,
-          productos: [],
-          cantidadProductosId1: 0,
-          cantidadProductosId20: 0,
-          cantidadProductosId2: 0,
-          cantidadProductosId41: 0,
-          cantidadProductosId48: 0,
+          productos: [], 
+          cantidadProductosId1: 0, cantidadProductosId20: 0, cantidadProductosId2: 0,
+          cantidadProductosId41: 0, cantidadProductosId48: 0,
         };
       }
       bloques[hora].pedidos.push(pedido);
-      pedido.productos.forEach((producto) => {
-        bloques[hora].cantidadProductos += producto.cantidad;
-        // 'producto' aquí es el objeto original del pedido, que asumimos tiene 'producto.position'.
-        // 'producto.alias' se usa como 'nombre' en el objeto agrupado.
-        // Si 'producto.nombre' es más adecuado que 'producto.alias' para mostrar, ajústalo.
-        const productoExistente = bloques[hora].productos.find(p => p.nombre === producto.alias);
-        if (productoExistente) {
-          productoExistente.cantidad += producto.cantidad;
-          productoExistente.entregado += producto.entregado;
-          // Si 'position' es una propiedad estática del producto y el productoExistente
-          // no la tiene (por si acaso), se la asignamos.
-          if (productoExistente.position === undefined && producto.position !== undefined) {
-            productoExistente.position = producto.position;
+      if(pedido.productos && Array.isArray(pedido.productos)){
+        pedido.productos.forEach((producto) => {
+          const cantidadProducto = Number(producto.cantidad) || 0; 
+          bloques[hora].cantidadProductos += cantidadProducto;
+          const productoExistente = bloques[hora].productos.find(p => 
+            p.nombre === producto.alias && 
+            p.categoria === producto.categoria 
+          );
+          if (productoExistente) {
+            productoExistente.cantidad += cantidadProducto;
+            productoExistente.entregado += (Number(producto.entregado) || 0); 
+          } else {
+            bloques[hora].productos.push({
+              nombre: producto.alias, 
+              cantidad: cantidadProducto, 
+              categoria: producto.categoria, 
+              entregado: (Number(producto.entregado) || 0), 
+              position: producto.position 
+            });
           }
-        } else {
-          bloques[hora].productos.push({nombre: producto.alias, cantidad: producto.cantidad, categoria: producto.categoria, entregado:producto.entregado, position: producto.position});
-        }
-        if (producto.id === 1) bloques[hora].cantidadProductosId1 += producto.cantidad;
-        if (producto.id === 2) bloques[hora].cantidadProductosId2 += producto.cantidad;
-        if (producto.id === 20) bloques[hora].cantidadProductosId20 += producto.cantidad;
-        if (producto.id === 41) bloques[hora].cantidadProductosId41 += producto.cantidad;
-        if (producto.id === 48) bloques[hora].cantidadProductosId48 += producto.cantidad;
-      });
+          if (producto.id === 1) bloques[hora].cantidadProductosId1 += cantidadProducto;
+          if (producto.id === 2 || producto.id === 39 || producto.id === 40) bloques[hora].cantidadProductosId2 += cantidadProducto;
+          if (producto.id === 20) bloques[hora].cantidadProductosId20 += cantidadProducto;
+          if (producto.id === 41) bloques[hora].cantidadProductosId41 += cantidadProducto;
+          if (producto.id === 48) bloques[hora].cantidadProductosId48 += cantidadProducto;
+        });
+      }
     });
+    for (const hora in bloques) {
+        bloques[hora].productos.sort((a, b) => {
+            const categoriaPrioridad = { comida: 1, complementos: 2, bebidas: 3, postres: 4, extras: 5, default: 6 };
+            const categoriaA = categoriaPrioridad[a.categoria] || categoriaPrioridad.default;
+            const categoriaB = categoriaPrioridad[b.categoria] || categoriaPrioridad.default;
+            if (categoriaA !== categoriaB) return categoriaA - categoriaB;
+            return (a.position || 0) - (b.position || 0);
+        });
+    }
     return bloques;
   };
 
-  const bloquesPedidos = agruparPorBloques15Minutos(pedidos);
-
-  const bloquesDespuesDeLas18 = Object.keys(bloquesPedidos)
-    .filter(bloque => dayjs(bloque, 'HH:mm').hour() >= 18)
-    .reduce((total, bloque) => {
-      return total + bloquesPedidos[bloque].cantidadProductosId1 + bloquesPedidos[bloque].cantidadProductosId2 / 2;
-    }, 0);
-  setTotalProductosDespuesDeLas18(bloquesDespuesDeLas18);
-
-  const bloquesAntesdelas18 = Object.keys(bloquesPedidos)
-    .filter(bloque => dayjs(bloque, 'HH:mm').hour() < 18)
-    .reduce((total, bloque) => {
-      return total + bloquesPedidos[bloque].cantidadProductosId1 + bloquesPedidos[bloque].cantidadProductosId2 / 2;
-    }, 0 );
-  setTotalbloquesAntesdelas18(bloquesAntesdelas18);
-
-  const totalProductos = totalProductosDespuesDeLas18 + totalbloquesAntesdelas18;
-
- /* useEffect(() => {
-    const cargarNumeroBarra = async () => {
-      try {
-        const fecha = obtenerFechaFormateada();
-        const docRef = doc(db, "estadisticas_diarias", fecha);
-        const docSnap = await getDoc(docRef);
-        if (docSnap.exists()) {
-          const data = docSnap.data();
-          setNumeroBarra(data.enbarra);
-          setVm(data.vm);
-        } else {
-          setNumeroBarra(0);
-        }
-      } catch (e) {
-        console.error("Error al cargar los datos de numeroBarra: ", e);
-      }
-    };
-    cargarNumeroBarra();
-  }, []);*/
-
-  const [clientes, setClientes] = useState([]);
+  const bloquesPedidos = agruparPorBloques15Minutos(pedidos || []);
+  
   const [searchTerm, setSearchTerm] = useState('');
+  const handleSearchChange = (e) => setSearchTerm(e.target.value);
 
-  const handleSearchChange = (e) => {
-    setSearchTerm(e.target.value);
-  };
-
-  const [totales, setTotales] = useState({
-    totalProductosId1: 0,
-    totalProductosId2: 0,
-    totalProductosId20: 0,
-    totalProductosId41: 0,
-    totalProductosId48: 0,
+  const [totalesProximos45Min, setTotalesProximos45Min] = useState({
+    totalProductosId1: 0, totalProductosId2: 0, totalProductosId20: 0,
+    totalProductosId41: 0, totalProductosId48: 0,
   });
 
   useEffect(() => {
     const horaActual = dayjs().locale('es').tz('Europe/Madrid');
     const horaFin = horaActual.add(45, 'minutes');
     const nuevosTotales = Object.keys(bloquesPedidos).reduce(
-      (acc, bloque) => {
-        const horaBloque = dayjs(bloque, 'HH:mm');
-        if (horaBloque.isBetween(horaActual, horaFin, null, '[)')) {
-          acc.totalProductosId1 += bloquesPedidos[bloque].cantidadProductosId1;
-          acc.totalProductosId2 += bloquesPedidos[bloque].cantidadProductosId2;
-          acc.totalProductosId20 += bloquesPedidos[bloque].cantidadProductosId20;
-          acc.totalProductosId41 += bloquesPedidos[bloque].cantidadProductosId41;
-          acc.totalProductosId48 += bloquesPedidos[bloque].cantidadProductosId48;
+      (acc, bloqueHora) => {
+        const horaBloqueDate = dayjs(bloqueHora, 'HH:mm', 'es', true).tz('Europe/Madrid', true); 
+        if (horaBloqueDate.isValid() && horaBloqueDate.isBetween(horaActual, horaFin, null, '[)')) {
+          const bloqueData = bloquesPedidos[bloqueHora];
+          acc.totalProductosId1 += (bloqueData.cantidadProductosId1 || 0);
+          acc.totalProductosId2 += (bloqueData.cantidadProductosId2 || 0); 
+          acc.totalProductosId20 += (bloqueData.cantidadProductosId20 || 0);
+          acc.totalProductosId41 += (bloqueData.cantidadProductosId41 || 0);
+          acc.totalProductosId48 += (bloqueData.cantidadProductosId48 || 0); 
         }
         return acc;
       },
       { totalProductosId1: 0, totalProductosId2: 0, totalProductosId20: 0, totalProductosId41: 0, totalProductosId48: 0 }
     );
-    if (
-      nuevosTotales.totalProductosId1 !== totales.totalProductosId1 ||
-      nuevosTotales.totalProductosId2 !== totales.totalProductosId2 ||
-      nuevosTotales.totalProductosId20 !== totales.totalProductosId20 ||
-      nuevosTotales.totalProductosId41 !== totales.totalProductosId41 ||
-      nuevosTotales.totalProductosId48 !== totales.totalProductosId48
-    ) {
-      setTotales(nuevosTotales);
+    if (!isEqual(nuevosTotales, totalesProximos45Min)) { // Usar isEqual para comparación profunda
+      setTotalesProximos45Min(nuevosTotales);
     }
-  }, [bloquesPedidos, totales]); // Agregado 'totales' a las dependencias
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [bloquesPedidos]); // Removido totalesProximos45Min para evitar bucles si la estructura interna de bloquesPedidos no cambia pero la referencia sí
 
   let bloquesFiltrados = bloquesPedidos;
-  if (!dateToPass) {
+  if (!dateToPass) { 
     const currentTime = dayjs().locale('es').tz('Europe/Madrid');
     const isBefore6PM = currentTime.hour() < 18;
-    if (isBefore6PM) {
-      bloquesFiltrados = Object.keys(bloquesPedidos)
-        .filter((hora) => dayjs(hora, 'HH:mm').hour() < 18)
-        .reduce((acc, hora) => { acc[hora] = bloquesPedidos[hora]; return acc; }, {});
-    } else {
-      bloquesFiltrados = Object.keys(bloquesPedidos)
-        .filter((hora) => dayjs(hora, 'HH:mm').hour() >= 18)
-        .reduce((acc, hora) => { acc[hora] = bloquesPedidos[hora]; return acc; }, {});
-    }
+    bloquesFiltrados = Object.fromEntries(
+      Object.entries(bloquesPedidos).filter(([hora]) => {
+        const horaBloqueDate = dayjs(hora, 'HH:mm', 'es', true).tz('Europe/Madrid', true); 
+        if(!horaBloqueDate.isValid()) return false;
+        return isBefore6PM ? horaBloqueDate.hour() < 18 : horaBloqueDate.hour() >= 18;
+      })
+    );
   }
-
-  const pollosEntregados = Object.values(bloquesFiltrados).reduce((total, bloque) => {
-    const entregadosPorBloque = bloque.pedidos.reduce((sumaEntregados, pedido) => {
-      const productosDePollo = pedido.productos.filter(producto => producto.id === 1 || producto.id === 2);
-      const entregados = productosDePollo.reduce((totalEntregado, producto) => {
-        if (producto.id === 1) return totalEntregado + (producto.entregado || 0); // Asegurar que entregado es numérico
-        if (producto.id === 2) return totalEntregado + ((producto.entregado || 0) * 0.5); // Asegurar que entregado es numérico
-        return totalEntregado;
-      }, 0);
-      return sumaEntregados + entregados;
-    }, 0);
-    return total + entregadosPorBloque;
-  }, 0);
-
-  // El cálculo de mostrarBarra ahora se realiza centralmente en DataContext.
-  // Ordenes.jsx simplemente consume el valor de mostrarBarra del contexto.
-  // console.log("[Ordenes] mostrarBarra del contexto:", mostrarBarra);
-
-
-
-
+  
   return (
     <>
-      <div className="flex justify-center items-center w-full p-[0.5vh] mt-[6vh] mb-1" >
-        <div className="grid grid-cols-12 gap-2 w-full fixed top-0 bg-white p-2">
-          {/* --- Columna 1 y 2 (Offcanvas y Pedidos Online) --- */}
-          <div className="flex w-full gap-2" >
-            <div className="w-1/2 h-[10vh] bg-[#f2ac02] flex justify-center items-center rounded-xl shadow-md cursor-pointer" onClick={toggleOffcanvas}>
-              {/* SVG Offcanvas */}
-              <svg width="2.3vw" height="2.3vw" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><g id="SVGRepo_bgCarrier" strokeWidth="0"/><g id="SVGRepo_tracerCarrier" strokeLinecap="round" strokeLinejoin="round"/><g id="SVGRepo_iconCarrier"> <path d="M20 7L4 7" stroke="#FFFFFF" strokeWidth="1.5" strokeLinecap="round"/> <path d="M20 12L4 12" stroke="#FFFFFF" strokeWidth="1.5" strokeLinecap="round"/> <path d="M20 17L4 17" stroke="#FFFFFF" strokeWidth="1.5" strokeLinecap="round"/> </g></svg>
-            </div>
-            <div className="w-1/2 h-[10vh] bg-[#f2ac02] flex flex-col justify-center items-center rounded-xl shadow-md">
-              {/* SVG Pedidos Online */}
-              <svg fill="#FFFFFF" height="2vw" width="2vw" version="1.1" id="Layer_1" xmlns="http://www.w3.org/2000/svg" xmlnsXlink="http://www.w3.org/1999/xlink" viewBox="0 0 512 512" xmlSpace="preserve"><g id="SVGRepo_bgCarrier" strokeWidth="5"/><g id="SVGRepo_tracerCarrier" strokeLinecap="round" strokeLinejoin="round"/><g id="SVGRepo_iconCarrier"> <g> <g> <path d="M499.2,409.6H12.8c-7.074,0-12.8,5.726-12.8,12.8s5.726,12.8,12.8,12.8h486.4c7.074,0,12.8-5.726,12.8-12.8 S506.274,409.6,499.2,409.6z"/> </g> </g> <g> <g> <path d="M460.8,76.8H51.2c-14.14,0-25.6,11.46-25.6,25.6v256c0,14.14,11.46,25.6,25.6,25.6h409.6c14.14,0,25.6-11.46,25.6-25.6 v-256C486.4,88.26,474.94,76.8,460.8,76.8z M460.8,358.4H51.2v-256h409.6V358.4z"/> </g> </g> <g> <g> <path d="M353.57,164.233c-4.813-6.673-12.544-10.633-20.77-10.633H194.441l-61.688-24.678c-6.528-2.654-14.012,0.546-16.64,7.125 c-2.628,6.554,0.572,14.003,7.134,16.623l55.953,22.383V256c0,14.14,11.46,25.6,25.6,25.6h102.4 c11.017,0,20.804-7.049,24.286-17.502l25.6-76.8C359.689,179.49,358.383,170.906,353.57,164.233z M307.2,256H204.8v-76.8h128 L307.2,256z"/> </g> </g> <g> <g> <circle cx="204.8" cy="307.2" r="25.6"/> </g> </g> <g> <g> <circle cx="307.2" cy="307.2" r="25.6"/> </g> </g> </g></svg>
-              <p className="text-white text-[0.90vw] text-center bg-green-700 rounded-md py-1 px-3 mt-2">{pedidosConOrigenUno}</p>
-            </div>
-          </div>
+      <TestHeader /> {/* <--- NUEVO HEADER INTEGRADO AQUÍ ---> */}
 
-          {/* --- Columna 3 (Pedido Rápido) --- */}
-          <div className='w-[8vw] h-[10vh] bg-[#f2ac02] rounded-xl shadow-md'>
-            <div className="flex justify-center items-center h-1/2 cursor-pointer" onClick={() => handlePedidoRapido(1)}>
-              <button type='button' className="text-white text-center text-[1.8vw] font-nunito border-b-4">1P</button>
-            </div>
-            <div className="flex justify-center items-center h-1/2 cursor-pointer" onClick={() => handlePedidoRapido(2)}>
-              <button type='button' className="text-white text-center text-[1.8vw] font-nunito ">1/2P</button>
-            </div>
-          </div>
-
-          {/* --- Columna 4 (Restar 5/4) --- */}
-          <div className='w-[8vw] h-[10vh] bg-gray-700 rounded-xl shadow-md'>
-            <div className="flex justify-center items-center h-1/2 cursor-pointer" onClick={restarCinco}>
-              <button type='button' className="text-white text-center text-[1.8vw] font-nunito border-b-4">-5</button>
-            </div>
-            <div className="flex justify-center items-center h-1/2 cursor-pointer" onClick={restarCuatro}>
-              <button type='button' className="text-white text-center text-[1.8vw] font-nunito">-4</button>
-            </div>
-          </div>
-
-          {/* --- Columna 5 (Sumar 5/4) --- */}
-          <div className='w-[8vw] h-[10vh] bg-gray-700 rounded-xl shadow-md'>
-            <div className="flex justify-center items-center h-1/2 cursor-pointer" onClick={sumarCinco} >
-              <button type='button' className="text-white text-center text-[1.8vw] font-nunito border-b-4" >+5</button>
-            </div>
-            <div className="flex justify-center items-center h-1/2 cursor-pointer" onClick={sumarCuatro}>
-              <button type='number' className="text-white text-center text-[1.8vw] font-nunito">+4</button>
-            </div>
-          </div>
-
-          {/* --- Columna 6 (En Barra) - MODIFICADO --- */}
-          <div
-            className={`w-[8vw] h-[10vh] ${mostrarBarra < 0 ? 'bg-[#cb4335]' : 'bg-gray-500'} flex flex-col justify-center items-center rounded-xl shadow-md cursor-pointer`}
-            onClick={handleShowSumarModal} // <-- Abre el modal al hacer clic
-          >
-            {/* Muestra el valor de mostrarBarra */}
-            <h1 className="text-white text-center text-[2.5vw] font-nunito">
-              {/* Si es entero, muestra sin decimales, si no, con uno */}
-              {mostrarBarra % 1 === 0 ? mostrarBarra : mostrarBarra.toFixed(1)}
-            </h1>
-            <p className="text-white text-center text-[0.85vw] font-nunito mt-[0.90vh] ">En barra</p>
-          </div>
-          {/* --- FIN MODIFICACIÓN --- */}
-
-
-          {/* --- Columna 7 (Sumar 1 / 1/2) --- */}
-          <div className='w-[8vw] h-[10vh] bg-gray-700 rounded-xl shadow-md'>
-            <div className="flex justify-center items-center h-1/2 cursor-pointer" onClick={sumarUno}>
-              <button type='button' className="text-white text-center text-[1.8vw] font-nunito border-b-4">+1</button>
-            </div>
-            <div className="flex justify-center items-center h-1/2 cursor-pointer" onClick={sumaMedio}>
-              <button type='button' className="text-white text-center text-[1.8vw] font-nunito">+1/2</button>
-            </div>
-          </div>
-
-          {/* --- Columna 8 (Restar 1 / 1/2) --- */}
-          <div className='w-[8vw] h-[10vh] bg-gray-700 rounded-xl shadow-md'>
-            <div className="flex justify-center items-center h-1/2 cursor-pointer" onClick={restarUno}>
-              <button type='button' className="text-white text-center text-[1.8vw] font-nunito border-b-4">-1</button>
-            </div>
-            <div className="flex justify-center items-center h-1/2 cursor-pointer" onClick={restaMedio}>
-              <button type='button' className="text-white text-center text-[1.8vw] font-nunito">-1/2</button>
-            </div>
-          </div>
-
-          {/* --- Columna 9 (Libres) --- */}
-        <div className={`w-[8vw] h-[10vh] ${libres < 0 ? 'bg-[#cb4335]' : 'bg-[#f2ac02]'} flex flex-col justify-center items-center rounded-xl shadow-md`}>
-          <h1 className="text-white text-center text-[2.5vw] font-nunito">{libres}</h1>
-          <p className="text-white text-center text-[0.85vw] font-nunito mt-[0.90vh]">Libres</p>
-        </div>
-
-          {/* --- Columna 10 (VM) --- */}
-          <div className='w-[8vw] h-[10vh] bg-[#f2ac02] flex flex-col justify-center items-center rounded-xl shadow-md'>
-            <h1 className="text-white text-center text-[2vw] font-nunito">{totalbloquesAntesdelas18.toFixed(1)}</h1>
-            <h1 className="text-white text-center text-[2w] font-nunito">VM</h1>
-          </div>
-
-          {/* --- Columna 11 (VT) --- */}
-          <div className='w-[8vw] h-[10vh] bg-[#f2ac02] flex flex-col justify-center items-center rounded-xl shadow-md'>
-            <h1 className="text-white text-center text-[2vw] font-nunito">{totalProductosDespuesDeLas18.toFixed(1)}</h1>
-            <h1 className="text-white text-center text-[2w] font-nunito">VT</h1>
-          </div>
-
-          {/* --- Columna 12 (VD) --- */}
-          <div className='w-[8vw] h-[10vh] bg-[#f2ac02] flex flex-col justify-center items-center rounded-xl shadow-md'>
-            <h1 className="text-white text-center text-[2vw] font-nunito">{totalProductos.toFixed(1)}</h1>
-            <h1 className="text-white text-center text-[2w] font-nunito">VD</h1>
-          </div>
-
-          {/* --- Columna 13 (Reloj/Calendario) --- */}
-          <div className={`${divStyle} flex flex-col justify-center items-center rounded-xl shadow-md cursor-pointer`} onClick={handleShowModal}>            
-            <RelojDistinto 
-              fecha={dateToPass ? dateToPass.toDate() : new Date()} 
-              isToday={!dateToPass} />
-          </div>
-        </div>
-      </div>
-
-      {/* --- Barra de Búsqueda y Totales 45 min --- */}
-      <div className="w-full bg-gray-700 mt-[4vh] p-1 fixed flex ">
-        {/* ... (código de búsqueda sin cambios) ... */}
+      {/* BARRA DE BÚSQUEDA Y FILTROS (Original de Ordenes.jsx) */}
+      <div className="w-full bg-gray-700 p-1 fixed flex z-10 top-[12vh] h-[6vh] items-center">
         <div className="flex justify-start items-center">
           <div className="ms-3 p-1">
             <svg width="28px" height="28px" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><g id="SVGRepo_bgCarrier" strokeWidth="0"/><g id="SVGRepo_tracerCarrier" strokeLinecap="round" strokeLinejoin="round"/><g id="SVGRepo_iconCarrier"><path fillRule="evenodd" clipRule="evenodd" d="M15 10.5C15 12.9853 12.9853 15 10.5 15C8.01472 15 6 12.9853 6 10.5C6 8.01472 8.01472 6 10.5 6C12.9853 6 15 8.01472 15 10.5ZM14.1793 15.2399C13.1632 16.0297 11.8865 16.5 10.5 16.5C7.18629 16.5 4.5 13.8137 4.5 10.5C4.5 7.18629 7.18629 4.5 10.5 4.5C13.8137 4.5 16.5 7.18629 16.5 10.5C16.5 11.8865 16.0297 13.1632 15.2399 14.1792L20.0304 18.9697L18.9697 20.0303L14.1793 15.2399Z" fill="#e5e7e9"/></g></svg>
           </div>
-          <div className="ms-1 w-30 h-6 bg-white rounded-md">
-            <div className="relative w-full">
+          <div className="ms-1 w-30 h-6 bg-white rounded-md"> 
+            <div className="relative w-full h-full"> 
               <input type="text" className="w-full h-full bg-transparent border-none outline-none px-2 text-center pl-8" placeholder="buscar..." value={searchTerm} onChange={handleSearchChange}/>
               {searchTerm && (
                 <button className="absolute right-2 top-1/2 transform -translate-y-1/2" onClick={() => setSearchTerm('')}>
@@ -810,67 +435,50 @@ const Ordenes = () => {
             </div>
           </div>
         </div>
-        {/* ... (código de totales 45 min sin cambios) ... */}
-        <div className="flex justify-center w-full mt-1">
+        <div className="flex justify-center w-full items-center"> 
           <div className="text-white text-[1.5vh]">
-            {(() => {
-              return (
-                <div>
-                  {dateToPass && (
-                    <span className="text-[#75adab] font-nunito font-bold -ms-[15vw] mt-1 flex items-center justify-between">
-                      MODO SUPERVISIÓN DE PEDIDOS
-                      <button onClick={() => { window.location.reload(); }} className=" text-[#75adab] hover:text-yellow-700 font-bold text-lg leading-none -me-[40vw]" aria-label="Volver al día actual">&times;</button>
-                    </span>
-                  )}
-                  <div className={`text-gray-400 font-nunito text-xl flex space-x-1 -ms-[8vw] ${ dateToPass ? 'bg-gray-300' : 'bg-transparent' }`}>
-                    {!dateToPass && (
-                      <>
-                        <span>Prox 45 min</span><span>|</span><span className="font-nunito text-gray-400">Pollo:</span><span className="text-white font-nunito font-extrabold">{totales.totalProductosId1}</span><span>+</span><span className="text-white font-nunito font-extrabold">{totales.totalProductosId2}</span><span>/2</span>
-                        { totales.totalProductosId20 > 0 && ( <><span>|</span><span className="text-gray-400 font-nunito">Codillo:</span><span className="text-white font-nunito font-extrabold">{totales.totalProductosId20}</span></> )}
-                        { totales.totalProductosId41 > 0 && ( <><span>|</span><span className="text-gray-400 font-nunito">Costilla:</span><span className="text-white font-nunito font-extrabold">{totales.totalProductosId41}</span></> )}
-                        { totales.totalProductosId48 > 0 && ( <><span>+</span><span className="text-white font-nunito font-extrabold">{totales.totalProductosId48}</span><span>/2</span></> )}
-                      </>
-                    )}
-                  </div>
-                </div>
-              );
-            })()}
+            <div>
+              {dateToPass && ( // Este dateToPass es del DataContext
+                <span className="text-[#75adab] font-nunito font-bold -ms-[15vw] flex items-center justify-between"> 
+                  MODO SUPERVISIÓN DE PEDIDOS ({dayjs(dateToPass).format("DD/MM/YYYY")}) {/* Mostrar fecha */}
+                  <button 
+                    onClick={() => { setDateToPass(null); }} 
+                    className=" text-[#75adab] hover:text-yellow-700 font-bold text-lg leading-none -me-[40vw]" 
+                    aria-label="Volver al día actual">&times;
+                  </button>
+                </span>
+              )}
+              <div className={`font-nunito text-xl flex space-x-1 -ms-[8vw] ${ dateToPass ? 'text-gray-700' : 'text-gray-400' }`}>
+                {!dateToPass && ( // Mostrar solo si es hoy (dateToPass del context es null)
+                  <>
+                    <span>Prox 45 min</span><span>|</span><span className="font-nunito text-gray-400">Pollo:</span><span className="text-white font-nunito font-extrabold">{(totalesProximos45Min.totalProductosId1 + (totalesProximos45Min.totalProductosId2 * 0.5)).toFixed(1)}</span>
+                    { totalesProximos45Min.totalProductosId20 > 0 && ( <><span>|</span><span className="text-gray-400 font-nunito">Codillo:</span><span className="text-white font-nunito font-extrabold">{totalesProximos45Min.totalProductosId20}</span></> )}
+                    { (totalesProximos45Min.totalProductosId41 > 0 || totalesProximos45Min.totalProductosId48 > 0) && ( <><span>|</span><span className="text-gray-400 font-nunito">Costilla:</span><span className="text-white font-nunito font-extrabold">{(totalesProximos45Min.totalProductosId41 + (totalesProximos45Min.totalProductosId48 * 0.5)).toFixed(1)}</span></> )}
+                  </>
+                )}
+              </div>
+            </div>
           </div>
         </div>
       </div>
 
-      {/* --- Lista de Pedidos --- */}
-      <div className="w-full bg-gray-100 flex flex-col justify-center items-center mt-[5.4rem] mb-2 pl-1 pr-1 ">
-        {Object.keys(bloquesFiltrados).map((bloque) => (
-          <div key={bloque} className="w-full ">
-            {/* ... (código del título del bloque sin cambios) ... */}
+      {/* CONTENIDO PRINCIPAL DE ÓRDENES (Scrollable) */}
+      <div className="w-full bg-gray-100 flex flex-col justify-center items-center pt-[18vh] mb-2 pl-1 pr-1">
+        {Object.keys(bloquesFiltrados).sort().map((bloqueHora) => (
+          <div key={bloqueHora} className="w-full ">
             <div className="text-center bg-gray-500 text-md font-semibold mb-1 text-white font-nunito rounded-md ">
               <div className="flex justify-center items-center">
-                <div><span className='text-xl ms-[48vw] font-extrabold'>{bloque}</span></div>
+                <div><span className='text-xl ms-[1vw] sm:ms-[48vw] font-extrabold'>{bloqueHora}</span></div>
                 <div className='flex ml-auto me-4 items-center'>
-                  <p className="text-lg font-bold text-gray-300"><span> Pedidos: </span>{bloquesFiltrados[bloque]?.pedidos.length || 0} | Entregados: </p>
+                  <p className="text-lg font-bold text-gray-300"><span> Pedidos: </span>{bloquesFiltrados[bloqueHora]?.pedidos.length || 0} | Entregados: </p>
                   <p className="text-lg font-bold text-gray-300 ms-1">
-                    {bloquesFiltrados[bloque]?.pedidos.filter(pedido => pedido.productos.every(producto => producto.entregado === producto.cantidad)).length || 0}
+                    {bloquesFiltrados[bloqueHora]?.pedidos.filter(p => p.productos.every(prod => prod.entregado === prod.cantidad && prod.cantidad > 0 )).length || 0}
                   </p>
                 </div>
               </div>
-              {/* ... (código de productos del bloque sin cambios) ... */}
-              {Object.keys(bloquesFiltrados[bloque].productos).length > 0 && (
-                <div className="">
-                  {bloquesFiltrados[bloque].productos
-                    .sort((a, b) => {
-                      const categoriaPrioridad = { comida: 1, complementos: 2, bebidas: 3, postres: 4, extras: 5, default: 6 };
-                      const categoriaA = categoriaPrioridad[a.categoria] || categoriaPrioridad.default;
-                      const categoriaB = categoriaPrioridad[b.categoria] || categoriaPrioridad.default;
-
-                      if (categoriaA !== categoriaB) {
-                        return categoriaA - categoriaB;
-                      }
-                      // Ordenación secundaria por posición si las categorías son iguales
-                      const positionA = a.position || 0; // Asumir 0 si no está definido
-                      const positionB = b.position || 0; // Asumir 0 si no está definido
-                      return positionA - positionB;
-                    })
+              {bloquesFiltrados[bloqueHora].productos.length > 0 && (
+                <div className="p-1">
+                  {bloquesFiltrados[bloqueHora].productos
                     .map((producto, index) => {
                       const categoriaColor = producto.categoria === "comida" ? "text-yellow-500" : producto.categoria === "complementos" ? "text-green-900" : producto.categoria === "bebidas" ? "text-red-700" : producto.categoria === "postres" ? "text-purple-700" : producto.categoria === "extras" ? "text-gray-900" : "text-gray-900";
                       if (producto.categoria === "comida" || producto.categoria === "complementos") {
@@ -881,258 +489,135 @@ const Ordenes = () => {
                 </div>
               )}
             </div>
-            {/* ... (código de mapeo de pedidos sin cambios) ... */}
-            {bloquesFiltrados[bloque].pedidos.filter((pedido) => {
-              const numeroPedido = String(pedido.NumeroPedido || "");
-              const clienteMatch = pedido.cliente?.toLowerCase().includes(searchTerm.toLowerCase());
-              const numeroPedidoMatch = numeroPedido.toLowerCase().includes(searchTerm.toLowerCase());
-              return clienteMatch || numeroPedidoMatch;
+            {bloquesFiltrados[bloqueHora].pedidos.filter((pedido) => {
+              const searchLower = searchTerm.toLowerCase();
+              const numeroPedidoStr = String(pedido.NumeroPedido || "").toLowerCase();
+              const clienteStr = String(pedido.cliente || "").toLowerCase();
+              return clienteStr.includes(searchLower) || numeroPedidoStr.includes(searchLower);
             }).map((pedido) => {
-              const todosCompletados = pedido.productos.every(producto => producto.entregado === producto.cantidad);
+              const todosCompletados = pedido.productos.every(producto => producto.entregado === producto.cantidad && producto.cantidad > 0);
               const containerColor = todosCompletados ? 'bg-[#52be80]' : 'bg-gray-200';
               return (
-                <div key={pedido.id} className={`w-full flex ${containerColor} p-[0.30vh] mb-1 rounded-md`}>
+                <div key={pedido.id || pedido.NumeroPedido} className={`w-full flex ${containerColor} p-[0.30vh] mb-1 rounded-md shadow`}>
                   <div className="flex items-center">
-                    <h3 className={`text-[0.75vw] font-semibold mr-4 text-center ${pedido.origen === 1 ? 'text-green-700' : pedido.origen === 0 ? 'text-gray-600' : 'text-gray-700'}`}>
+                    <h3 className={`text-[0.75vw] font-semibold mr-1 sm:mr-4 text-center ${pedido.origen === 1 ? 'text-green-700' : pedido.origen === 0 ? 'text-gray-600' : 'text-gray-700'}`}>
                       {pedido.NumeroPedido}
-                      <p className="pt-1 w-24 text-[1vw] font-extrabold">{pedido.cliente ? pedido.cliente : 'Generico'}</p>
+                      <p className="pt-1 w-20 sm:w-24 text-[0.8vw] sm:text-[1vw] font-extrabold truncate">{pedido.cliente ? pedido.cliente : 'Generico'}</p>
                     </h3>
-                    <div className="ms-[-0.5vw]">
-                      <button className="p-1 rounded-md hover:bg-[#f2ac02] transition-all border-1 border-gray-300" onClick={() => handleShowModal1(pedido)}>
+                    <div className="ms-[-0.5vw] me-1 sm:me-0">
+                      <button className="p-1 rounded-md hover:bg-[#f2ac02] transition-all border border-gray-300" onClick={() => handleShowOptionsModal(pedido)}>
                         <svg fill="#808b96" width="25px" height="25px" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M12,7a2,2,0,1,0-2-2A2,2,0,0,0,12,7Zm0,10a2,2,0,1,0,2,2A2,2,0,0,0,12,17Zm0-7a2,2,0,1,0,2,2A2,2,0,0,0,12,10Z"/></svg>
                       </button>
                     </div>
                   </div>
-                  <div className="ml-2 gap-2 flex flex-wrap items-center">
+                  <div className="ml-1 sm:ml-2 gap-1 sm:gap-2 flex flex-wrap items-center flex-grow">
                     {pedido.productos
                       .sort((a, b) => {
-                        const categoriaPrioridad = { comida: 1, complementos: 2, bebidas: 3, postres: 4, extras: 5 };
-                        const categoriaA = categoriaPrioridad[a.categoria] || 6;
-                        const categoriaB = categoriaPrioridad[b.categoria] || 6;
+                        const categoriaPrioridad = { comida: 1, complementos: 2, bebidas: 3, postres: 4, extras: 5, default: 6 };
+                        const categoriaA = categoriaPrioridad[a.categoria] || categoriaPrioridad.default;
+                        const categoriaB = categoriaPrioridad[b.categoria] || categoriaPrioridad.default;
                         if (categoriaA !== categoriaB) return categoriaA - categoriaB;
-                        const positionA = a.position || 0;
-                        const positionB = b.position || 0;
-                        return positionA - positionB;
+                        return (a.position || 0) - (b.position || 0);
                       })
                       .map((producto, index) => {
                         let borderColor = 'border-gray-500';
                         let backgroundColor = 'bg-white';
                         const entregadoActual = producto.entregado || 0;
                         const cantidadTotal = producto.cantidad;
-                        if (producto.categoria === 'comida') borderColor = 'border-3 border-yellow-500';
-                        else if (producto.categoria === 'complementos') borderColor = 'border-3 border-green-700';
-                        else if (producto.categoria === 'bebidas') borderColor = 'border-3 border-red-700';
-                        else if (producto.categoria === 'postres') borderColor = 'border-3 border-purple-700';
-                        else if (producto.categoria === 'extras') borderColor = 'border-3 border-gray-500';
-                        if (entregadoActual === cantidadTotal) backgroundColor = 'bg-[#52be80]';
+                        if (producto.categoria === 'comida') borderColor = 'border-yellow-500';
+                        else if (producto.categoria === 'complementos') borderColor = 'border-green-700';
+                        else if (producto.categoria === 'bebidas') borderColor = 'border-red-700';
+                        else if (producto.categoria === 'postres') borderColor = 'border-purple-700';
+                        if (entregadoActual === cantidadTotal && cantidadTotal > 0) backgroundColor = 'bg-[#52be80]';
+                        
                         return (
                           <div
-                            key={producto.id_cart || index} // Si id_cart no existe, usa index. Considera una key más descriptiva si es necesario.
-                            className={`border-2 ${borderColor} ${backgroundColor} p-2 rounded-md w-auto flex items-center text-md cursor-pointer`}
-                            onClick={() => handleClick(pedido.NumeroPedido, producto, producto.cantidad, index)}>
+                            key={producto.id_cart || `${producto.id}-${index}-${producto.alias}`} 
+                            className={`border-2 ${borderColor} ${backgroundColor} p-1 sm:p-2 rounded-md w-auto flex items-center text-xs sm:text-sm cursor-pointer my-1`}
+                            onClick={() => handleClickProductoEntregado(pedido.NumeroPedido, producto, producto.cantidad, index)}>
                             {producto.alias}
-                            <strong className="text-gray-500 ms-1"> [ </strong><strong>{producto.entregado}/{producto.cantidad}</strong><strong className="text-gray-500"> ] </strong>
-                            {producto.celiaco && <img src={singluten} alt="Sin gluten" className="w-5 h-5 ml-2" />}
-                            {producto.tostado>0 && <img src={fire_new} alt="Tostado" className="w-5 h-5 ml-2" />}
-                            {producto.troceado && <img src={tijera_new} alt="Troceado" className="w-5 h-5 ml-2" />}
-                            {producto.sinsalsa && <p className="ms-2 font-extrabold font-nunito"> | S.S</p>}
-                            {producto.extrasalsa && <p className="ms-2 font-extrabold font-nunito"> | E.S</p>}
-                           
+                            <strong className="text-gray-500 ms-1"> [ </strong><strong>{entregadoActual}/{cantidadTotal}</strong><strong className="text-gray-500"> ] </strong>
+                            {producto.celiaco && <img src={singluten} alt="Sin gluten" className="w-4 h-4 sm:w-5 sm:h-5 ml-1 sm:ml-2" />}
+                            {producto.tostado>0 && <img src={fire_new} alt="Tostado" className="w-4 h-4 sm:w-5 sm:h-5 ml-1 sm:ml-2" />}
+                            {producto.troceado && <img src={tijera_new} alt="Troceado" className="w-4 h-4 sm:w-5 sm:h-5 ml-1 sm:ml-2" />}
+                            {producto.sinsalsa && <p className="ms-1 sm:ms-2 text-xs sm:text-sm font-extrabold font-nunito">| S.S</p>}
+                            {producto.extrasalsa && <p className="ms-1 sm:ms-2 text-xs sm:text-sm font-extrabold font-nunito">| E.S</p>}
                           </div>
                         );
                       })}
-                     {pedido.productos.every(producto => producto.entregado === producto.cantidad) && (
-                      <>
-                        <GenerarQRCodeInvisible numeroPedido={pedido.NumeroPedido} />
-                        <ImprimirPedidoCompleto numeroPedido={pedido.NumeroPedido} />
-                      </>
-                    )}
-                    {pedido.pagado && !pedido.observaciones && ( <div className={`ml-2 p-2 gap-3 border-1 border-gray-700 ${pedido.productos.every(producto => producto.entregado === producto.cantidad) ? 'bg-[#52be80]' : 'bg-gray-300'} rounded-md w-auto font-nunito flex justify-center items-center`}><img src={dinero} alt="importe pagado" className="w-5" /></div> )}
-                    {pedido.pagado && pedido.observaciones && ( <div className={`ml-2 p-2 gap-3 border-1 border-gray-700 ${pedido.productos.every(producto => producto.entregado === producto.cantidad) ? 'bg-[#52be80]' : 'bg-gray-300'} rounded-md w-auto font-nunito flex justify-center items-center`}><p className="flex items-center gap-3"><img src={dinero} alt="importe pagado" className="w-5" />Ob: {pedido.observaciones}</p></div> )}
-                    {!pedido.pagado && pedido.observaciones && ( <div className={`ml-2 p-2 gap-3 border-1 border-gray-700 ${pedido.productos.every(producto => producto.entregado === producto.cantidad) ? 'bg-[#52be80]' : 'bg-gray-300'} rounded-md w-auto font-nunito flex justify-center items-center`}><p>Ob: {pedido.observaciones}</p></div> )}
+                      {todosCompletados && (
+                        <>
+                          <GenerarQRCodeInvisible numeroPedido={pedido.NumeroPedido} />
+                          <ImprimirPedidoCompleto numeroPedido={pedido.NumeroPedido} />
+                        </>
+                      )}
+                      {pedido.pagado && !pedido.observaciones && ( <div className={`ml-1 sm:ml-2 p-1 sm:p-2 border border-gray-700 ${todosCompletados ? 'bg-[#52be80]' : 'bg-gray-300'} rounded-md w-auto font-nunito flex justify-center items-center`}><img src={dinero} alt="pagado" className="w-4 sm:w-5" /></div> )}
+                      {pedido.pagado && pedido.observaciones && ( <div className={`ml-1 sm:ml-2 p-1 sm:p-2 border border-gray-700 ${todosCompletados ? 'bg-[#52be80]' : 'bg-gray-300'} rounded-md w-auto font-nunito flex justify-center items-center text-xs sm:text-sm`}><p className="flex items-center gap-1 sm:gap-3"><img src={dinero} alt="pagado" className="w-4 sm:w-5" />Ob: <span className="truncate max-w-[50px] sm:max-w-[100px]">{pedido.observaciones}</span></p></div> )}
+                      {!pedido.pagado && pedido.observaciones && ( <div className={`ml-1 sm:ml-2 p-1 sm:p-2 border border-gray-700 ${todosCompletados ? 'bg-[#52be80]' : 'bg-gray-300'} rounded-md w-auto font-nunito flex justify-center items-center text-xs sm:text-sm`}><p>Ob: <span className="truncate max-w-[50px] sm:max-w-[100px]">{pedido.observaciones}</span></p></div> )}
                   </div>
                 </div>
               );
             })}
           </div>
         ))}
-      </div>
-
-      {/* --- Offcanvas (Menú lateral) --- */}
-      <Offcanvas show={show} onHide={toggleOffcanvas} placement="start" style={{ width: '120px', top: '123px', background: '#f2ac02', borderTopRightRadius: '30px', borderBottomRightRadius: '30px' }}>
-        {/* ... (contenido del Offcanvas sin cambios) ... */}
-        <Offcanvas.Header closeButton><Offcanvas.Title></Offcanvas.Title></Offcanvas.Header>
-        <Offcanvas.Body>
-          <Nav>
-            <ul className=" ms-2 flex flex-col justify-between text-center items-center gap-7 bg-[#f2ac02] ">
-              <Link className=" p-3 mt-2 hover:bg-gray-100 hover:rounded-2xl " to={"/layout/comida"}>
-                <svg width="40px" height="40px" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" stroke="#757575"><g id="SVGRepo_bgCarrier" strokeWidth="0"/><g id="SVGRepo_tracerCarrier" strokeLinecap="round" strokeLinejoin="round"/><g id="SVGRepo_iconCarrier"> <path d="M22 12.2039V13.725C22 17.6258 22 19.5763 20.8284 20.7881C19.6569 22 17.7712 22 14 22H10C6.22876 22 4.34315 22 3.17157 20.7881C2 19.5763 2 17.6258 2 13.725V12.2039C2 9.91549 2 8.77128 2.5192 7.82274C3.0384 6.87421 3.98695 6.28551 5.88403 5.10813L7.88403 3.86687C9.88939 2.62229 10.8921 2 12 2C13.1079 2 14.1106 2.62229 16.116 3.86687L18.116 5.10812C20.0131 6.28551 20.9616 6.87421 21.4808 7.82274" stroke="#757575" strokeWidth="1.5" strokeLinecap="round"/> <path d="M15 18H9" stroke="#757575" strokeWidth="1.5" strokeLinecap="round"/> </g></svg>
-              </Link>
-              <Link className='p-3 hover:bg-gray-100 hover:rounded-2xl' to={"/ordenes"} onClick={() => { window.location.reload(); }}>
-                <svg width="40px" height="40px" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><g id="SVGRepo_bgCarrier" strokeWidth="0"/><g id="SVGRepo_tracerCarrier" strokeLinecap="round" strokeLinejoin="round"/><g id="SVGRepo_iconCarrier"> <path d="M10.5 14L17 14" stroke="#757575" strokeWidth="1.5" strokeLinecap="round"/> <path d="M7 14H7.5" stroke="#757575" strokeWidth="1.5" strokeLinecap="round"/> <path d="M7 10.5H7.5" stroke="#757575" strokeWidth="1.5" strokeLinecap="round"/> <path d="M7 17.5H7.5" stroke="#757575" strokeWidth="1.5" strokeLinecap="round"/> <path d="M10.5 10.5H17" stroke="#757575" strokeWidth="1.5" strokeLinecap="round"/> <path d="M10.5 17.5H17" stroke="#757575" strokeWidth="1.5" strokeLinecap="round"/> <path d="M8 3.5C8 2.67157 8.67157 2 9.5 2H14.5C15.3284 2 16 2.67157 16 3.5V4.5C16 5.32843 15.3284 6 14.5 6H9.5C8.67157 6 8 5.32843 8 4.5V3.5Z" stroke="#757575" strokeWidth="1.5"/> <path d="M21 16.0002C21 18.8286 21 20.2429 20.1213 21.1215C19.2426 22.0002 17.8284 22.0002 15 22.0002H9C6.17157 22.0002 4.75736 22.0002 3.87868 21.1215C3 20.2429 3 18.8286 3 16.0002V13.0002M16 4.00195C18.175 4.01406 19.3529 4.11051 20.1213 4.87889C21 5.75757 21 7.17179 21 10.0002V12.0002M8 4.00195C5.82497 4.01406 4.64706 4.11051 3.87868 4.87889C3.11032 5.64725 3.01385 6.82511 3.00174 9" stroke="#757575" strokeWidth="1.5" strokeLinecap="round"/> </g></svg>
-              </Link>
-              <Link className='p-3 hover:bg-gray-100 hover:rounded-2xl' to={"/freidora"}>
-                <svg fill="#757575" version="1.1" id="Capa_1" xmlns="http://www.w3.org/2000/svg" xmlnsXlink="http://www.w3.org/1999/xlink" width="40px" height="40px" viewBox="0 0 91.689 91.689" xmlSpace="preserve"><g id="SVGRepo_bgCarrier" strokeWidth="0"/><g id="SVGRepo_tracerCarrier" strokeLinecap="round" strokeLinejoin="round"/><g id="SVGRepo_iconCarrier"> <g> <path d="M74.41,42.085l-6.922,3.783l0.58-6.131l1.436,0.376l16.424-5.548l-3.037-10.497l-13.729,4.637l-14.853-3.892l-14.513,2.276 l-13.521-2.528l-10.109,8.94l6.299,8.324L22.2,41.833l-9.982,3.899l-7.474-4.445L0,50.855l11.6,6.9l12.813-5.004l3.576-0.113 l-3.738,8.75l11.969,6.232L48.73,61.9l14.635-1.299l13.471-7.364l14.443,1.183l0.41-10.919L74.41,42.085z M27.438,29.346 l12.301,2.301l14.371-2.255l15.19,3.98l10.857-3.667l0.553,1.908l-11.347,3.834l-15.342-4.02l-14.309,2.245l-11.758-2.199 l-4.762,4.211l-1.172-1.549L27.438,29.346z M29.121,36.258l10.533,1.971l5.236-0.821l-8.355,3.971l-13.697,0.435L29.121,36.258z M23.506,48.284l-11.654,4.552l-6.215-3.695L6.5,47.402l5.463,3.249l11.143-4.351l14.477-0.461l14.324-6.809l11.86,1.652 l-0.186,1.978l-11.352-1.58l-14.184,6.741L23.506,48.284z M39.096,52.284l13.867-6.592l11.834,1.647l-4.608,2.52l-14.285,1.268 l-9.746,4.456l-5.801-3.021L39.096,52.284z M87.266,49.611l-11.424-0.936l-13.776,7.532l-14.492,1.285l-11.379,5.204l-6.414-3.338 l0.764-1.786l5.639,2.937l10.877-4.976l14.428-1.278l13.916-7.606l11.938,0.979L87.266,49.611z"/> </g> </g></svg>
-              </Link>
-              <Link className='p-3 hover:bg-gray-100 hover:rounded-2xl ' to={"/cocina"}>
-                <svg fill="#757575" height="40px" width="40px" version="1.1" id="Layer_1" xmlns="http://www.w3.org/2000/svg" xmlnsXlink="http://www.w3.org/1999/xlink" viewBox="0 0 512 512" xmlSpace="preserve" stroke="#757575" strokeWidth="6"><g id="SVGRepo_bgCarrier" strokeWidth="0"/><g id="SVGRepo_tracerCarrier" strokeLinecap="round" strokeLinejoin="round" /><g id="SVGRepo_iconCarrier"> <g> <g> <g> <path d="M85.432,411.629H40.162c-4.466,0-8.084,3.618-8.084,8.084c0,4.466,3.618,8.084,8.084,8.084h45.269 c4.466,0,8.084-3.618,8.084-8.084C93.516,415.247,89.896,411.629,85.432,411.629z"/> <path d="M471.838,411.629h-45.269c-4.466,0-8.084,3.618-8.084,8.084c0,4.466,3.618,8.084,8.084,8.084h45.269 c4.466,0,8.084-3.618,8.084-8.084C479.922,415.247,476.303,411.629,471.838,411.629z"/> <path d="M490.981,115.637h-21.435h-5.392c-4.466,0-8.084,3.619-8.084,8.084c0,4.466,3.618,8.084,8.084,8.084h5.392h21.435 c2.674,0,4.851,2.176,4.851,4.851v205.151H264.084V131.805h83.659h89.466c4.466,0,8.084-3.619,8.084-8.084 c0-4.466-3.618-8.084-8.084-8.084h-89.466H256H21.019C9.429,115.637,0,125.066,0,136.656v213.236v21.492 c0,11.59,9.429,21.019,21.019,21.019H256h234.981c11.59,0,21.019-9.429,21.019-21.019v-21.492V136.656 C512,125.066,502.571,115.637,490.981,115.637z M247.916,341.807h-27.365c-4.466,0-8.084,3.619-8.084,8.084 s3.618,8.084,8.084,8.084h27.365v18.258H21.019c-2.674,0.001-4.851-2.175-4.851-4.849v-13.408h177.795 c4.466,0,8.084-3.618,8.084-8.084c0-4.466-3.618-8.084-8.084-8.084H16.168V136.656c0-2.674,2.176-4.851,4.851-4.851h226.897 V341.807z M495.832,371.384c0,2.674-2.176,4.851-4.851,4.851H264.084v-18.258h231.747V371.384z"/> <path d="M286.181,209.934v53.787c0,4.466,3.619,8.084,8.084,8.084c4.466,0,8.084-3.618,8.084-8.084v-53.787 c0-4.466-3.618-8.084-8.084-8.084C289.8,201.85,286.181,205.468,286.181,209.934z"/> <path d="M217.735,271.805c4.466,0,8.084-3.618,8.084-8.084v-53.787c0-4.466-3.619-8.084-8.084-8.084s-8.084,3.619-8.084,8.084 v53.787C209.65,268.187,213.269,271.805,217.735,271.805z"/> <path d="M8.084,100.371h495.832c4.466,0,8.084-3.618,8.084-8.084c0-4.466-3.618-8.084-8.084-8.084H8.084 C3.619,84.203,0,87.821,0,92.287C0,96.753,3.619,100.371,8.084,100.371z"/> <path d="M43.32,200.086c2.068,0,4.137-0.789,5.716-2.368l29.048-29.049c3.157-3.157,3.157-8.276-0.001-11.432 c-3.156-3.156-8.275-3.157-11.432,0.001l-29.048,29.049c-3.157,3.157-3.157,8.276,0.001,11.432 C39.182,199.297,41.251,200.086,43.32,200.086z"/> <path d="M64.557,225.374c1.579,1.578,3.649,2.367,5.717,2.367s4.138-0.789,5.717-2.367l52.958-52.958 c3.157-3.158,3.157-8.276,0-11.433c-3.158-3.156-8.276-3.156-11.434,0l-52.958,52.958C61.4,217.099,61.4,222.217,64.557,225.374z "/> <path d="M46.664,231.834l-2.877,2.877c-3.157,3.158-3.157,8.276,0,11.433c1.579,1.578,3.649,2.367,5.717,2.367 c2.068,0,4.138-0.789,5.717-2.367l2.877-2.877c3.157-3.158,3.157-8.276,0-11.433C54.94,228.678,49.822,228.678,46.664,231.834z"/> </g> </g> </g> </g></svg>
-              </Link>
-              <Link className='p-3 hover:bg-gray-100 hover:rounded-2xl ' to={"/buscadorPedidos"}>
-                <svg width="40px" height="40px" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><g id="SVGRepo_bgCarrier" strokeWidth="0"/><g id="SVGRepo_tracerCarrier" strokeLinecap="round" strokeLinejoin="round"/><g id="SVGRepo_iconCarrier"> <path d="M14 4C17.7712 4 19.6569 4 20.8284 5.17157C22 6.34315 22 8.22876 22 12V13M10 4C6.22876 4 4.34315 4 3.17157 5.17157C2 6.34315 2 8.22876 2 12C2 15.7712 2 17.6569 3.17157 18.8284C4.34315 20 6.22876 20 10 20H13" stroke="#757575" strokeWidth="1.5" strokeLinecap="round"/> <path d="M10 16H6" stroke="#757575" strokeWidth="1.5" strokeLinecap="round"/> <circle cx="18" cy="17" r="3" stroke="#757575" strokeWidth="1.5"/> <path d="M20.5 19.5L21.5 20.5" stroke="#757575" strokeWidth="1.5" strokeLinecap="round"/> <path d="M2 10L7 10M22 10L11 10" stroke="#757575" strokeWidth="1.5" strokeLinecap="round"/> </g></svg>
-              </Link>
-              <Link className='p-3 hover:bg-gray-100 hover:rounded-2xl ' to={"/stock"}>
-                <svg width="40px" height="40px" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><g id="SVGRepo_bgCarrier" strokeWidth="0"/><g id="SVGRepo_tracerCarrier" strokeLinecap="round" strokeLinejoin="round"/><g id="SVGRepo_iconCarrier"> <path d="M7.50626 15.2647C7.61657 15.6639 8.02965 15.8982 8.4289 15.7879C8.82816 15.6776 9.06241 15.2645 8.9521 14.8652L7.50626 15.2647ZM6.07692 7.27442L6.79984 7.0747V7.0747L6.07692 7.27442ZM4.7037 5.91995L4.50319 6.64265L4.7037 5.91995ZM3.20051 4.72457C2.80138 4.61383 2.38804 4.84762 2.2773 5.24675C2.16656 5.64589 2.40035 6.05923 2.79949 6.16997L3.20051 4.72457ZM20.1886 15.7254C20.5895 15.6213 20.8301 15.2118 20.7259 14.8109C20.6217 14.41 20.2123 14.1695 19.8114 14.2737L20.1886 15.7254ZM10.1978 17.5588C10.5074 18.6795 9.82778 19.8618 8.62389 20.1747L9.00118 21.6265C10.9782 21.1127 12.1863 19.1239 11.6436 17.1594L10.1978 17.5588ZM8.62389 20.1747C7.41216 20.4896 6.19622 19.7863 5.88401 18.6562L4.43817 19.0556C4.97829 21.0107 7.03196 22.1383 9.00118 21.6265L8.62389 20.1747ZM5.88401 18.6562C5.57441 17.5355 6.254 16.3532 7.4579 16.0403L7.08061 14.5885C5.10356 15.1023 3.89544 17.0911 4.43817 19.0556L5.88401 18.6562ZM7.4579 16.0403C8.66962 15.7254 9.88556 16.4287 10.1978 17.5588L11.6436 17.1594C11.1035 15.2043 9.04982 14.0768 7.08061 14.5885L7.4579 16.0403ZM8.9521 14.8652L6.79984 7.0747L5.354 7.47414L7.50626 15.2647L8.9521 14.8652ZM4.90421 5.19725L3.20051 4.72457L2.79949 6.16997L4.50319 6.64265L4.90421 5.19725ZM6.79984 7.0747C6.54671 6.15847 5.8211 5.45164 4.90421 5.19725L4.50319 6.64265C4.92878 6.76073 5.24573 7.08223 5.354 7.47414L6.79984 7.0747ZM11.1093 18.085L20.1886 15.7254L19.8114 14.2737L10.732 16.6332L11.1093 18.085Z" fill="#757575"/> <path d="M19.1647 6.2358C18.6797 4.48023 18.4372 3.60244 17.7242 3.20319C17.0113 2.80394 16.1062 3.03915 14.2962 3.50955L12.3763 4.00849C10.5662 4.47889 9.66119 4.71409 9.24954 5.40562C8.8379 6.09714 9.0804 6.97492 9.56541 8.73049L10.0798 10.5926C10.5648 12.3481 10.8073 13.2259 11.5203 13.6252C12.2333 14.0244 13.1384 13.7892 14.9484 13.3188L16.8683 12.8199C18.6784 12.3495 19.5834 12.1143 19.995 11.4227C20.2212 11.0429 20.2499 10.6069 20.1495 10" stroke="#757575" strokeWidth="1.5" strokeLinecap="round"/> </g></svg>
-              </Link>
-              <Link className='p-3 mb-2 hover:bg-gray-100 hover:rounded-2xl' to={"/login"}>
-                <svg width="40px" height="40px" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><g id="SVGRepo_bgCarrier" strokeWidth="0"/><g id="SVGRepo_tracerCarrier" strokeLinecap="round" strokeLinejoin="round"/><g id="SVGRepo_iconCarrier"> <path d="M15 12L2 12M2 12L5.5 9M2 12L5.5 15" stroke="#757575" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/> <path d="M9.00195 7C9.01406 4.82497 9.11051 3.64706 9.87889 2.87868C10.7576 2 12.1718 2 15.0002 2L16.0002 2C18.8286 2 20.2429 2 21.1215 2.87868C22.0002 3.75736 22.0002 5.17157 22.0002 8L22.0002 16C22.0002 18.8284 22.0002 20.2426 21.1215 21.1213C20.3531 21.8897 19.1752 21.9862 17 21.9983M9.00195 17C9.01406 19.175 9.11051 20.3529 9.87889 21.1213C10.5202 21.7626 11.4467 21.9359 13 21.9827" stroke="#757575" strokeWidth="1.5" strokeLinecap="round"/> </g></svg>
-              </Link>
-            </ul>
-          </Nav>
-        </Offcanvas.Body>
-      </Offcanvas>
-
-      {/* --- Modal Fecha --- */}
-      <Modal show={showModal} onHide={handleCloseModal} size="md" backdrop="static" keyboard={false} centered>
-        {/* ... (contenido del modal fecha sin cambios) ... */}
-        <Modal.Body >
-          <ThemeProvider theme={theme}>
-            <LocalizationProvider dateAdapter={AdapterDayjs} adapterLocale="es">
-              <DemoContainer components={['StaticDatePicker']}>
-                <DemoItem>
-                  <StaticDatePicker displayStaticWrapperAs="desktop" value={selectedDate} defaultValue={dayjs('DD/MM/YYYY')} onChange={handleDateChange} sx={{ '& .MuiPickersDay-root': { fontSize: '1.5rem' }, '& .MuiPickersCalendarHeader-root': { fontSize: '1.5rem' }, '& .MuiPickersDay-selected': { backgroundColor: 'blue' }, '& .MuiPickersDay-dayWithMargin': { margin: '2px' } }}/>
-                </DemoItem>
-              </DemoContainer>
-            </LocalizationProvider>
-          </ThemeProvider>
-        </Modal.Body>
-        <Modal.Footer className='no-border'>
-          <Button variant="secondary" className="shadow-md bg-white border-red-500 hover:bg-red-700 hover:border-red-700 p-2 font-nunito text-red-500 hover:text-red-700" onClick={handleCloseModal}>Cancelar</Button>
-          <Button variant="primary" className="shadow-md p-2 bg-white font-nunito text-yellow-500 border-yellow-500 hover:text-yellow-600 hover:border-yellow-600" onClick={handleAccept}>Aceptar</Button>
-        </Modal.Footer>
-      </Modal>
-
-      {/* --- Modal Iconos (Borrar/Editar/Mensaje) --- */}
-      <Modal show={showModal1} onHide={handleCloseModal1} size="md" backdrop="static" keyboard={false} centered>
-        {/* ... (contenido del modal iconos sin cambios) ... */}
+      </div> 
+      
+      {/* Modals del cuerpo de Órdenes (Options, Turno) se mantienen */}
+      <Modal show={showOptionsModal} onHide={handleCloseOptionsModal} size="md" backdrop="static" keyboard={false} centered>
         <Modal.Body className="flex flex-col items-center ">
          {pedidoSeleccionado && pedidoSeleccionado.origen === 1 && (
-            <div className=" p-3 text-center">
-             <h1 className='text-red-600 font-extrabold font-nunito'>-PEDIDO APP NO EDITABLE-</h1>
-            <p className='text-gray-400 font-nunito text-xs mt-1 -mb-2'> Puedes crear un nuevo pedido con los datos del cliente desde aqui</p>
+           <div className="p-3 text-center">
+             <h1 className='text-red-600 font-extrabold font-nunito text-lg'>-PEDIDO APP NO EDITABLE-</h1>
+             <p className='text-gray-400 font-nunito text-xs mt-1 -mb-2'>Puedes crear un nuevo pedido con los datos del cliente desde aquí.</p>
+           </div>
+         )}
+          <div className="flex space-x-4 sm:space-x-6">
+            <div className="p-2 sm:p-3 cursor-pointer hover:bg-yellow-500 rounded-md text-center" onClick={() => borrarOrden(pedidoSeleccionado?.NumeroPedido)}>
+              <svg width="3.5vw" height="3.5vw" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className="mx-auto max-w-[40px] max-h-[40px]"><g id="SVGRepo_bgCarrier" strokeWidth="0"/><g id="SVGRepo_tracerCarrier" strokeLinecap="round" strokeLinejoin="round"/><g id="SVGRepo_iconCarrier"> <path d="M20.5001 6H3.5" stroke="#f10707 " strokeWidth="1.5" strokeLinecap="round"/> <path d="M18.8334 8.5L18.3735 15.3991C18.1965 18.054 18.108 19.3815 17.243 20.192C16.378 21 15.0476 21 12.3868 21H11.6134C8.9526 21 7.6222 21 6.75719 20.192C5.89218 19.3815 5.80368 18.054 5.62669 15.3991L5.16675 8.5" stroke="#f10707 " strokeWidth="1.5" strokeLinecap="round"/> <path d="M9.5 11.5833V17.3333" stroke="#f10707 " strokeWidth="1.5" strokeLinecap="round"/> <path d="M14.5 11.5833V17.3333" stroke="#f10707 " strokeWidth="1.5" strokeLinecap="round"/> <path d="M7.5 6.00002C7.50256 5.05106 7.50256 4.10209 7.50256 3.15313C7.50256 2.42807 7.50004 1.70301 8.33803 1.94199C9.17602 2.18097 9.58402 2.55699 10.4001 2.943L10.5001 3M16.5 6.00002C16.4974 5.05106 16.4974 4.10209 16.4974 3.15313C16.4974 2.42807 16.4999 1.70301 15.6619 1.94199C14.8239 2.18097 14.4159 2.55699 13.5998 2.943L13.4998 3" stroke="#f10707 " strokeWidth="1.5" strokeLinecap="round"/> </g></svg>
+              <p className="text-xs sm:text-sm font-nunito text-gray-700 mt-1">Borrar</p>
             </div>
-          )}
-          <div className="flex space-x-6">
-            <div className="p-3 cursor-pointer hover:bg-yellow-500 rounded-md" onClick={() => borrarOrden(pedidoSeleccionado.NumeroPedido)}>
-              <svg width="4vw" height="4vw" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><g id="SVGRepo_bgCarrier" strokeWidth="0"/><g id="SVGRepo_tracerCarrier" strokeLinecap="round" strokeLinejoin="round"/><g id="SVGRepo_iconCarrier"> <path d="M20.5001 6H3.5" stroke="#f10707 " strokeWidth="1.5" strokeLinecap="round"/> <path d="M6.5 6C6.55588 6 6.58382 6 6.60915 5.99936C7.43259 5.97849 8.15902 5.45491 8.43922 4.68032C8.44784 4.65649 8.45667 4.62999 8.47434 4.57697L8.57143 4.28571C8.65431 4.03708 8.69575 3.91276 8.75071 3.8072C8.97001 3.38607 9.37574 3.09364 9.84461 3.01877C9.96213 3 10.0932 3 10.3553 3H13.6447C13.9068 3 14.0379 3 14.1554 3.01877C14.6243 3.09364 15.03 3.38607 15.2493 3.8072C15.3043 3.91276 15.3457 4.03708 15.4286 4.28571L15.5257 4.57697C15.5433 4.62992 15.5522 4.65651 15.5608 4.68032C15.841 5.45491 16.5674 5.97849 17.3909 5.99936C17.4162 6 17.4441 6 17.5 6" stroke="#f10707 " strokeWidth="1.5"/> <path d="M18.3735 15.3991C18.1965 18.054 18.108 19.3815 17.243 20.1907C16.378 21 15.0476 21 12.3868 21H11.6134C8.9526 21 7.6222 21 6.75719 20.1907C5.89218 19.3815 5.80368 18.054 5.62669 15.3991L5.16675 8.5M18.8334 8.5L18.6334 11.5" stroke="#f10707 " strokeWidth="1.5" strokeLinecap="round"/> </g></svg>
-              <p className='text-center p-1 font-nunito text-[#f10707]'>Borrar</p>
+              <div 
+                className={`p-2 sm:p-3 cursor-pointer hover:bg-yellow-500 rounded-md text-center ${pedidoSeleccionado?.origen === 1 ? 'opacity-50 cursor-not-allowed' : ''}`} 
+                onClick={() => {
+                    if (pedidoSeleccionado?.origen !== 1) {
+                        handleEditOrder(pedidoSeleccionado);
+                        handleCloseOptionsModal();
+                    }
+                }}>
+              <svg width="3.5vw" height="3.5vw" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className="mx-auto max-w-[40px] max-h-[40px]"><g id="SVGRepo_bgCarrier" strokeWidth="0"/><g id="SVGRepo_tracerCarrier" strokeLinecap="round" strokeLinejoin="round"/><g id="SVGRepo_iconCarrier"> <path d="M13.0201 5.82844L15.8485 3.00001C16.0438 2.80474 16.2781 2.65252 16.5358 2.55142C16.7935 2.45032 17.069 2.39868 17.3485 2.39868C17.628 2.39868 17.9035 2.45032 18.1612 2.55142C18.4189 2.65252 18.6532 2.80474 18.8485 3.00001C19.0438 3.19528 19.196 3.42958 19.2971 3.68729C19.3982 3.94501 19.4498 4.22053 19.4498 4.50001C19.4498 4.77949 19.3982 5.05501 19.2971 5.31272C19.196 5.57044 19.0438 5.80474 18.8485 6.00001L17.1821 7.66645M5.82842 17.1821L2.99999 19.9999C2.95074 20.0492 2.9078 20.1062 2.87262 20.1687C2.83744 20.2312 2.81055 20.2983 2.7929 20.3679L2.50001 21.5C2.47871 21.5932 2.48255 21.6906 2.51113 21.7825C2.53971 21.8744 2.59218 21.9581 2.66403 22.026L2.97402 22.336C3.04187 22.4078 3.12558 22.4603 3.21753 22.4889C3.30948 22.5175 3.40675 22.5213 3.50001 22.5L4.63213 22.2071C4.70171 22.1894 4.76883 22.1625 4.83134 22.1274C4.89386 22.0922 4.95081 22.0492 5.00001 22L13.0201 13.9798M13.0201 5.82844L7.66665 11.1821C7.47138 11.3774 7.31917 11.6117 7.21807 11.8694C7.11697 12.1271 7.06532 12.4026 7.06532 12.6821V15.5105C7.06532 15.9247 7.23082 16.3216 7.52343 16.6142C7.81604 16.9068 8.21297 17.0723 8.62718 17.0723H11.4556C11.735 17.0723 12.0106 17.0206 12.2683 16.9195C12.526 16.8184 12.7603 16.6662 12.9556 16.4709L17.1821 12.2444L13.0201 5.82844Z" stroke="#000000" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/> </g></svg>
+              <p className="text-xs sm:text-sm font-nunito text-gray-700 mt-1">Editar</p>
             </div>
-             {pedidoSeleccionado && (
-                pedidoSeleccionado.origen === 1 ? (
-                  <div className="p-3 cursor-pointer hover:bg-yellow-500 rounded-lg" onClick={() => handleCreateOrder(pedidoSeleccionado)}>
-                    <svg width="4vw" height="4vw" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                      <g id="SVGRepo_bgCarrier" strokeWidth="0"/>
-                      <g id="SVGRepo_tracerCarrier" strokeLinecap="round" strokeLinejoin="round"/>
-                      <g id="SVGRepo_iconCarrier">
-                        <path d="M12 5V19" stroke="#808b96" strokeWidth="1.5" strokeLinecap="round"/>
-                        <path d="M5 12H19" stroke="#808b96" strokeWidth="1.5" strokeLinecap="round"/>
-                        <path d="M10 21.9948C6.58687 21.9658 4.70529 21.7764 3.46447 20.5355C2 19.0711 2 16.714 2 12C2 7.28595 2 4.92893 3.46447 3.46447C4.92893 2 7.28595 2 12 2C16.714 2 19.0711 2 20.5355 3.46447C21.5093 4.43821 21.8356 5.80655 21.9449 8" stroke="#808b96" strokeWidth="1.5" strokeLinecap="round"/>
-                      </g>
-                    </svg>
-                    <p className='text-center p-1 font-nunito text-[#808b96]'>Crear</p>
-  
-                  
-                  </div>
-                  
-                ) : (
-                  <div className="p-3 cursor-pointer hover:bg-yellow-500 rounded-lg" onClick={() => handleEditOrder(pedidoSeleccionado)}>
-                    <svg width="4vw" height="4vw" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                      <g id="SVGRepo_bgCarrier" strokeWidth="0"/>
-                      <g id="SVGRepo_tracerCarrier" strokeLinecap="round" strokeLinejoin="round"/>
-                      <g id="SVGRepo_iconCarrier">
-                        <path d="M10 21.9948C6.58687 21.9658 4.70529 21.7764 3.46447 20.5355C2 19.0711 2 16.714 2 12C2 7.28595 2 4.92893 3.46447 3.46447C4.92893 2 7.28595 2 12 2C16.714 2 19.0711 2 20.5355 3.46447C21.5093 4.43821 21.8356 5.80655 21.9449 8" stroke="#808b96" strokeWidth="1.5" strokeLinecap="round"/>
-                        <path d="M2.5 7.25C2.08579 7.25 1.75 7.58579 1.75 8C1.75 8.41421 2.08579 8.75 2.5 8.75V7.25ZM22 7.25H2.5V8.75H22V7.25Z" fill="#808b96"/>
-                        <path d="M10.5 2.5L7 8" stroke="#808b96" strokeWidth="1.5" strokeLinecap="round"/>
-                        <path d="M17 2.5L13.5 8" stroke="#808b96" strokeWidth="1.5" strokeLinecap="round"/>
-                        <path d="M18.562 13.9354L18.9791 13.5183C19.6702 12.8272 20.7906 12.8272 21.4817 13.5183C22.1728 14.2094 22.1728 15.3298 21.4817 16.0209L21.0646 16.438M18.562 13.9354C18.562 13.9354 18.6142 14.8217 19.3962 15.6038C20.1783 16.3858 21.0646 16.438 21.0646 16.438M18.562 13.9354L14.7275 17.77C14.4677 18.0297 14.3379 18.1595 14.2262 18.3027C14.0945 18.4716 13.9815 18.6544 13.8894 18.8478C13.8112 19.0117 13.7532 19.1859 13.637 19.5344L13.2651 20.65L13.1448 21.0109M21.0646 16.438L17.23 20.2725C16.9703 20.5323 16.8405 20.6621 16.6973 20.7738C16.5284 20.9055 16.3456 21.0185 16.1522 21.1106C15.9883 21.1888 15.8141 21.2468 15.4656 21.363L14.35 21.7349L13.9891 21.8552M13.9891 21.8552L13.6281 21.9755C13.4567 22.0327 13.2676 21.988 13.1398 21.8602C13.012 21.7324 12.9673 21.5433 13.0245 21.3719L13.1448 21.0109M13.9891 21.8552L13.1448 21.0109" stroke="#808b96" strokeWidth="1.5"/>
-                      </g>
-                    </svg>
-                    <p className='text-center p-1 font-nunito text-[#808b96]'>Editar</p>
-                  </div>
-                )
-              )}
-            <div className="p-3 cursor-pointer hover:bg-yellow-500 rounded-md">
-              <svg fill="#2ad12f " height="4vw" width="4vw" version="1.1" id="Capa_1" xmlns="http://www.w3.org/2000/svg" xmlnsXlink="http://www.w3.org/1999/xlink" viewBox="0 0 220.262 220.262" xmlSpace="preserve"><g id="SVGRepo_bgCarrier" strokeWidth="0"/><g id="SVGRepo_tracerCarrier" strokeLinecap="round" strokeLinejoin="round"/><g id="SVGRepo_iconCarrier"> <g> <path d="M110.127,0C50.606,0,2.184,48.424,2.184,107.944c0,23.295,9.455,44.211,13.521,52.123 c1.893,3.685,6.416,5.135,10.099,3.243c3.684-1.893,5.136-6.415,3.243-10.099c-3.566-6.941-11.862-25.247-11.862-45.268 C17.184,56.695,58.878,15,110.127,15c51.254,0,92.951,41.695,92.951,92.944c0,51.251-41.697,92.946-92.951,92.946 c-20.044,0-35.971-6.94-41.889-9.925c-1.755-0.886-3.788-1.046-5.66-0.447l-47.242,15.097c-3.945,1.261-6.122,5.481-4.861,9.427 c1.018,3.187,3.968,5.219,7.142,5.219c0.757,0,1.526-0.115,2.285-0.358l44.391-14.186c9.287,4.311,25.633,10.173,45.834,10.173 c59.524,0,107.951-48.424,107.951-107.946C218.078,48.424,169.651,0,110.127,0z"/> <path d="M88.846,89.537c-3.285,2.523-3.902,7.231-1.38,10.517c2.523,3.285,7.23,3.903,10.517,1.38 c2.299-1.766,8.406-6.456,7.512-14.845c-0.551-4.987-5.417-11.83-9.402-16.691c-5.831-7.114-10.767-11.327-14.643-12.513 c-3.632-1.126-7.354-0.948-11.066,0.53c-7.636,3.052-13.025,8.108-15.585,14.622c-2.493,6.344-2.04,13.443,1.313,20.537 c7.827,16.522,18.288,30.791,31.093,42.413c0.05,0.047,0.101,0.093,0.152,0.139c12.987,11.48,28.352,20.325,45.675,26.293 c3.287,1.129,6.513,1.692,9.611,1.692c3.892,0,7.583-0.888,10.94-2.658c6.191-3.264,10.621-9.177,12.814-17.115 c1.056-3.848,0.82-7.564-0.689-11.024c-1.619-3.745-6.35-8.184-14.064-13.193c-5.269-3.422-12.601-7.5-17.64-7.5 c-0.003,0-0.007,0-0.011,0c-8.406,0.034-12.397,6.621-13.899,9.102c-2.146,3.543-1.014,8.155,2.529,10.301 c3.541,2.146,8.154,1.015,10.301-2.529c0.593-0.98,0.969-1.5,1.205-1.772c4.236,1.23,15.567,8.642,17.889,11.761 c0.038,0.166,0.043,0.417-0.082,0.874c-0.739,2.675-2.268,6.204-5.349,7.828c-2.879,1.516-6.312,0.863-8.677,0.051 c-15.413-5.31-29.053-13.142-40.543-23.279c-0.003-0.003-0.007-0.006-0.01-0.01c-11.377-10.308-20.693-23.023-27.688-37.788 c-1.071-2.268-2.1-5.607-0.91-8.634c1.274-3.242,4.613-5.15,7.183-6.177c0.441-0.176,0.69-0.203,0.871-0.179 c3.358,1.965,11.969,12.402,13.66,16.477C90.229,88.41,89.753,88.84,88.846,89.537z"/> </g> </g></svg>
-              <p className='text-center p-1 font-nunito text-[#2ad12f]'>Mensaje</p>
+            <div 
+              className="p-2 sm:p-3 cursor-pointer hover:bg-yellow-500 rounded-md text-center" 
+              onClick={() => { 
+                  handleCreateOrder(pedidoSeleccionado); 
+                  handleCloseOptionsModal(); 
+              }}>
+              <svg width="3.5vw" height="3.5vw" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className="mx-auto max-w-[40px] max-h-[40px]"><g id="SVGRepo_bgCarrier" strokeWidth="0"/><g id="SVGRepo_tracerCarrier" strokeLinecap="round" strokeLinejoin="round"/><g id="SVGRepo_iconCarrier"> <path d="M15 12L12 12M12 12L9 12M12 12L12 9M12 12L12 15" stroke="#000000" strokeWidth="1.5" strokeLinecap="round"/> <path d="M7 3.33782C8.47087 2.48697 10.1786 2 12 2C17.5228 2 22 6.47715 22 12C22 17.5228 17.5228 22 12 22C6.47715 22 2 17.5228 2 12C2 10.1786 2.48697 8.47087 3.33782 7" stroke="#000000" strokeWidth="1.5" strokeLinecap="round"/> </g></svg>
+              <p className="text-xs sm:text-sm font-nunito text-gray-700 mt-1">Nuevo</p>
             </div>
           </div>
         </Modal.Body>
-        <Modal.Footer className='no-border'>
-          <Button variant="primary" className="p-2 shadow-sm bg-white font-nunito text-yellow-500 border-yellow-500 hover:text-yellow-600 hover:border-yellow-600" onClick={handleCloseModal1}>Cerrar</Button>
+        <Modal.Footer className='border-t-0'>
+          <Button variant="secondary" className="shadow-md bg-white border-red-500 text-red-500 hover:bg-red-700 hover:border-red-700 hover:text-white p-2 font-nunito" onClick={handleCloseOptionsModal}>Cerrar</Button>
         </Modal.Footer>
       </Modal>
-
-      {/* --- Modal Cierre Turno --- */}
-      <Modal show={showModal2} onHide={handleCloseModal2} size="md" backdrop="static" keyboard={false} centered>
-        {/* ... (contenido del modal cierre turno sin cambios) ... */}
+      
+      <Modal show={showTurnoModal} onHide={handleCloseTurnoModal} size="md" backdrop="static" keyboard={false} centered>
         <Modal.Body className="flex flex-col items-center ">
           <div><h1 className='font-nunito text-2xl font-[2vw] text-[#808b96]'>El Turno actual ha finalizado!</h1></div>
           <div className='p-2'>
             <svg fill="#808b96 " width="100px" height="100px" viewBox="-5.5 0 32 32" version="1.1" xmlns="http://www.w3.org/2000/svg"><g id="SVGRepo_bgCarrier" strokeWidth="0"/><g id="SVGRepo_tracerCarrier" strokeLinecap="round" strokeLinejoin="round"/><g id="SVGRepo_iconCarrier"> <path d="M10.16 25.92c-2.6 0-8.72-0.24-9.88-2.24-1.28-2.28 2.040-8.24 3.080-10.040 1.040-1.76 4.64-7.56 7.12-7.56 2.8 0 7.24 7.48 8.56 10.12 1.92 3.84 2.48 6.4 1.56 7.6-1.52 2.040-8.96 2.12-10.44 2.12zM10.48 7.72c-0.72 0-3.080 2.36-5.64 6.76-2.76 4.68-3.48 7.72-3.080 8.4 0.32 0.56 3.2 1.4 8.4 1.4 5.44 0 8.64-0.88 9.080-1.48 0.28-0.36 0.040-2.28-1.72-5.84-2.64-5.28-6.12-9.24-7.040-9.24zM10.52 19.2c-0.48 0-0.84-0.36-0.84-0.84v-6.36c0-0.48 0.36-0.84 0.84-0.84s0.84 0.36 0.84 0.84v6.32c0 0.48-0.4 0.88-0.84 0.88zM11.36 21.36c0 0.464-0.376 0.84-0.84 0.84s-0.84-0.376-0.84-0.84c0-0.464 0.376-0.84 0.84-0.84s0.84 0.376 0.84 0.84z"/> </g></svg>
           </div>
         </Modal.Body>
-        <Modal.Footer className='no-border'>
-          <Button variant="primary" className="bg-yellow-500 border-yellow-500 hover:bg-yellow-600 hover:border-yellow-600 p-2 font-nunito" onClick={handleCloseModal2}>Aceptar</Button>
+        <Modal.Footer className='border-t-0'>
+          <Button variant="primary" className="bg-yellow-500 border-yellow-500 hover:bg-yellow-600 hover:border-yellow-600 p-2 font-nunito" onClick={handleCloseTurnoModal}>Aceptar</Button>
         </Modal.Footer>
       </Modal>
-
-      {/* --- Modal para Sumar Número --- */}
-
-     <Modal show={showSumarModal} onHide={handleCloseSumarModal} size="md" backdrop="static" keyboard={false} top>
-       <Modal.Body className="bg-white  p-4">
-         <h1 className="text-center font-nunito text-2xl text-gray-700 mb-4">Sumar en barra</h1>
-         <Form.Group controlId="numeroParaSumar">
-           <Form.Label className="block text-center text-gray-300 font-nunito mb-4">
-             Introduce la cantidad a sumar (admite negativos):
-           </Form.Label>
-           <div className="flex justify-center ">
-             <input
-               type="number"
-               value={numeroASumar}
-               onChange={(e) => {
-                 const val = e.target.value;
-                 if (val.length <= 3) {
-                   handleNumeroASumarChange(e);
-                 }
-               }}
-               maxLength={3}
-               autoFocus
-               className="text-center w-[40%]  text-3xl font-nunito text-gray-700 bg-transparent border-b-2 border-yellow-400 focus:outline-none focus:border-yellow-500 transition duration-300"
-               placeholder="0"
-             />
-           </div>
-         </Form.Group>
-       </Modal.Body>
-       <Modal.Footer className="flex justify-end gap-2" style={{ borderTop: 'none' }}>
-               <Button
-               variant="secondary"
-               onClick={handleCloseSumarModal}
-               className=" shadow-md bg-white border-red-500 hover:bg-red-700 hover:border-red-700 p-2 font-nunito text-red-500 hover:text-red-700">
-               Cancelar
-             </Button>
-         <Button
-           variant="primary"
-           onClick={handleConfirmarSuma}
-           className="shadow-md p-2 bg-white font-nunito text-yellow-500 border-yellow-500 hover:text-yellow-600 hover:border-yellow-600">
-           Actualizar
-         </Button>
-       </Modal.Footer>
-     </Modal>
-
-
-      {/* --- FIN MODAL --- */}
-
-
-      <PedidoRapido ref={pedidoRapidoRef} datosCliente={datosCliente} />
+      
+      {/* El Modal de Sumar en Barra y el Offcanvas de menú ya no son necesarios aquí, TestHeader los manejaría si tuviera esa funcionalidad */}
+      {/* Si PedidoRapido se usa fuera del TestHeader, se mantiene. Si no, se elimina. TestHeader tiene su propio PedidoRapido. */}
+      {/* <PedidoRapido ref={pedidoRapidoRef} datosCliente={datosCliente} /> */} 
     </>
   );
 };
