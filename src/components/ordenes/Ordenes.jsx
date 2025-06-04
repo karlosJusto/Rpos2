@@ -257,26 +257,37 @@ const Ordenes = () => {
             throw new Error("El campo 'productos' en Firestore no es un array o no existe.");
         }
 
-        let targetIndexInFirestore = productosFirestore.findIndex(p =>
-            p.id_cart === productoClickeado.id_cart || 
-            (p.id === productoClickeado.id &&
-             p.alias === productoClickeado.alias && 
-             p.uniqueId === productoClickeado.uniqueId) 
-        );
+        let targetIndexInFirestore = -1;
 
+        // 1. Try to find by id_cart if productoClickeado.id_cart is present
+        if (productoClickeado.id_cart) {
+            targetIndexInFirestore = productosFirestore.findIndex(p => p.id_cart === productoClickeado.id_cart);
+        }
+
+        // 2. If not found by id_cart, and productoClickeado.uniqueId is present, try by uniqueId (with id and alias)
+        if (targetIndexInFirestore === -1 && productoClickeado.uniqueId) {
+            targetIndexInFirestore = productosFirestore.findIndex(p => 
+                p.id === productoClickeado.id &&
+                p.alias === productoClickeado.alias &&
+                p.uniqueId === productoClickeado.uniqueId
+            );
+        }
+        
+        // 3. If still not found by a unique identifier, attempt the broader attribute match
         if (targetIndexInFirestore === -1) {
             targetIndexInFirestore = productosFirestore.findIndex(p =>
                 p.id === productoClickeado.id &&
                 p.alias === productoClickeado.alias && 
-                JSON.stringify(p.opciones || {}) === JSON.stringify(productoClickeado.opciones || {}) && 
-                p.tostado === (productoClickeado.tostado) && 
-                p.troceado === (productoClickeado.troceado) &&
-                p.sinsalsa === (productoClickeado.sinsalsa) &&
-                p.extrasalsa === (productoClickeado.extrasalsa) &&
-                p.celiaco === (productoClickeado.celiaco)
+                isEqual(p.opciones || {}, productoClickeado.opciones || {}) && // Use isEqual for robust object comparison
+                p.tostado === productoClickeado.tostado && 
+                p.troceado === productoClickeado.troceado &&
+                p.sinsalsa === productoClickeado.sinsalsa &&
+                p.extrasalsa === productoClickeado.extrasalsa &&
+                p.celiaco === productoClickeado.celiaco
             );
         }
         
+        // 4. The existing fallback to indiceProductoEnPedido (use with caution)
         if (targetIndexInFirestore === -1) {
           console.warn(`Producto específico no encontrado por atributos en pedido ${numeroPedidoStr}. Intentando por índice local ${indiceProductoEnPedido}. Clickeado:`, productoClickeado);
           if (productosFirestore[indiceProductoEnPedido] && productosFirestore[indiceProductoEnPedido].id === productoClickeado.id && productosFirestore[indiceProductoEnPedido].alias === productoClickeado.alias ) {
