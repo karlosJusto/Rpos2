@@ -162,24 +162,34 @@ const Cocina = () => {
   };
 
   useEffect(() => {
-    if (isLoadingCocina || isLoadingProductosStock) {
-      console.log("[Effect A] Waiting for base data...");
-      setIsLoadingPedidosAndProcessing(true);
+    // If 'cocina' data (cocinaProducts) is still loading,
+    // we must wait and clear dependent states.
+    if (isLoadingCocina) {
+      console.log("[Effect A] Waiting for COCINA base data (cocinaProducts)...");
+      setIsLoadingPedidosAndProcessing(true); // This effect's processing part is also "loading" or waiting
       setProductsData([]);
       setPedidosDelTurnoState([]);
-      return;
-    }
-    if (cocinaProducts.length === 0 && !isLoadingCocina) {
-      console.log("[Effect A] No base products defined. Skipping.");
-      setIsLoadingPedidosAndProcessing(false);
-      setProductsData([]);
-      setPedidosDelTurnoState([]);
-      return;
+      return; // Exit early
     }
 
+    // If 'cocina' data has finished loading, but there are no cocinaProducts.
+    // !isLoadingCocina is true here because the above block would have caught it.
+    if (cocinaProducts.length === 0) {
+      console.log("[Effect A] No base cocinaProducts defined after loading. Skipping further processing.");
+      setIsLoadingPedidosAndProcessing(false); // No pedidos/aggregation processing will occur.
+      setProductsData([]);
+      setPedidosDelTurnoState([]);
+      return; // Exit early
+    }
+
+    // If we've reached this point:
+    // 1. `cocinaProducts` are loaded and `cocinaProducts.length > 0`.
+    // 2. `isLoadingCocina` is false.
+    // This effect will now proceed to set up the 'pedidos' listener and aggregate data.
+    // This main processing part has its own loading state.
+    console.log(`[Effect A] cocinaProducts available. Setting up listener / Re-running due to Date (from context: ${selectedDateStr}), Products, Stock...`);
     setIsLoadingPedidosAndProcessing(true);
     const pedidosRef = collection(db, 'pedidos');
-    console.log(`[Effect A] Setting up listener / Re-running due to Date (from context: ${selectedDateStr}), Products, Stock...`);
 
     const unsubscribe = onSnapshot(pedidosRef, (querySnapshot) => {
       console.log(`[Effect A] Snapshot received (${querySnapshot.size} docs). Filtering for date: ${selectedDateStr}`);
@@ -343,7 +353,7 @@ const Cocina = () => {
       console.log("[Effect A] Cleaning up listener.");
       unsubscribe();
     };
-  }, [selectedDateStr, cocinaProducts, productosStockMap, isToday, getTurnoActual, isLoadingCocina, isLoadingProductosStock, playNotificationSound]);
+  }, [selectedDateStr, cocinaProducts, productosStockMap, isToday, getTurnoActual, isLoadingCocina, playNotificationSound]);
 
 
   useEffect(() => {
@@ -490,15 +500,21 @@ const Cocina = () => {
           </div>
         )}
 
-        {isLoadingOverall && (
+        {/* Muestra el cargador principal solo si los productos base de 'cocina' aún no se han cargado
+            O si después de cargar, no hay productos definidos y no estamos en medio de una carga de pedidos. */}
+        {(isLoadingCocina || (!isLoadingCocina && cocinaProducts.length === 0 && !isLoadingPedidosAndProcessing)) && (
           <div className="text-center p-10 flex-grow">
             Cargando datos de cocina...
           </div>
         )}
 
-        {!isLoadingOverall && (
+        {/* Muestra las tarjetas de producto y ensaladas si los productos de 'cocina' están cargados.
+            Este bloque se renderizará incluso si isLoadingPedidosAndProcessing es true,
+            permitiendo que las tarjetas se actualicen suavemente. */}
+        {!isLoadingCocina && cocinaProducts.length > 0 && (
           <div className="flex flex-col flex-grow min-h-0">
-            {productsData.length > 0 ? (
+            {/* Muestra el área de la cuadrícula si hay datos de productos o si se están cargando */}
+            {(productsData.length > 0 || isLoadingPedidosAndProcessing) ? (
               <div className="p-6 flex-grow overflow-hidden mt-0">
                 <div className={`grid gap-6 ${gridClass} h-full`}>
                   {productsData.slice(0, 9).map((product) => (
@@ -507,8 +523,11 @@ const Cocina = () => {
                 </div>
               </div>
             ) : (
+              // Este caso: !isLoadingPedidosAndProcessing Y productsData.length === 0
+              // (y sabemos que cocinaProducts.length > 0 por la condición externa)
+              // Significa que el procesamiento terminó, pero no resultó en datos de productos mostrables para la vista actual.
               <div className="text-center p-10 text-gray-500 flex-grow">
-                No hay productos o pedidos para mostrar en este turno/fecha ({selectedDateStr}).
+                No hay productos con pedidos para mostrar en este turno/fecha ({selectedDateStr}).
               </div>
             )}
 
