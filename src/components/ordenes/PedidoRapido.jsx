@@ -133,6 +133,14 @@ const PedidoRapido = forwardRef(({ datosCliente }, ref) => {
         return; // Cancelar la venta si no se encuentra el producto de stock
       }
 
+      // Determinar el valor de 'position'
+      let positionValue = 0; // Valor por defecto o para otros productos
+      if (idProduct === 1) {
+        positionValue = 1;
+      } else if (idProduct === 2) {
+        positionValue = 2;
+      }
+
       const productoRapidoData = {
         NumeroPedido: nextId,
         cliente: clienteData.cliente,
@@ -155,6 +163,7 @@ const PedidoRapido = forwardRef(({ datosCliente }, ref) => {
           entregado: 1,
           troceado: false,
           categoria: productData.categoria || 'No especificado',
+          position: positionValue, // Añadir el campo position
           precio: (productData.price || 0).toFixed(2),
           total: (productData.price || 0).toFixed(2),
         }],
