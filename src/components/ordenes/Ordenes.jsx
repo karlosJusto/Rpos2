@@ -58,6 +58,23 @@ const Ordenes = () => {
 
   const [displayPedidos, setDisplayPedidos] = useState(pedidosFromContext || []);
 
+  // Estados para el nuevo modal de detalle de pollos
+  const [showDetallePollosModal, setShowDetallePollosModal] = useState(false);
+  const [detallePollosData, setDetallePollosData] = useState(null);
+  const [bloqueHorarioSeleccionadoParaDetalle, setBloqueHorarioSeleccionadoParaDetalle] = useState('');
+
+   // Funciones para el modal de detalle de pollos
+  const handleOpenDetallePollosModal = (datosPollos, horaBloque) => {
+    setDetallePollosData(datosPollos);
+    setBloqueHorarioSeleccionadoParaDetalle(horaBloque);
+    setShowDetallePollosModal(true);
+  };
+
+  const handleCloseDetallePollosModal = () => {
+    setShowDetallePollosModal(false);
+    setDetallePollosData(null);
+  };
+
   useEffect(() => {
     // Keep local displayPedidos in sync with context, ensuring it's always an array
     setDisplayPedidos(pedidosFromContext || []);
@@ -385,6 +402,7 @@ const Ordenes = () => {
           productos: [], 
           cantidadProductosId1: 0, cantidadProductosId20: 0, cantidadProductosId2: 0,
           cantidadProductosId41: 0, cantidadProductosId48: 0,
+          pollosAgrupados: {} // Para el desglose detallado de pollos
         };
       }
       bloques[hora].pedidos.push(pedido);
@@ -413,6 +431,44 @@ const Ordenes = () => {
           if (producto.id === 20) bloques[hora].cantidadProductosId20 += cantidadProducto;
           if (producto.id === 41) bloques[hora].cantidadProductosId41 += cantidadProducto;
           if (producto.id === 48) bloques[hora].cantidadProductosId48 += cantidadProducto;
+
+          // Lógica para el desglose detallado de pollos
+          const esPolloEntero = producto.id === 1;
+          const esMedioPolloEquivalente = producto.id === 2 || producto.id === 39 || producto.id === 40 || (producto.alias || producto.nombre || "").toLowerCase().includes("menú pollo");
+
+          if (esPolloEntero || esMedioPolloEquivalente) {
+            const tipoPollo = esPolloEntero ? "entero" : "medio";
+            const tostadoKey = producto.tostado ? "t" : "f";
+            const troceadoKey = producto.troceado ? "t" : "f";
+            const sinsalsaKey = producto.sinsalsa ? "t" : "f";
+            const extrasalsaKey = producto.extrasalsa ? "t" : "f";
+
+            const clavePollo = `${tipoPollo}_${tostadoKey}_${troceadoKey}_${sinsalsaKey}_${extrasalsaKey}`;
+            
+            let nombreDisplayPollo = tipoPollo === "entero" ? "Pollo" : "1/2 Pollo"; // Abreviado para más espacio
+            let detallesDisplay = [];
+            if (producto.tostado) detallesDisplay.push("Tostado");
+            if (producto.troceado) detallesDisplay.push("Troceado");
+            if (producto.sinsalsa) detallesDisplay.push("S.S");
+            if (producto.extrasalsa) detallesDisplay.push("E.S");
+            
+            if (detallesDisplay.length > 0) {
+              nombreDisplayPollo += ` (${detallesDisplay.join(', ')})`;
+            }
+
+            if (!bloques[hora].pollosAgrupados[clavePollo]) {
+              bloques[hora].pollosAgrupados[clavePollo] = {
+                tipo: tipoPollo, // Guardar el tipo para ordenar
+                nombre: nombreDisplayPollo,
+                cantidad: 0,
+                cantidadEntregada: 0, // Inicializar cantidad entregada
+              };
+            }
+            // Para el display de "1/2 P.", contamos unidades de medio pollo.
+            // Para "P.", contamos unidades de pollo entero.
+            bloques[hora].pollosAgrupados[clavePollo].cantidad += cantidadProducto; // Sumar la cantidad del item directamente
+            bloques[hora].pollosAgrupados[clavePollo].cantidadEntregada += (producto.entregado || 0); // Sumar la cantidad entregada del item directamente
+          }
         });
       }
     });
@@ -480,7 +536,7 @@ const Ordenes = () => {
       <TestHeader /> {/* <--- NUEVO HEADER INTEGRADO AQUÍ ---> */}
 
       {/* BARRA DE BÚSQUEDA Y FILTROS (Original de Ordenes.jsx) */}
-      <div className="w-full bg-gray-700 p-1 fixed flex z-10 top-[12vh] h-[6vh] items-center">
+      <div className="w-full bg-gray-700 p-1 fixed flex z-20 top-[12vh] h-[6vh] items-center">
         <div className="flex justify-start items-center">
           <div className="ms-3 p-1">
             <svg width="28px" height="28px" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><g id="SVGRepo_bgCarrier" strokeWidth="0"/><g id="SVGRepo_tracerCarrier" strokeLinecap="round" strokeLinejoin="round"/><g id="SVGRepo_iconCarrier"><path fillRule="evenodd" clipRule="evenodd" d="M15 10.5C15 12.9853 12.9853 15 10.5 15C8.01472 15 6 12.9853 6 10.5C6 8.01472 8.01472 6 10.5 6C12.9853 6 15 8.01472 15 10.5ZM14.1793 15.2399C13.1632 16.0297 11.8865 16.5 10.5 16.5C7.18629 16.5 4.5 13.8137 4.5 10.5C4.5 7.18629 7.18629 4.5 10.5 4.5C13.8137 4.5 16.5 7.18629 16.5 10.5C16.5 11.8865 16.0297 13.1632 15.2399 14.1792L20.0304 18.9697L18.9697 20.0303L14.1793 15.2399Z" fill="#e5e7e9"/></g></svg>
@@ -500,7 +556,7 @@ const Ordenes = () => {
           <div className="text-white text-[1.5vh]">
             <div>
               {dateToPass && ( // Este dateToPass es del DataContext
-                <span className="text-[#75adab] font-nunito font-bold -ms-[15vw] flex items-center justify-between"> 
+                <span className="text-[#75adab] font-nunito font-bold -ms-[20vw] flex items-center justify-between"> 
                   MODO SUPERVISIÓN DE PEDIDOS ({dayjs(dateToPass).format("DD/MM/YYYY")}) {/* Mostrar fecha */}
                   <button 
                     onClick={() => { setDateToPass(null); }} 
@@ -524,19 +580,43 @@ const Ordenes = () => {
       </div>
 
       {/* CONTENIDO PRINCIPAL DE ÓRDENES (Scrollable) */}
-      <div className="w-full bg-gray-100 flex flex-col justify-center items-center pt-[18vh] mb-2 pl-1 pr-1">
+      <div className="w-full bg-gray-100 flex flex-col justify-center items-center pt-[18vh] mb-2 pl-1 pr-1 z-10">
         {Object.keys(bloquesFiltrados).sort().map((bloqueHora) => (
           <div key={bloqueHora} className="w-full ">
             <div className="text-center bg-gray-500 text-md font-semibold mb-1 text-white font-nunito rounded-md ">
-              <div className="flex justify-center items-center">
-                <div><span className='text-xl ms-[1vw] sm:ms-[48vw] font-extrabold'>{bloqueHora}</span></div>
-                <div className='flex ml-auto me-4 items-center'>
-                  <p className="text-lg font-bold text-gray-300"><span> Pedidos: </span>{bloquesFiltrados[bloqueHora]?.pedidos.length || 0} | Entregados: </p>
-                  <p className="text-lg font-bold text-gray-300 ms-1">
-                    {bloquesFiltrados[bloqueHora]?.pedidos.filter(p => p.productos.every(prod => prod.entregado === prod.cantidad && prod.cantidad > 0 )).length || 0}
+
+              {/* CONTENIDO Pollo detalle */}
+
+              <div className="relative flex items-center px-4 h-[25px]">
+                {/* Izquierda - Desglose de Pollos */}
+                 <div className="z-10 mt-3 flex items-center px-2 ">
+                  <button
+                    onClick={() => handleOpenDetallePollosModal(bloquesFiltrados[bloqueHora].pollosAgrupados || {}, bloqueHora)}
+                    className="p-1 rounded-md hover:bg-gray-600 transition-colors"
+                    title="Ver detalle de pollos"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line>
+                    </svg>
+                  </button>
+               </div>
+
+                {/* Centro fijo */}
+                <div className="absolute left-1/2 transform -translate-x-1/2">
+                  <span className='text-xl font-extrabold'>{bloqueHora}</span>
+                </div>
+
+                {/* Derecha */}
+                <div className="ml-auto flex items-center gap-1 z-10">
+                  <p className="text-lg font-bold text-gray-300">
+                    <span>Pedidos: </span>{bloquesFiltrados[bloqueHora]?.pedidos.length || 0} | Entregados:
+                  </p>
+                  <p className="text-lg font-bold text-gray-300">
+                    {bloquesFiltrados[bloqueHora]?.pedidos.filter(p => p.productos.every(prod => prod.entregado === prod.cantidad && prod.cantidad > 0)).length || 0}
                   </p>
                 </div>
               </div>
+
               {bloquesFiltrados[bloqueHora].productos.length > 0 && (
                 <div className="p-1">
                   {bloquesFiltrados[bloqueHora].productos
@@ -573,6 +653,7 @@ const Ordenes = () => {
                   </div>
                   <div className="ml-1 sm:ml-2 gap-1 sm:gap-2 flex flex-wrap items-center flex-grow">
                     {pedido.productos
+                     .filter(producto => producto.id !== 59)
                       .sort((a, b) => {
                         const categoriaPrioridad = { comida: 1, complementos: 2, bebidas: 3, postres: 4, extras: 5, default: 6 };
                         const categoriaA = categoriaPrioridad[a.categoria] || categoriaPrioridad.default;
@@ -608,13 +689,25 @@ const Ordenes = () => {
                       })}
                       {todosCompletados && (
                         <>
-                          {/* <GenerarQRCodeInvisible numeroPedido={pedido.NumeroPedido} />*/}
+                         <GenerarQRCodeInvisible numeroPedido={pedido.NumeroPedido} />
                           <ImprimirPedidoCompleto numeroPedido={pedido.NumeroPedido} />
                         </>
                       )}
-                      {pedido.pagado && !pedido.observaciones && ( <div className={`ml-1 sm:ml-2 p-1 sm:p-2 border border-gray-700 ${todosCompletados ? 'bg-[#52be80]' : 'bg-gray-300'} rounded-md w-auto font-nunito flex justify-center items-center`}><img src={dinero} alt="pagado" className="w-4 sm:w-5" /></div> )}
-                      {pedido.pagado && pedido.observaciones && ( <div className={`ml-1 sm:ml-2 p-1 sm:p-2 border border-gray-700 ${todosCompletados ? 'bg-[#52be80]' : 'bg-gray-300'} rounded-md w-auto font-nunito flex justify-center items-center text-xs sm:text-sm`}><p className="flex items-center gap-1 sm:gap-3"><img src={dinero} alt="pagado" className="w-4 sm:w-5" />Ob: <span className="truncate max-w-[50px] sm:max-w-[100px]">{pedido.observaciones}</span></p></div> )}
-                      {!pedido.pagado && pedido.observaciones && ( <div className={`ml-1 sm:ml-2 p-1 sm:p-2 border border-gray-700 ${todosCompletados ? 'bg-[#52be80]' : 'bg-gray-300'} rounded-md w-auto font-nunito flex justify-center items-center text-xs sm:text-sm`}><p>Ob: <span className="truncate max-w-[50px] sm:max-w-[100px]">{pedido.observaciones}</span></p></div> )}
+                    {pedido.pagado && pedido.observaciones && (
+                    <div className={`ml-1 sm:ml-2 p-1 sm:p-2 border-1 border-gray-700 ${todosCompletados ? 'bg-[#52be80]' : 'bg-gray-300'} rounded-md w-auto font-nunito flex justify-center items-center text-xs sm:text-sm`}>
+                      <p className="flex items-center gap-1 sm:gap-3">
+                        <img src={dinero} alt="pagado" className="w-4 sm:w-5" />
+                        Ob: <span className="whitespace-nowrap">{pedido.observaciones}</span>
+                      </p>
+                    </div>
+                  )}
+                  {!pedido.pagado && pedido.observaciones && (
+                    <div className={`ml-1 sm:ml-2 p-1 sm:p-2 border-1 border-gray-700 ${todosCompletados ? 'bg-[#52be80]' : 'bg-gray-300'} rounded-md w-auto font-nunito flex justify-center items-center text-xs sm:text-sm`}>
+                      <p className="flex items-center gap-1 sm:gap-3">
+                        Ob: <span className="whitespace-nowrap">{pedido.observaciones}</span>
+                      </p>
+                    </div>
+                  )}
                   </div>
                 </div>
               );
@@ -634,33 +727,53 @@ const Ordenes = () => {
          )}
           <div className="flex space-x-4 sm:space-x-6">
             <div className="p-2 sm:p-3 cursor-pointer hover:bg-yellow-500 rounded-md text-center" onClick={() => borrarOrden(pedidoSeleccionado?.NumeroPedido)}>
-              <svg width="3.5vw" height="3.5vw" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className="mx-auto max-w-[40px] max-h-[40px]"><g id="SVGRepo_bgCarrier" strokeWidth="0"/><g id="SVGRepo_tracerCarrier" strokeLinecap="round" strokeLinejoin="round"/><g id="SVGRepo_iconCarrier"> <path d="M20.5001 6H3.5" stroke="#f10707 " strokeWidth="1.5" strokeLinecap="round"/> <path d="M18.8334 8.5L18.3735 15.3991C18.1965 18.054 18.108 19.3815 17.243 20.192C16.378 21 15.0476 21 12.3868 21H11.6134C8.9526 21 7.6222 21 6.75719 20.192C5.89218 19.3815 5.80368 18.054 5.62669 15.3991L5.16675 8.5" stroke="#f10707 " strokeWidth="1.5" strokeLinecap="round"/> <path d="M9.5 11.5833V17.3333" stroke="#f10707 " strokeWidth="1.5" strokeLinecap="round"/> <path d="M14.5 11.5833V17.3333" stroke="#f10707 " strokeWidth="1.5" strokeLinecap="round"/> <path d="M7.5 6.00002C7.50256 5.05106 7.50256 4.10209 7.50256 3.15313C7.50256 2.42807 7.50004 1.70301 8.33803 1.94199C9.17602 2.18097 9.58402 2.55699 10.4001 2.943L10.5001 3M16.5 6.00002C16.4974 5.05106 16.4974 4.10209 16.4974 3.15313C16.4974 2.42807 16.4999 1.70301 15.6619 1.94199C14.8239 2.18097 14.4159 2.55699 13.5998 2.943L13.4998 3" stroke="#f10707 " strokeWidth="1.5" strokeLinecap="round"/> </g></svg>
-              <p className="text-xs sm:text-sm font-nunito text-gray-700 mt-1">Borrar</p>
+              <svg width="4vw" height="4vw" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><g id="SVGRepo_bgCarrier" strokeWidth="0"/><g id="SVGRepo_tracerCarrier" strokeLinecap="round" strokeLinejoin="round"/><g id="SVGRepo_iconCarrier"> <path d="M20.5001 6H3.5" stroke="#f10707 " strokeWidth="1.5" strokeLinecap="round"/> <path d="M6.5 6C6.55588 6 6.58382 6 6.60915 5.99936C7.43259 5.97849 8.15902 5.45491 8.43922 4.68032C8.44784 4.65649 8.45667 4.62999 8.47434 4.57697L8.57143 4.28571C8.65431 4.03708 8.69575 3.91276 8.75071 3.8072C8.97001 3.38607 9.37574 3.09364 9.84461 3.01877C9.96213 3 10.0932 3 10.3553 3H13.6447C13.9068 3 14.0379 3 14.1554 3.01877C14.6243 3.09364 15.03 3.38607 15.2493 3.8072C15.3043 3.91276 15.3457 4.03708 15.4286 4.28571L15.5257 4.57697C15.5433 4.62992 15.5522 4.65651 15.5608 4.68032C15.841 5.45491 16.5674 5.97849 17.3909 5.99936C17.4162 6 17.4441 6 17.5 6" stroke="#f10707 " strokeWidth="1.5"/> <path d="M18.3735 15.3991C18.1965 18.054 18.108 19.3815 17.243 20.1907C16.378 21 15.0476 21 12.3868 21H11.6134C8.9526 21 7.6222 21 6.75719 20.1907C5.89218 19.3815 5.80368 18.054 5.62669 15.3991L5.16675 8.5M18.8334 8.5L18.6334 11.5" stroke="#f10707 " strokeWidth="1.5" strokeLinecap="round"/> </g></svg>
+              <p className='text-center p-1 font-nunito text-[#f10707]'>Borrar</p>
             </div>
-              <div 
-                className={`p-2 sm:p-3 cursor-pointer hover:bg-yellow-500 rounded-md text-center ${pedidoSeleccionado?.origen === 1 ? 'opacity-50 cursor-not-allowed' : ''}`} 
-                onClick={() => {
-                    if (pedidoSeleccionado?.origen !== 1) {
-                        handleEditOrder(pedidoSeleccionado);
-                        handleCloseOptionsModal();
-                    }
-                }}>
-              <svg width="3.5vw" height="3.5vw" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className="mx-auto max-w-[40px] max-h-[40px]"><g id="SVGRepo_bgCarrier" strokeWidth="0"/><g id="SVGRepo_tracerCarrier" strokeLinecap="round" strokeLinejoin="round"/><g id="SVGRepo_iconCarrier"> <path d="M13.0201 5.82844L15.8485 3.00001C16.0438 2.80474 16.2781 2.65252 16.5358 2.55142C16.7935 2.45032 17.069 2.39868 17.3485 2.39868C17.628 2.39868 17.9035 2.45032 18.1612 2.55142C18.4189 2.65252 18.6532 2.80474 18.8485 3.00001C19.0438 3.19528 19.196 3.42958 19.2971 3.68729C19.3982 3.94501 19.4498 4.22053 19.4498 4.50001C19.4498 4.77949 19.3982 5.05501 19.2971 5.31272C19.196 5.57044 19.0438 5.80474 18.8485 6.00001L17.1821 7.66645M5.82842 17.1821L2.99999 19.9999C2.95074 20.0492 2.9078 20.1062 2.87262 20.1687C2.83744 20.2312 2.81055 20.2983 2.7929 20.3679L2.50001 21.5C2.47871 21.5932 2.48255 21.6906 2.51113 21.7825C2.53971 21.8744 2.59218 21.9581 2.66403 22.026L2.97402 22.336C3.04187 22.4078 3.12558 22.4603 3.21753 22.4889C3.30948 22.5175 3.40675 22.5213 3.50001 22.5L4.63213 22.2071C4.70171 22.1894 4.76883 22.1625 4.83134 22.1274C4.89386 22.0922 4.95081 22.0492 5.00001 22L13.0201 13.9798M13.0201 5.82844L7.66665 11.1821C7.47138 11.3774 7.31917 11.6117 7.21807 11.8694C7.11697 12.1271 7.06532 12.4026 7.06532 12.6821V15.5105C7.06532 15.9247 7.23082 16.3216 7.52343 16.6142C7.81604 16.9068 8.21297 17.0723 8.62718 17.0723H11.4556C11.735 17.0723 12.0106 17.0206 12.2683 16.9195C12.526 16.8184 12.7603 16.6662 12.9556 16.4709L17.1821 12.2444L13.0201 5.82844Z" stroke="#000000" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/> </g></svg>
-              <p className="text-xs sm:text-sm font-nunito text-gray-700 mt-1">Editar</p>
-            </div>
-            <div 
-              className="p-2 sm:p-3 cursor-pointer hover:bg-yellow-500 rounded-md text-center" 
-              onClick={() => { 
-                  handleCreateOrder(pedidoSeleccionado); 
-                  handleCloseOptionsModal(); 
-              }}>
-              <svg width="3.5vw" height="3.5vw" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className="mx-auto max-w-[40px] max-h-[40px]"><g id="SVGRepo_bgCarrier" strokeWidth="0"/><g id="SVGRepo_tracerCarrier" strokeLinecap="round" strokeLinejoin="round"/><g id="SVGRepo_iconCarrier"> <path d="M15 12L12 12M12 12L9 12M12 12L12 9M12 12L12 15" stroke="#000000" strokeWidth="1.5" strokeLinecap="round"/> <path d="M7 3.33782C8.47087 2.48697 10.1786 2 12 2C17.5228 2 22 6.47715 22 12C22 17.5228 17.5228 22 12 22C6.47715 22 2 17.5228 2 12C2 10.1786 2.48697 8.47087 3.33782 7" stroke="#000000" strokeWidth="1.5" strokeLinecap="round"/> </g></svg>
-              <p className="text-xs sm:text-sm font-nunito text-gray-700 mt-1">Nuevo</p>
+              {pedidoSeleccionado && (
+  <div
+    className="p-2 sm:p-3 cursor-pointer hover:bg-yellow-500 rounded-md text-center"
+    onClick={() => {
+      if (pedidoSeleccionado.origen === 1) {
+        handleCreateOrder(pedidoSeleccionado); // 
+        handleCloseOptionsModal();
+      } else {
+        handleEditOrder(pedidoSeleccionado);
+        handleCloseOptionsModal();
+      }
+    }}
+  >
+    {pedidoSeleccionado.origen === 1 ? (
+      <>
+        {/* Ícono Crear */}
+        <svg  width="4vw" height="4vw" fill="none" viewBox="0 0 24 24" stroke="#808b96" strokeWidth="2">
+          <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+        </svg>
+        <p className="text-center p-1 font-nunito text-[#808b96]">Crear</p>
+      </>
+    ) : (
+      <>
+        {/* Ícono Editar */}
+        <svg width="4vw" height="4vw" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M10 21.9948C6.58687 21.9658 4.70529 21.7764 3.46447 20.5355C2 19.0711 2 16.714 2 12C2 7.28595 2 4.92893 3.46447 3.46447C4.92893 2 7.28595 2 12 2C16.714 2 19.0711 2 20.5355 3.46447C21.5093 4.43821 21.8356 5.80655 21.9449 8" stroke="#808b96" strokeWidth="1.5" strokeLinecap="round"/>
+          <path d="M2.5 7.25C2.08579 7.25 1.75 7.58579 1.75 8C1.75 8.41421 2.08579 8.75 2.5 8.75V7.25ZM22 7.25H2.5V8.75H22V7.25Z" fill="#808b96"/>
+          <path d="M10.5 2.5L7 8" stroke="#808b96" strokeWidth="1.5" strokeLinecap="round"/>
+          <path d="M17 2.5L13.5 8" stroke="#808b96" strokeWidth="1.5" strokeLinecap="round"/>
+          <path d="M18.562 13.9354L18.9791 13.5183C19.6702 12.8272 20.7906 12.8272 21.4817 13.5183C22.1728 14.2094 22.1728 15.3298 21.4817 16.0209L21.0646 16.438M18.562 13.9354C18.562 13.9354 18.6142 14.8217 19.3962 15.6038C20.1783 16.3858 21.0646 16.438 21.0646 16.438M18.562 13.9354L14.7275 17.77C14.4677 18.0297 14.3379 18.1595 14.2262 18.3027C14.0945 18.4716 13.9815 18.6544 13.8894 18.8478C13.8112 19.0117 13.7532 19.1859 13.637 19.5344L13.2651 20.65L13.1448 21.0109M21.0646 16.438L17.23 20.2725C16.9703 20.5323 16.8405 20.6621 16.6973 20.7738C16.5284 20.9055 16.3456 21.0185 16.1522 21.1106C15.9883 21.1888 15.8141 21.2468 15.4656 21.363L14.35 21.7349L13.9891 21.8552M13.9891 21.8552L13.6281 21.9755C13.4567 22.0327 13.2676 21.988 13.1398 21.8602C13.012 21.7324 12.9673 21.5433 13.0245 21.3719L13.1448 21.0109M13.9891 21.8552L13.1448 21.0109" stroke="#808b96" strokeWidth="1.5"/>
+        </svg>
+        <p className="text-center p-1 font-nunito text-[#808b96]">Editar</p>
+      </>
+    )}
+  </div>
+)}
+            <div className="p-2 sm:p-3 cursor-pointer hover:bg-yellow-500 rounded-md text-center">
+              <svg fill="#2ad12f " height="4vw" width="4vw" version="1.1" id="Capa_1" xmlns="http://www.w3.org/2000/svg" xmlnsXlink="http://www.w3.org/1999/xlink" viewBox="0 0 220.262 220.262" xmlSpace="preserve"><g id="SVGRepo_bgCarrier" strokeWidth="0"/><g id="SVGRepo_tracerCarrier" strokeLinecap="round" strokeLinejoin="round"/><g id="SVGRepo_iconCarrier"> <g> <path d="M110.127,0C50.606,0,2.184,48.424,2.184,107.944c0,23.295,9.455,44.211,13.521,52.123 c1.893,3.685,6.416,5.135,10.099,3.243c3.684-1.893,5.136-6.415,3.243-10.099c-3.566-6.941-11.862-25.247-11.862-45.268 C17.184,56.695,58.878,15,110.127,15c51.254,0,92.951,41.695,92.951,92.944c0,51.251-41.697,92.946-92.951,92.946 c-20.044,0-35.971-6.94-41.889-9.925c-1.755-0.886-3.788-1.046-5.66-0.447l-47.242,15.097c-3.945,1.261-6.122,5.481-4.861,9.427 c1.018,3.187,3.968,5.219,7.142,5.219c0.757,0,1.526-0.115,2.285-0.358l44.391-14.186c9.287,4.311,25.633,10.173,45.834,10.173 c59.524,0,107.951-48.424,107.951-107.946C218.078,48.424,169.651,0,110.127,0z"/> <path d="M88.846,89.537c-3.285,2.523-3.902,7.231-1.38,10.517c2.523,3.285,7.23,3.903,10.517,1.38 c2.299-1.766,8.406-6.456,7.512-14.845c-0.551-4.987-5.417-11.83-9.402-16.691c-5.831-7.114-10.767-11.327-14.643-12.513 c-3.632-1.126-7.354-0.948-11.066,0.53c-7.636,3.052-13.025,8.108-15.585,14.622c-2.493,6.344-2.04,13.443,1.313,20.537 c7.827,16.522,18.288,30.791,31.093,42.413c0.05,0.047,0.101,0.093,0.152,0.139c12.987,11.48,28.352,20.325,45.675,26.293 c3.287,1.129,6.513,1.692,9.611,1.692c3.892,0,7.583-0.888,10.94-2.658c6.191-3.264,10.621-9.177,12.814-17.115 c1.056-3.848,0.82-7.564-0.689-11.024c-1.619-3.745-6.35-8.184-14.064-13.193c-5.269-3.422-12.601-7.5-17.64-7.5 c-0.003,0-0.007,0-0.011,0c-8.406,0.034-12.397,6.621-13.899,9.102c-2.146,3.543-1.014,8.155,2.529,10.301 c3.541,2.146,8.154,1.015,10.301-2.529c0.593-0.98,0.969-1.5,1.205-1.772c4.236,1.23,15.567,8.642,17.889,11.761 c0.038,0.166,0.043,0.417-0.082,0.874c-0.739,2.675-2.268,6.204-5.349,7.828c-2.879,1.516-6.312,0.863-8.677,0.051 c-15.413-5.31-29.053-13.142-40.543-23.279c-0.003-0.003-0.007-0.006-0.01-0.01c-11.377-10.308-20.693-23.023-27.688-37.788 c-1.071-2.268-2.1-5.607-0.91-8.634c1.274-3.242,4.613-5.15,7.183-6.177c0.441-0.176,0.69-0.203,0.871-0.179 c3.358,1.965,11.969,12.402,13.66,16.477C90.229,88.41,89.753,88.84,88.846,89.537z"/> </g> </g></svg>
+              <p className='text-center p-1 -ms-2 font-nunito text-[#2ad12f]'>Mensaje</p>
             </div>
           </div>
         </Modal.Body>
         <Modal.Footer className='border-t-0'>
-          <Button variant="secondary" className="shadow-md bg-white border-red-500 text-red-500 hover:bg-red-700 hover:border-red-700 hover:text-white p-2 font-nunito" onClick={handleCloseOptionsModal}>Cerrar</Button>
+          <Button variant="primary" className="shadow-md bg-white border-red-500 text-red-500 hover:bg-red-700 hover:border-red-700 hover:text-red-700 p-2 font-nunito" onClick={handleCloseOptionsModal}>Cerrar</Button>
         </Modal.Footer>
       </Modal>
       
@@ -673,6 +786,59 @@ const Ordenes = () => {
         </Modal.Body>
         <Modal.Footer className='border-t-0'>
           <Button variant="primary" className="bg-yellow-500 border-yellow-500 hover:bg-yellow-600 hover:border-yellow-600 p-2 font-nunito" onClick={handleCloseTurnoModal}>Aceptar</Button>
+        </Modal.Footer>
+      </Modal>
+
+         {/* Modal para mostrar el detalle de pollos */}
+      <Modal show={showDetallePollosModal} onHide={handleCloseDetallePollosModal} size="md" keyboard={false} centered>
+       
+        <Modal.Body className='bg-gray-100 font-nunito rounded-md'>
+
+            <div className='flex justify-center items-center text-gray-700 font-extrabold font-nunito p-2 mb-2'>
+              <h1 className='text-xl' > Detalle Pollos franja horaria- {bloqueHorarioSeleccionadoParaDetalle}</h1>
+            </div>
+            <div className="flex justify-center">
+  {detallePollosData && Object.keys(detallePollosData).length > 0 ? (
+    <ul className="list-none space-y-1 text-sm text-center">
+      {Object.values(detallePollosData)
+        .sort((a, b) => {
+          if (a.tipo === 'entero' && b.tipo === 'medio') return -1;
+          if (a.tipo === 'medio' && b.tipo === 'entero') return 1;
+          return a.nombre.localeCompare(b.nombre);
+        })
+        .map((polloDetalle, idx) => {
+          const entregadoCompleto = polloDetalle.cantidad === polloDetalle.cantidadEntregada;
+
+          return (
+            <li
+              key={idx}
+              className={`text-gray-700 text-lg ${entregadoCompleto ? 'line-through text-gray-400' : ''}`}
+            >
+              <strong className="text-green-400">{polloDetalle.cantidad}</strong> x {polloDetalle.nombre}{' '}
+              (
+              <strong className={entregadoCompleto ? 'text-green-500' : 'text-gray-900'}>
+                {polloDetalle.cantidadEntregada}
+              </strong>
+              )
+            </li>
+          );
+        })}
+    </ul>
+  ) : (
+    <p className="text-center text-gray-500">No hay pollos para mostrar en este bloque.</p>
+  )}
+</div>
+
+
+        </Modal.Body>
+        <Modal.Footer className='bg-gray-100 border-t-0'>
+          <Button 
+            variant="primary" 
+            onClick={handleCloseDetallePollosModal}
+            className="bg-white border-gray-500 text-gray-500 hover:border-yellow-900 hover:text-gray-900 font-nunito"
+          >
+            Cerrar
+          </Button>
         </Modal.Footer>
       </Modal>
       

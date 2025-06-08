@@ -106,7 +106,7 @@ const LGFreidora = ( ) => {
         </Offcanvas.Header>
         <Offcanvas.Body>
           <Nav>
-          <ul className=" ms-2 flex  flex-col justify-between text-center items-center gap-10   bg-[#f2ac02] ">
+          <ul className=" ms-3 flex  flex-col justify-between text-center items-center gap-6  bg-[#f2ac02] ">
 
             <Link className=" p-3 mt-2  hover:bg-gray-100 hover:rounded-2xl " to={"/layout/comida"}>
 

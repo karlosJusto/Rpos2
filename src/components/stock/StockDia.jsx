@@ -105,13 +105,21 @@ const StockDia = () => {
   // Obtener la fecha actual y formatearla
   const fechaHoy = dayjs().tz('Europe/Madrid').format('DD/MM/YYYY');
 
-  // Sumar la cantidad de Pollo Asado (id 1) y 1/2 Pollo (id 2)
-  const calcularTotalPollo = (productos) => {
-    const polloAsado = productos.find(p => p.id === 1);
-    const medioPollo = productos.find(p => p.id === 2);
-    const total = (polloAsado ? polloAsado.cantidadTotal : 0) + (medioPollo ? medioPollo.cantidadTotal * 0.5 : 0);
-    return total.toFixed(1); // Retorna el total con un decimal
-  };
+  // Sumar la cantidad de Pollo Asado (id 1) y 1/2 Pollo (id 2) tambien sumamos 0.5 de menu fat y 0.5 e menu fit
+const calcularTotalPollo = (productos) => {
+  const polloAsado = productos.find(p => p.id === 1);
+  const medioPollo = productos.find(p => p.id === 2);
+  const menufit = productos.find(p => p.id === 39);
+  const menufat = productos.find(p => p.id === 40);
+
+  const total =
+    (polloAsado ? polloAsado.cantidadTotal : 0) +
+    (medioPollo ? medioPollo.cantidadTotal * 0.5 : 0) +
+    (menufit ? menufit.cantidadTotal * 0.5 : 0) +
+    (menufat ? menufat.cantidadTotal * 0.5 : 0);
+
+  return total.toFixed(1); // Retorna el total con un decimal
+};
 
   return (
     <div className="max-w-full mx-auto">

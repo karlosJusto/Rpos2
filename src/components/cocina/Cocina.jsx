@@ -487,7 +487,7 @@ const Cocina = () => {
 
         {/* Banner de Modo Supervisión, ahora usa `showSupervisionHeader` y `selectedDateStr` derivados del contexto */}
         {showSupervisionHeader && (
-          <div className="text-[#75adab] bg-gray-700 px-4 py-2 flex justify-between items-center text-sm mb-4 mx-auto max-w-3xl rounded shrink-0" >
+        <div className="text-[#75adab] bg-gray-700 px-4 py-2 flex justify-between items-center text-sm  w-full  shrink-0">
             <span className='font-nunito text-center flex-grow font-bold'>MODO SUPERVISIÓN DE COCINA ({selectedDateStr})</span>
             <button
               onClick={handleCloseSupervision} // Ahora llama a setDateToPass(null)

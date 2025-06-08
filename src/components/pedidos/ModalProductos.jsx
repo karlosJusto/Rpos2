@@ -104,6 +104,7 @@ const ModalProductos = ({ show, handleClose, product, isNuevoProducto }) => {
       categoria: baseProductInfo.categoria,
       alias: baseProductInfo.alias,
       position: baseProductInfo.position,
+       botonCeliaco: baseProductInfo.botonCeliaco || false,
     };
     console.log("buyProducts: configuredProductDetails:", configuredProductDetails);
 

@@ -9,14 +9,25 @@ import tienda from '../../assets/tienda.png';
 import web from '../../assets/web.png';
 // SVGs for edit/delete icons (can be inlined or imported)
 const EditIcon = () => (
-  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5">
+  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="#eab308" className="w-5 h-5">
     <path strokeLinecap="round" strokeLinejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10" />
   </svg>
 );
 
-const DeleteIcon = () => (
-  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5">
-    <path strokeLinecap="round" strokeLinejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12.56 0c1.153 0 2.242.078 3.223.224C9.308 5.901 9.73 6.09 10.5 6.473m6.038-1.122c.47-.18.99-.321 1.513-.427M4.772 5.79L4.772 5.79m14.456 0L19.228 5.79m-14.456 0L4.772 5.79M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12.56 0c1.153 0 2.242.078 3.223.224C9.308 5.901 9.73 6.09 10.5 6.473m6.038-1.122c.47-.18.99-.321 1.513-.427M4.772 5.79L4.772 5.79m14.456 0L19.228 5.79m-14.456 0L4.772 5.79" />
+  const DeleteIcon = () => (
+  <svg
+    xmlns="http://www.w3.org/2000/svg"
+    fill="none"
+    viewBox="0 0 24 24"
+    strokeWidth={1.5}
+    stroke="#EF4444" 
+    className="w-5 h-5"
+  >
+    <path
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      d="M6 7h12M10 11v6M14 11v6M5 7l1 12a2 2 0 002 2h8a2 2 0 002-2l1-12M9 7V4a1 1 0 011-1h4a1 1 0 011 1v3"
+    />
   </svg>
 );
 
@@ -334,7 +345,7 @@ const ListarClientes = () => {
                 <th className="px-4 py-3 text-center">Localidad</th>
                 <th className="px-4 py-3 text-center">Correo</th>
                 <th className="px-4 py-3 text-center">ID Cliente</th>
-                <th className="px-4 py-3 text-center">Acciones</th> {/* Nueva columna */}
+                <th className="px-4 py-3 text-center">Acciones</th> 
               </tr>
             </thead>
             <tbody>
@@ -501,60 +512,109 @@ const ListarClientes = () => {
 
       {/* Modal para Modificar Cliente */}
       <Modal show={showModificarClienteModal} onHide={handleCloseModificarModal} centered>
-        <Modal.Header closeButton>
-          <Modal.Title className="text-gray-700 font-nunito font-bold">Modificar Cliente</Modal.Title>
-        </Modal.Header>
+       
         <Modal.Body>
+
+            <div>
+              <h1 className='text-gray-700 text-xl font-nunito font-bold text-center mb-4'>Modificar Cliente</h1>
+            </div>
+
           {mensajeAccion && <p className={`text-sm font-bold font-nunito mb-3 text-center ${mensajeAccion.includes("Error") || mensajeAccion.startsWith("Nombre y teléfono") ? "text-red-600" : "text-green-700"}`}>{mensajeAccion}</p>}
           <Form>
             <Form.Group className="mb-3" controlId="formClienteNombre">
-              <Form.Label className="text-gray-700 font-nunito">Nombre</Form.Label>
+              <Form.Label className="text-gray-500 text-sm font-extrabold font-nunito ms-2">Nombre</Form.Label>
               <Form.Control type="text" name="cliente" value={formDataCliente.cliente} onChange={handleFormChangeCliente} placeholder="Nombre del cliente" className="font-nunito text-sm"/>
             </Form.Group>
             <Form.Group className="mb-3" controlId="formClienteTelefono">
-              <Form.Label className="text-gray-700 font-nunito">Teléfono</Form.Label>
-              <Form.Control type="text" name="telefono" value={formDataCliente.telefono} onChange={handleFormChangeCliente} placeholder="Teléfono" className="font-nunito text-sm"/>
+              <Form.Label className="text-gray-500 text-sm font-extrabold font-nunito ms-2">Teléfono (No modificable)</Form.Label>
+              <Form.Control type="text" readOnly disabled name="telefono" value={formDataCliente.telefono} onChange={handleFormChangeCliente} placeholder="Teléfono" className="font-nunito text-sm" />
             </Form.Group>
             <Form.Group className="mb-3" controlId="formClienteLocalidad">
-              <Form.Label className="text-gray-700 font-nunito">Localidad</Form.Label>
-              <Form.Control type="text" name="localidad" value={formDataCliente.localidad} onChange={handleFormChangeCliente} placeholder="Localidad (opcional)" className="font-nunito text-sm"/>
+              <Form.Label className="text-gray-500 text-sm font-extrabold font-nunito ms-2">Localidad</Form.Label>
+             <div className="relative">
+                <Form.Control
+                  as="select"
+                  name="localidad"
+                  value={formDataCliente.localidad}
+                  onChange={handleFormChangeCliente}
+                  className="font-nunito text-sm appearance-none pr-8"
+                >
+                  <option value="">Seleccionar localidad (opcional)</option>
+                  <option value="Mungia">Mungia</option>
+                  <option value="Larrauri">Larrauri</option>
+                  <option value="Laukariz">Laukariz</option>
+                  <option value="Markaida">Markaida</option>
+                  <option value="Fruiz">Fruiz</option>
+                  <option value="Gatica">Gatica</option>
+                  <option value="Derio">Derio</option>
+                  <option value="Otros">Otros...</option>
+                </Form.Control>
+
+                  {/* Flecha SVG */}
+                  <div className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-gray-400">
+                    <svg
+                      className="w-4 h-4"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      viewBox="0 0 24 24"
+                    >
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+                    </svg>
+                  </div>
+                </div>
             </Form.Group>
             <Form.Group className="mb-3" controlId="formClienteEmail">
-              <Form.Label className="text-gray-700 font-nunito">Email</Form.Label>
+              <Form.Label className="text-gray-500 text-sm font-extrabold font-nunitob ms-2">Email</Form.Label>
               <Form.Control type="email" name="email" value={formDataCliente.email} onChange={handleFormChangeCliente} placeholder="Email (opcional)" className="font-nunito text-sm"/>
             </Form.Group>
             {/* Podríamos añadir input para img_perfil aquí si se decide implementar */}
           </Form>
-        </Modal.Body>
-        <Modal.Footer>
-          <Button variant="secondary" onClick={handleCloseModificarModal} className="px-4 py-2 shadow-sm text-sm font-medium text-gray-700 bg-gray-200 border-gray-300 rounded-md hover:bg-gray-300">
+
+          <div className='items-center justify-center flex gap-6 mt-5 mb-3'>
+
+             <Button variant="secondary" onClick={handleCloseModificarModal}  className=" shadow-md bg-white border-red-500 hover:bg-red-700 hover:border-red-700 p-2 font-nunito text-red-500 hover:text-red-700">
             Cancelar
           </Button>
-          <Button variant="primary" onClick={handleGuardarClienteModificado} className="px-4 py-2 bg-yellow-500 text-white rounded-md hover:bg-yellow-600 text-sm font-medium">
-            Guardar Cambios
+          <Button variant="primary" onClick={handleGuardarClienteModificado}  className="shadow-md bg-white text-yellow-500 border-yellow-500 hover:bg-yellow-600 hover:text-yellow-600 hover:border-yellow-600 p-2 font-nunito">
+            Actualizar 
           </Button>
-        </Modal.Footer>
+
+
+          </div>
+        </Modal.Body>
+  
       </Modal>
 
       {/* Modal para Confirmar Eliminación de Cliente */}
       <Modal show={showConfirmDeleteModal} onHide={handleCloseEliminarModal} centered>
-        <Modal.Header closeButton>
-          <Modal.Title className="text-gray-700 font-nunito font-bold">Confirmar Eliminación</Modal.Title>
-        </Modal.Header>
+      
         <Modal.Body>
+
+           <div>
+              <h1 className='text-gray-700 text-xl font-nunito font-bold text-center mb-4'>Confirmar Eliminación</h1>
+            </div>
+
           {mensajeAccion && <p className={`text-sm font-bold font-nunito mb-3 text-center ${mensajeAccion.includes("Error") ? "text-red-600" : "text-green-700"}`}>{mensajeAccion}</p>}
-          <p className="text-gray-600 font-nunito">
+          <p className="text-gray-600 font-nunito text-center">
             ¿Estás seguro de que deseas eliminar al cliente <strong className="text-gray-800">{clienteParaAccion?.cliente}</strong>? Esta acción no se puede deshacer.
           </p>
-        </Modal.Body>
-        <Modal.Footer>
-          <Button variant="secondary" onClick={handleCloseEliminarModal} className="px-4 py-2 shadow-sm text-sm font-medium text-gray-700 bg-gray-200 border-gray-300 rounded-md hover:bg-gray-300">
+
+          <div className='items-center justify-center flex gap-6 mt-5 mb-3'>
+
+            <Button variant="secondary" onClick={handleCloseEliminarModal} className=" shadow-md bg-white border-gray-500 hover:bg-gray-300 hover:border-gray-700 p-2 font-nunito text-gray-500 hover:text-gray-700">
             Cancelar
           </Button>
-          <Button variant="danger" onClick={handleConfirmarEliminarCliente} className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 text-sm font-medium">
+          <Button variant="danger" onClick={handleConfirmarEliminarCliente} className=" shadow-md bg-white border-red-500 hover:bg-red-700 hover:border-red-700 p-2 font-nunito text-red-500 hover:text-red-700">
             Sí, Eliminar
           </Button>
-        </Modal.Footer>
+
+
+          </div>
+
+          
+        </Modal.Body>
+
       </Modal>
     </div>
   );

@@ -209,7 +209,7 @@ const Ticket = (props) => {
       )}
 
       {/* Sección Cliente */}
-      <div className="p-[1.3vh] mt-[1.8vh]">
+      <div className="p-[1.3vh] mt-[0.9vh]">
         <h1 className="font-nunito border-b-2 text-gray-600 font-bold border-gray-600 text-[1vw]">
           Cliente
         </h1>
@@ -300,7 +300,7 @@ const Ticket = (props) => {
       )}
 
       {/* Lista de Elementos del Carrito */}
-      <div className="p-[1.3vh] max-h-[45%] overflow-y-auto">
+      <div className="p-[1.3vh] max-h-[43%] overflow-y-auto">
         <CartElements />
       </div>
 

@@ -12,6 +12,29 @@ const MODAL_MODES = {
   EDIT: 'editar',
 };
 
+const EditIcon = () => (
+  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="#eab308" className="w-5 h-5">
+    <path strokeLinecap="round" strokeLinejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10" />
+  </svg>
+);
+
+  const DeleteIcon = () => (
+  <svg
+    xmlns="http://www.w3.org/2000/svg"
+    fill="none"
+    viewBox="0 0 24 24"
+    strokeWidth={1.5}
+    stroke="#EF4444" 
+    className="w-5 h-5"
+  >
+    <path
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      d="M6 7h12M10 11v6M14 11v6M5 7l1 12a2 2 0 002 2h8a2 2 0 002-2l1-12M9 7V4a1 1 0 011-1h4a1 1 0 011 1v3"
+    />
+  </svg>
+);
+
 export default function ListaProductos() {
   const [productos, setProductos] = useState([]);
   const categoryOrder = ["comida", "complementos", "bebidas", "postres", "extras"];
@@ -26,6 +49,7 @@ export default function ListaProductos() {
 
   const [showDeleteConfirmModal, setShowDeleteConfirmModal] = useState(false);
   const [productToDelete, setProductToDelete] = useState(null);
+  const [disableDeleteReason, setDisableDeleteReason] = useState(""); // Estado para el motivo de deshabilitación
 
   // Helper para mostrar mensajes que se auto-limpian
   const showAutoClearMessage = (msg, duration = 3000) => {
@@ -39,8 +63,8 @@ export default function ListaProductos() {
     return product.name || product.nombre || defaultName;
   };
   
-  // Helper para verificar flags como 'cocina' que pueden ser "1", 1 o true
-  const isCocinaFlagSet = (value) => String(value) === "1" || value === true || value === 1;
+  // Helper para verificar flags como 'cocina' o 'freidora' que pueden ser "1", 1 o true
+  const isFlagSet = (value) => String(value) === "1" || value === true || value === 1;
 
   const fetchProducts = async () => {
     setLoading(true);
@@ -113,24 +137,37 @@ export default function ListaProductos() {
 
   const handleDelete = (producto) => {
     setProductToDelete(producto);
-    setShowDeleteConfirmModal(true);
     setMensaje(""); 
+
+    // Verificar si el producto está activo en cocina o freidora
+    let reason = "";
+    if (isFlagSet(producto.cocina) && isFlagSet(producto.freidora)) {
+      reason = "Este producto está activo en Cocina y Freidora. Desactívalo primero de esas áreas.";
+    } else if (isFlagSet(producto.cocina)) {
+      reason = "Este producto está activo en Cocina. Desactívalo primero y guarda cambios. Posteriormente ya puedes eliminarlo.";
+    } else if (isFlagSet(producto.freidora)) {
+      reason = "Este producto está activo en Freidora. Desactívalo primero y guarda cambios. Posteriormente ya puedes eliminarlo.";
+    }
+    setDisableDeleteReason(reason);
+
+    setShowDeleteConfirmModal(true);
   };
 
   const handleCloseDeleteConfirmModal = () => {
     setShowDeleteConfirmModal(false);
     setProductToDelete(null);
+    setDisableDeleteReason(""); // Limpiar la razón al cerrar
   };
 
   const executeDelete = async () => {
-    if (!productToDelete) return;
+    if (!productToDelete || disableDeleteReason) return; // No ejecutar si está deshabilitado
 
     setLoading(true);
     setMensaje("Eliminando producto...");
     try {
       await deleteDoc(doc(db, "productos", productToDelete.id));
 
-      if (isCocinaFlagSet(productToDelete.cocina)) {
+      if (isFlagSet(productToDelete.cocina)) {
         try {
           await deleteDoc(doc(db, "cocina", productToDelete.id));
         } catch (cocinaError) {
@@ -148,6 +185,7 @@ export default function ListaProductos() {
       setLoading(false);
       setShowDeleteConfirmModal(false);
       setProductToDelete(null);
+      setDisableDeleteReason(""); // Limpiar la razón
     }
   };
 
@@ -237,7 +275,7 @@ export default function ListaProductos() {
         </div>
 
         {mensaje && (
-          <p className={`text-center text-sm mb-4 ${mensaje.toLowerCase().includes("error") ? 'text-red-600' : 'text-green-600'}`}>
+          <p className={`text-center text-sm mb-4 ${mensaje.toLowerCase().includes("error") || mensaje.toLowerCase().includes("desactívalo") ? 'text-red-600' : 'text-green-600'}`}>
             {mensaje}
           </p>
         )}
@@ -333,13 +371,13 @@ export default function ListaProductos() {
                         </div>
                       </td>
                     <td className="px-4 py-2 hidden sm:table-cell text-center font-nunito">
-                        {isCocinaFlagSet(producto.gluten_free) && (
+                        {isFlagSet(producto.gluten_free) && (
                           <img src={singluten} alt="Sin gluten" className="inline-block w-4 h-4 mx-1" title="Sin Gluten"/>
                         )}
-                        {isCocinaFlagSet(producto.vegan) && (
+                        {isFlagSet(producto.vegan) && (
                           <img src={vegano} alt="Vegano" className="inline-block w-4 h-4 mx-1" title="Vegano"/>
                         )}
-                        {isCocinaFlagSet(producto.vegetarian) && (
+                        {isFlagSet(producto.vegetarian) && (
                           <img src={vegetariano} alt="Vegetariano" className="inline-block w-4 h-4 mx-1" title="Vegetariano"/>
                         )}
                       </td>
@@ -355,24 +393,26 @@ export default function ListaProductos() {
                         </span>
                       )}
                     </td>
-                    <td className="px-4 py-2 text-center">
-                      <div className="flex justify-center items-center gap-2">
-                        <button
-                          onClick={() => handleModify(producto)}
-                          className="px-2 py-1 text-xs bg-white border-1 hover:text-yellow-600 hover:border-yellow-600 text-yellow-500 border-yellow-500 rounded font-nunito transition-colors shadow-sm"
-                          aria-label={`Modificar ${getSafeProductName(producto)}`}
-                        >
-                          Modificar
-                        </button>
-                        <button
-                          onClick={() => handleDelete(producto)}
-                          className="px-2 py-1 text-xs border-red-500 border-1 rounded text-red-500 hover:text-red-900 hover:border-red-900 font-nunito shadow-sm"
-                          aria-label={`Eliminar ${getSafeProductName(producto)}`}
-                        >
-                          Eliminar
-                        </button>
-                      </div>
-                    </td>
+                    <td className="px-4 py-2 text-center"> {/* Celda para botones */}
+  <div className="flex justify-center items-center gap-2">
+    <button
+      onClick={() => handleModify(producto)}
+      className="p-1 text-gray-500 hover:text-yellow-600"
+      title={`Modificar ${getSafeProductName(producto)}`}
+      aria-label={`Modificar ${getSafeProductName(producto)}`}
+    >
+      <EditIcon />
+    </button>
+    <button
+      onClick={() => handleDelete(producto)}
+      className="p-1 text-red-500 hover:text-red-800"
+      title={`Eliminar ${getSafeProductName(producto)}`}
+      aria-label={`Eliminar ${getSafeProductName(producto)}`}
+    >
+      <DeleteIcon />
+    </button>
+  </div>
+</td>
                   </tr>
                 ))}
               </tbody>
@@ -383,73 +423,75 @@ export default function ListaProductos() {
 
       {/* Modal de Confirmación de Eliminación */}
       {showDeleteConfirmModal && productToDelete && (
-<div
-  className="modal fade show"
-  tabIndex="-1"
-  style={{ display: 'block', backgroundColor: 'rgba(0,0,0,0.5)' }}
-  aria-modal="true"
-  role="dialog"
->
-  <div className="modal-dialog modal-dialog-centered">
-    <div className="modal-content rounded-lg shadow-xl">
-      
-      {/* Header sin borde y centrado */}
-      <div className="modal-header flex justify-center items-center p-4 relative border-none">
-        <h5 className="modal-title text-xl font-extrabold text-gray-800 font-nunito text-center w-full">
-          Confirma la Eliminación
-        </h5>
-        <button
-          type="button"
-          className="btn-close absolute right-4 top-4 text-gray-400 hover:text-gray-600"
-          onClick={handleCloseDeleteConfirmModal}
-          aria-label="Cerrar"
-        ></button>
-      </div>
+        <div
+          className="modal fade show"
+          tabIndex="-1"
+          style={{ display: 'block', backgroundColor: 'rgba(0,0,0,0.5)' }}
+          aria-modal="true"
+          role="dialog"
+        >
+          <div className="modal-dialog modal-dialog-centered">
+            <div className="modal-content rounded-lg shadow-xl">
+              
+              <div className="modal-header flex justify-center items-center p-4 relative border-none">
+                <h5 className="modal-title text-xl font-extrabold text-gray-800 font-nunito text-center w-full">
+                  Confirma la Eliminación
+                </h5>
+                <button
+                  type="button"
+                  className="btn-close absolute right-4 top-4 text-gray-400 hover:text-gray-600"
+                  onClick={handleCloseDeleteConfirmModal}
+                  aria-label="Cerrar"
+                ></button>
+              </div>
 
-      {/* Cuerpo del modal */}
-      <div className="modal-body p-3 font-nunito text-center">
+              <div className="modal-body p-3 font-nunito text-center">
+                <div className=' d-flex justify-content-center align-items-center -mt-8 mb-2'>
+                  <svg fill="#c81d0c" width="75px" height="75px" viewBox="-5.5 0 32 32" version="1.1" xmlns="http://www.w3.org/2000/svg">
+                    <g id="SVGRepo_bgCarrier" strokeWidth="0"/>
+                    <g id="SVGRepo_tracerCarrier" strokeLinecap="round" strokeLinejoin="round"/>
+                    <g id="SVGRepo_iconCarrier"> <path d="M10.16 25.92c-2.6 0-8.72-0.24-9.88-2.24-1.28-2.28 2.040-8.24 3.080-10.040 1.040-1.76 4.64-7.56 7.12-7.56 2.8 0 7.24 7.48 8.56 10.12 1.92 3.84 2.48 6.4 1.56 7.6-1.52 2.040-8.96 2.12-10.44 2.12zM10.48 7.72c-0.72 0-3.080 2.36-5.64 6.76-2.76 4.68-3.48 7.72-3.080 8.4 0.32 0.56 3.2 1.4 8.4 1.4 5.44 0 8.64-0.88 9.080-1.48 0.28-0.36 0.040-2.28-1.72-5.84-2.64-5.28-6.12-9.24-7.040-9.24zM10.52 19.2c-0.48 0-0.84-0.36-0.84-0.84v-6.36c0-0.48 0.36-0.84 0.84-0.84s0.84 0.36 0.84 0.84v6.32c0 0.48-0.4 0.88-0.84 0.88zM11.36 21.36c0 0.464-0.376 0.84-0.84 0.84s-0.84-0.376-0.84-0.84c0-0.464 0.376-0.84 0.84-0.84s0.84 0.376 0.84 0.84z"/> </g>
+                  </svg>
+                </div>
 
-            <div className=' d-flex justify-content-center align-items-center -mt-8 mb-2'>
-            <svg fill="#c81d0c" width="75px" height="75px" viewBox="-5.5 0 32 32" version="1.1" xmlns="http://www.w3.org/2000/svg">
-              <g id="SVGRepo_bgCarrier" strokeWidth="0"/>
-              <g id="SVGRepo_tracerCarrier" strokeLinecap="round" strokeLinejoin="round"/>
-              <g id="SVGRepo_iconCarrier"> <path d="M10.16 25.92c-2.6 0-8.72-0.24-9.88-2.24-1.28-2.28 2.040-8.24 3.080-10.040 1.040-1.76 4.64-7.56 7.12-7.56 2.8 0 7.24 7.48 8.56 10.12 1.92 3.84 2.48 6.4 1.56 7.6-1.52 2.040-8.96 2.12-10.44 2.12zM10.48 7.72c-0.72 0-3.080 2.36-5.64 6.76-2.76 4.68-3.48 7.72-3.080 8.4 0.32 0.56 3.2 1.4 8.4 1.4 5.44 0 8.64-0.88 9.080-1.48 0.28-0.36 0.040-2.28-1.72-5.84-2.64-5.28-6.12-9.24-7.040-9.24zM10.52 19.2c-0.48 0-0.84-0.36-0.84-0.84v-6.36c0-0.48 0.36-0.84 0.84-0.84s0.84 0.36 0.84 0.84v6.32c0 0.48-0.4 0.88-0.84 0.88zM11.36 21.36c0 0.464-0.376 0.84-0.84 0.84s-0.84-0.376-0.84-0.84c0-0.464 0.376-0.84 0.84-0.84s0.84 0.376 0.84 0.84z"/> </g>
-            </svg>
+                <p className="text-gray-700 text-sm">
+                  ¿Está seguro que desea eliminar el producto "<strong>{getSafeProductName(productToDelete, 'este producto')}</strong>"?
+                </p>
+                <p className="text-sm text-gray-400 mt-2">
+                  Esta acción no se puede deshacer.
+                </p>
+                {disableDeleteReason && (
+                  <p className="text-sm text-red-600 mt-3 font-semibold">
+                    {disableDeleteReason}
+                  </p>
+                )}
+              </div>
+
+              <div className="modal-footer flex justify-center gap-4 p-4 bg-white rounded-b-lg border-none">
+                <button
+                  type="button"
+                  className="px-3 py-2 bg-white border-1 border-gray-300 text-gray-500 rounded hover:text-gray-900 hover:border-gray-900 font-nunito transition-colors shadow-md"
+                  onClick={handleCloseDeleteConfirmModal}
+                  disabled={loading && mensaje.startsWith("Eliminando")}
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="button"
+                  className={`px-3 py-2 bg-white border-1 rounded font-nunito transition-colors shadow-md ${
+                    disableDeleteReason 
+                    ? 'border-gray-400 text-gray-400 cursor-not-allowed' 
+                    : 'border-red-500 text-red-500 hover:text-red-700 hover:border-red-700'
+                  }`}
+                  onClick={executeDelete}
+                  disabled={(loading && mensaje.startsWith("Eliminando")) || !!disableDeleteReason}
+                >
+                  {loading && mensaje.startsWith("Eliminando") ? "Eliminando..." : "Eliminar"}
+                </button>
+              </div>
+            </div>
           </div>
-
-        <p className="text-gray-700 text-sm">
-          ¿Está seguro que desea eliminar el producto "<strong>{getSafeProductName(productToDelete, 'este producto')}</strong>"?
-        </p>
-        <p className="text-sm text-gray-400 mt-2">
-          Esta acción no se puede deshacer.
-        </p>
-      </div>
-
-      {/* Footer sin borde */}
-      <div className="modal-footer flex justify-center gap-4 p-4 bg-white rounded-b-lg border-none">
-        <button
-          type="button"
-          className="px-3 py-2 bg-white border-1 border-gray-300 text-gray-500 rounded hover:text-gray-900 hover:border-gray-900 font-nunito transition-colors shadow-md"
-          onClick={handleCloseDeleteConfirmModal}
-          disabled={loading && mensaje === "Eliminando producto..."}
-        >
-          Cancelar
-        </button>
-        <button
-          type="button"
-          className="px-3 py-2 bg-white  border-1 border-red-500 text-red-500 rounded hover:text-red-700 hover:border-red-700 font-nunito transition-colors shadow-md"
-          onClick={executeDelete}
-          disabled={loading && mensaje === "Eliminando producto..."}
-        >
-          {loading && mensaje === "Eliminando producto..." ? "Eliminando..." : "Eliminar"}
-        </button>
-      </div>
-    </div>
-  </div>
-</div>
-
-    
-     
+        </div>
       )}
 
       {/* Modal para Crear/Editar Productos */}
@@ -474,7 +516,6 @@ export default function ListaProductos() {
                   onClick={handleCloseModal}
                   aria-label="Cerrar"
                 >
-                   
                 </button>
               </div>
             <div className="modal-body p-0">

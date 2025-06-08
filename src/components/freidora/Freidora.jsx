@@ -222,7 +222,13 @@ useEffect(() => {
                 fechahora: fechaRecogidaPedido.format('HH:mm'),
                 doble: false,
                 vistoFreidora: productoItem.vistoFreidora, // Carry over the status
+                position: productoItem.position,
+
+                
               };
+
+
+          
   
               let claveUnicaPedido = `${productoBase.id}-${productoBase.fechahora}`;
               let esDobleOriginal = false;
@@ -313,9 +319,12 @@ useEffect(() => {
           entregado: pedido.entregado,
           cantidad_celiaco: pedido.cantidad_celiaco || 0,
           doble: pedido.doble,
+          position: pedido.position, // Asegurarse de propagar la posición
         };
       }
     });
+
+
 
     setPedidos(arrayPedidosProcesados);
     setPedidosTotales(productosTotalesAcumulados);
@@ -349,43 +358,71 @@ const tarjetaProductoClases =
       <div className={contenedorProductosClases}>
         {uniqueProductosFreidoraMostrados.map((productoInfo) => (
           <div key={productoInfo.id} className={tarjetaProductoClases}>
-            <div className="flex justify-center p-2">
+            <div className="flex justify-center p-2 -mt-4">
               <img
                 src={productoInfo.imagenSrc}
                 alt={productoInfo.nombreDisplay}
-                className="w-16 h-16 p-1 bg-white border-2 border-gray-700 rounded-full object-contain"
+                className="w-20 h-20  bg-white border-2 border-gray-700 rounded-full object-contain"
               />
             </div>
             {/* Opcional: Título dentro de la tarjeta si lo deseas */}
             {/* <p className="text-center font-semibold text-gray-700 text-sm px-2 truncate">{productoInfo.nombreDisplay}</p> */}
-            <div className="text-center p-2 overflow-y-auto flex-grow">
-              {pedidos
-                .filter((pedido) => pedido.fechahora === bloqueHorario && pedido.nombre.toLowerCase().includes(productoInfo.filtroKey))
-                .map((pedido, index) => {
-                  // Usar cantidad original del pedido para el borde, pero mostrar cantidad original y entregado
-                  const borderColor = pedido.cantidad > 0 ? 'border-red-500' : 'border-yellow-500';
-                  const itemKey = `${pedido.numeropedido || 'N/A'}-${pedido.id}-${productoInfo.id}-${index}`;
-                  return (
-                    <div
-                      key={itemKey}
-                      className={`mb-2 p-2 bg-white rounded-md shadow-md border-2 ${borderColor}`}
-                    >
-                      <div className="flex items-center justify-center">
-                        <h2 className="mr-2 text-md flex items-center">
-                          {`${pedido.cantidad_original_pedido}`} {/* Mostrar cantidad original del pedido */}
-                          <span className="font-bold px-1">[ {pedido.entregado} ]</span> x {pedido.alias}
-                          {pedido.cantidad_celiaco > 0 && (
-                            <span className="flex items-center ms-2">
-                              [ {pedido.cantidad_celiaco} x
-                              <img src={singluten} alt="Sin gluten" className="w-4 h-4 ms-1 me-1" /> ]
-                            </span>
-                          )}
-                        </h2>
-                      </div>
-                    </div>
-                  );
-                })}
-            </div>
+           <div className="text-center p-2 overflow-y-auto flex-grow">
+  {pedidos
+    .filter(
+      (pedido) =>
+        pedido.fechahora === bloqueHorario &&
+        pedido.nombre.toLowerCase().includes(productoInfo.filtroKey)
+    )
+    .sort((a, b) => {
+      const isDobleA = a.alias?.toLowerCase().includes('dobles');
+      const isDobleB = b.alias?.toLowerCase().includes('dobles');
+
+      const baseAliasA = a.alias?.toLowerCase().replace('dobles', '').trim();
+      const baseAliasB = b.alias?.toLowerCase().replace('dobles', '').trim();
+
+            const esPatataOPimiento = (alias) =>
+              alias.includes('patata') || alias.includes('pimiento');
+
+            // Si son del mismo grupo base y son patatas o pimientos
+            if (baseAliasA === baseAliasB && esPatataOPimiento(baseAliasA)) {
+              if (isDobleA && !isDobleB) return -1;
+              if (!isDobleA && isDobleB) return 1;
+            }
+
+            // Orden normal por posición si existe
+            return (Number(a.position) || 0) - (Number(b.position) || 0);
+          })
+          .map((pedido, index) => {
+            const borderColor = pedido.cantidad > 0 ? 'border-red-500' : 'border-green-500';
+              const itemKey = `${pedido.numeropedido || 'N/A'}-${pedido.id}-${productoInfo.id}-${index}`;
+
+              return (
+                <div
+                  key={itemKey}
+                  className={`mb-2 p-2 bg-white rounded-md shadow-md border-2 ${borderColor}`}
+                >
+                  <div className="flex items-center justify-center">
+                    <h2 className="mr-2 text-md flex items-center">
+                      {`${pedido.cantidad_original_pedido}`}
+                      <span className="font-bold px-1">[ {pedido.entregado} ]</span> x {pedido.alias}
+                      {pedido.cantidad_celiaco > 0 && (
+                        <span className="flex items-center ms-2">
+                          [ {pedido.cantidad_celiaco} x
+                          <img
+                            src={singluten}
+                            alt="Sin gluten"
+                            className="w-6 h-6 ms-1 me-1"
+                          /> ]
+                        </span>
+                      )}
+                    </h2>
+                  </div>
+                </div>
+              );
+            })}
+        </div>
+
           </div>
         ))}
       </div>
@@ -397,15 +434,34 @@ const tarjetaProductoClases =
           <h1 className="bg-gray-700 p-2 text-white text-lg text-center rounded-t-md">Totales</h1>
           <div className="text-center p-2 overflow-y-auto h-[calc(42vh-theme(spacing.10))]"> {/* Ajuste para scroll interno */}
             {Object.values(pedidosTotales)
-              .sort((a,b) => (a.alias || "").localeCompare(b.alias || "")) // Ordenar para consistencia
+                  .sort((a, b) => {
+                  const isDobleA = a.alias?.toLowerCase().includes('dobles');
+                  const isDobleB = b.alias?.toLowerCase().includes('dobles');
+
+                  const baseAliasA = a.alias?.toLowerCase().replace('dobles', '').trim();
+                  const baseAliasB = b.alias?.toLowerCase().replace('dobles', '').trim();
+
+                  const esPatataOPimiento = (alias) =>
+                    alias.includes('patata') || alias.includes('pimiento');
+
+                  // Si ambos productos están relacionados y son Patatas/Pimientos
+                  if (baseAliasA === baseAliasB && esPatataOPimiento(baseAliasA)) {
+                    if (isDobleA && !isDobleB) return -1;
+                    if (!isDobleA && isDobleB) return 1;
+                  }
+
+                  // Orden normal por posición
+                  return (Number(a.position) || 0) - (Number(b.position) || 0);
+                })
               .map((pedido, index) => {
-              const borderColor = pedido.cantidad > 0 ? 'border-red-500' : 'border-yellow-500';
+              const borderColor = pedido.cantidad > 0 ? 'border-red-500' : 'border-green-500';
               const itemKey = `total-${pedido.id}-${pedido.alias || index}-${pedido.doble ? 'd' : 's'}`;
               return (
                 <div
                   key={itemKey}
                   className={`mb-2 p-2 bg-white rounded-md shadow-md border-2 ${borderColor}`}
                 >
+
                   <div className="flex items-center justify-center">
                     <h2 className="mr-2 text-md flex items-center">
                       {`${pedido.cantidad + pedido.entregado}`}
@@ -413,7 +469,7 @@ const tarjetaProductoClases =
                       {pedido.cantidad_celiaco > 0 && (
                         <span className="flex items-center ms-2 gap-[0.1vw]">
                           [ {pedido.cantidad_celiaco} x
-                          <img src={singluten} alt="Sin gluten" className="w-4 h-4 ms-1 me-1" />]
+                          <img src={singluten} alt="Sin gluten" className="w-6 h-6 ms-1 me-1" />]
                         </span>
                       )}
                     </h2>
@@ -430,9 +486,27 @@ const tarjetaProductoClases =
           <div className="text-center p-2 overflow-y-auto h-[calc(42vh-theme(spacing.10))]">
             {pedidos
               .filter((pedido) => pedido.fechahora === anteriores)
-              .sort((a,b) => (a.alias || "").localeCompare(b.alias || ""))
+                .sort((a, b) => {
+                  const isDobleA = a.alias?.toLowerCase().includes('dobles');
+                  const isDobleB = b.alias?.toLowerCase().includes('dobles');
+
+                  const baseAliasA = a.alias?.toLowerCase().replace('dobles', '').trim();
+                  const baseAliasB = b.alias?.toLowerCase().replace('dobles', '').trim();
+
+                  const esPatataOPimiento = (alias) =>
+                    alias.includes('patata') || alias.includes('pimiento');
+
+                  // Si ambos productos están relacionados y son Patatas/Pimientos
+                  if (baseAliasA === baseAliasB && esPatataOPimiento(baseAliasA)) {
+                    if (isDobleA && !isDobleB) return -1;
+                    if (!isDobleA && isDobleB) return 1;
+                  }
+
+                  // Orden normal por posición
+                  return (Number(a.position) || 0) - (Number(b.position) || 0);
+                })
               .map((pedido, index) => {
-                const borderColor = pedido.cantidad > 0 ? 'border-red-500' : 'border-yellow-500';
+                const borderColor = pedido.cantidad > 0 ? 'border-red-500' : 'border-green-500';
                 const itemKey = `anterior-${pedido.numeropedido || 'N/A'}-${pedido.id}-${index}`;
                 return (
                   <div key={itemKey} className={`mb-2 p-2 bg-white rounded-md shadow-md border-2 ${borderColor}`}>
@@ -443,7 +517,7 @@ const tarjetaProductoClases =
                         {pedido.cantidad_celiaco > 0 && (
                           <span className="flex items-center ms-2">
                             [ {pedido.cantidad_celiaco} x
-                            <img src={singluten} alt="Sin gluten" className="w-4 h-4 ms-1 me-1" /> ]
+                            <img src={singluten} alt="Sin gluten" className="w-6 h-6 ms-1 me-1" /> ]
                           </span>
                         )}
                       </h2>
@@ -460,9 +534,27 @@ const tarjetaProductoClases =
           <div className="text-center p-2 overflow-y-auto h-[calc(42vh-theme(spacing.10))]">
             {pedidos
               .filter((pedido) => pedido.fechahora === posteriores)
-              .sort((a,b) => (a.alias || "").localeCompare(b.alias || ""))
+               .sort((a, b) => {
+                  const isDobleA = a.alias?.toLowerCase().includes('dobles');
+                  const isDobleB = b.alias?.toLowerCase().includes('dobles');
+
+                  const baseAliasA = a.alias?.toLowerCase().replace('dobles', '').trim();
+                  const baseAliasB = b.alias?.toLowerCase().replace('dobles', '').trim();
+
+                  const esPatataOPimiento = (alias) =>
+                    alias.includes('patata') || alias.includes('pimiento');
+
+                  // Si ambos productos están relacionados y son Patatas/Pimientos
+                  if (baseAliasA === baseAliasB && esPatataOPimiento(baseAliasA)) {
+                    if (isDobleA && !isDobleB) return -1;
+                    if (!isDobleA && isDobleB) return 1;
+                  }
+
+                  // Orden normal por posición
+                  return (Number(a.position) || 0) - (Number(b.position) || 0);
+                })
               .map((pedido, index) => {
-                const borderColor = pedido.cantidad > 0 ? 'border-red-500' : 'border-yellow-500';
+                const borderColor = pedido.cantidad > 0 ? 'border-red-500' : 'border-green-500';
                 const itemKey = `posterior-${pedido.numeropedido || 'N/A'}-${pedido.id}-${index}`;
                 return (
                   <div key={itemKey} className={`mb-2 p-2 bg-white rounded-md shadow-md border-2 ${borderColor}`}>
@@ -473,7 +565,7 @@ const tarjetaProductoClases =
                         {pedido.cantidad_celiaco > 0 && (
                           <span className="flex items-center ms-2">
                             [ {pedido.cantidad_celiaco} x
-                            <img src={singluten} alt="Sin gluten" className="w-4 h-4 ms-1 me-1" /> ]
+                            <img src={singluten} alt="Sin gluten" className="w-6 h-6 ms-1 me-1" /> ]
                           </span>
                         )}
                       </h2>
