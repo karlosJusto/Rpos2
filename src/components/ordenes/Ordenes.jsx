@@ -1,3 +1,4 @@
+// Ordenes.jsx
 import dinero from '../../assets/dinero.png';
 import singluten from '../../assets/singluten.png';
 import fire_new from '../../assets/fire_new.png';
@@ -6,7 +7,7 @@ import tijera_new from '../../assets/tijera_new.png';
 import GenerarQRCodeInvisible from './GenerarQRCodeInvisible';
 import isEqual from 'lodash/isEqual'; // Import isEqual
 
-import { useState, useContext, useEffect, useRef } from 'react';
+import { useState, useContext, useEffect, useRef, useMemo } from 'react';
 import { dataContext } from '../Context/DataContext';
 import { doc, updateDoc, getDoc, runTransaction, deleteDoc, increment } from 'firebase/firestore';
 import { db } from '../firebase/firebase';
@@ -105,6 +106,10 @@ const Ordenes = () => {
   const [showOptionsModal, setShowOptionsModal] = useState(false);
   const handleCloseOptionsModal = () => setShowOptionsModal(false);
   const [pedidoSeleccionado, setPedidoSeleccionado] = useState(null);
+  
+  // Estados para el modal de confirmación de borrado
+  const [showConfirmDeleteModal, setShowConfirmDeleteModal] = useState(false);
+  const [pedidoParaBorrar, setPedidoParaBorrar] = useState(null);
 
   const handleShowOptionsModal = (pedido) => {
     setPedidoSeleccionado(pedido);
@@ -127,22 +132,36 @@ const Ordenes = () => {
     navigate('/layout/comida');
   };
 
-  const borrarOrden = async (numeroPedido) => {
-    if (!pedidoSeleccionado || pedidoSeleccionado.NumeroPedido !== numeroPedido) {
-        console.error("[Ordenes][borrarOrden] Error: No hay pedido seleccionado o no coincide.");
-        handleCloseOptionsModal();
+  // Nueva función para mostrar el modal de confirmación de borrado
+  const handleShowConfirmDeleteModal = (pedido) => {
+    setPedidoParaBorrar(pedido); // Guardar el pedido que se va a borrar
+    setShowConfirmDeleteModal(true); // Mostrar el modal de confirmación
+    handleCloseOptionsModal(); // Cerrar el modal de opciones original
+  };
+
+  // Nueva función para cerrar el modal de confirmación de borrado
+  const handleCloseConfirmDeleteModal = () => {
+    setShowConfirmDeleteModal(false);
+    setPedidoParaBorrar(null); // Limpiar el pedido guardado
+  };
+
+  // La lógica de borrado ahora está en esta función, que se llama desde el modal de confirmación
+  const ejecutarBorradoConfirmado = async () => {
+    if (!pedidoParaBorrar || !pedidoParaBorrar.NumeroPedido) {
+        console.error("[Ordenes][ejecutarBorradoConfirmado] Error: No hay pedido para borrar o falta NumeroPedido.");
+        handleCloseConfirmDeleteModal();
         return;
     }
 
-    const numeroPedidoStr = numeroPedido.toString();
-    const logPrefix = `[Ordenes][borrarOrden][${numeroPedidoStr}]`;
+    const numeroPedidoStr = pedidoParaBorrar.NumeroPedido.toString();
+    const logPrefix = `[Ordenes][ejecutarBorradoConfirmado][${numeroPedidoStr}]`;
     const pedidoRef = doc(db, "pedidos", numeroPedidoStr);
 
     try {
         const pedidoSnap = await getDoc(pedidoRef);
         if (!pedidoSnap.exists()) {
             console.error(`${logPrefix} Pedido no encontrado en Firestore.`);
-            handleCloseOptionsModal();
+            handleCloseConfirmDeleteModal();
             return;
         }
         const pedidoData = pedidoSnap.data();
@@ -252,10 +271,10 @@ const Ordenes = () => {
         }
 
         await deleteDoc(pedidoRef);
-        handleCloseOptionsModal();
+        handleCloseConfirmDeleteModal(); // Cerrar el modal de confirmación
     } catch (error) {
         console.error(`${logPrefix} Error general al borrar pedido:`, error);
-        handleCloseOptionsModal();
+        handleCloseConfirmDeleteModal(); // Cerrar el modal de confirmación
     }
   };
 
@@ -484,7 +503,13 @@ const Ordenes = () => {
     return bloques;
   };
 
-  const bloquesPedidos = agruparPorBloques15Minutos(displayPedidos || []);
+  //const bloquesPedidos = agruparPorBloques15Minutos(displayPedidos || []);
+
+    // Memoizar bloquesPedidos
+  const bloquesPedidos = useMemo(() => {
+    // console.log("Recalculando bloquesPedidos..."); // Para depuración, puedes quitarlo después
+    return agruparPorBloques15Minutos(displayPedidos || []);
+  }, [displayPedidos]);
   
   const [searchTerm, setSearchTerm] = useState('');
   const handleSearchChange = (e) => setSearchTerm(e.target.value);
@@ -518,7 +543,7 @@ const Ordenes = () => {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [bloquesPedidos]); // Removido totalesProximos45Min para evitar bucles si la estructura interna de bloquesPedidos no cambia pero la referencia sí
 
-  let bloquesFiltrados = bloquesPedidos;
+  /*let bloquesFiltrados = bloquesPedidos;
   if (!dateToPass) { 
     const currentTime = dayjs().locale('es').tz('Europe/Madrid');
     const isBefore6PM = currentTime.hour() < 18;
@@ -529,7 +554,26 @@ const Ordenes = () => {
         return isBefore6PM ? horaBloqueDate.hour() < 18 : horaBloqueDate.hour() >= 18;
       })
     );
-  }
+  }*/
+
+    // Memoizar bloquesFiltrados
+  const bloquesFiltrados = useMemo(() => {
+    // console.log("Recalculando bloquesFiltrados..."); // Para depuración
+    if (!dateToPass) {
+      const currentTime = dayjs().locale('es').tz('Europe/Madrid');
+      const isBefore6PM = currentTime.hour() < 18;
+      return Object.fromEntries(
+        Object.entries(bloquesPedidos).filter(([hora]) => {
+          const horaBloqueDate = dayjs(hora, 'HH:mm', 'es', true).tz('Europe/Madrid', true);
+          if (!horaBloqueDate.isValid()) return false;
+          return isBefore6PM ? horaBloqueDate.hour() < 18 : horaBloqueDate.hour() >= 18;
+        })
+      );
+    }
+    return bloquesPedidos;
+  }, [bloquesPedidos, dateToPass]);
+
+  
   
   return (
     <>
@@ -708,6 +752,14 @@ const Ordenes = () => {
                       </p>
                     </div>
                   )}
+                  {pedido.pagado && !pedido.observaciones && (
+                    <div className={`ml-1 sm:ml-2 p-1 sm:p-2 border-1 border-gray-700 ${todosCompletados ? 'bg-[#52be80]' : 'bg-gray-300'} rounded-md w-auto font-nunito flex justify-center items-center text-xs sm:text-sm`}>
+                      <p className="flex items-center gap-1 sm:gap-3">
+                        <img src={dinero} alt="pagado" className="w-4 sm:w-5" />
+                      </p>
+                    </div>
+                  )}
+
                   </div>
                 </div>
               );
@@ -720,14 +772,16 @@ const Ordenes = () => {
       <Modal show={showOptionsModal} onHide={handleCloseOptionsModal} size="md" backdrop="static" keyboard={false} centered>
         <Modal.Body className="flex flex-col items-center ">
          {pedidoSeleccionado && pedidoSeleccionado.origen === 1 && (
-           <div className="p-3 text-center">
+           <div className="p-3 text-center -mt-2">
+            
              <h1 className='text-red-600 font-extrabold font-nunito text-lg'>-PEDIDO APP NO EDITABLE-</h1>
              <p className='text-gray-400 font-nunito text-xs mt-1 -mb-2'>Puedes crear un nuevo pedido con los datos del cliente desde aquí.</p>
            </div>
          )}
           <div className="flex space-x-4 sm:space-x-6">
-            <div className="p-2 sm:p-3 cursor-pointer hover:bg-yellow-500 rounded-md text-center" onClick={() => borrarOrden(pedidoSeleccionado?.NumeroPedido)}>
-              <svg width="4vw" height="4vw" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><g id="SVGRepo_bgCarrier" strokeWidth="0"/><g id="SVGRepo_tracerCarrier" strokeLinecap="round" strokeLinejoin="round"/><g id="SVGRepo_iconCarrier"> <path d="M20.5001 6H3.5" stroke="#f10707 " strokeWidth="1.5" strokeLinecap="round"/> <path d="M6.5 6C6.55588 6 6.58382 6 6.60915 5.99936C7.43259 5.97849 8.15902 5.45491 8.43922 4.68032C8.44784 4.65649 8.45667 4.62999 8.47434 4.57697L8.57143 4.28571C8.65431 4.03708 8.69575 3.91276 8.75071 3.8072C8.97001 3.38607 9.37574 3.09364 9.84461 3.01877C9.96213 3 10.0932 3 10.3553 3H13.6447C13.9068 3 14.0379 3 14.1554 3.01877C14.6243 3.09364 15.03 3.38607 15.2493 3.8072C15.3043 3.91276 15.3457 4.03708 15.4286 4.28571L15.5257 4.57697C15.5433 4.62992 15.5522 4.65651 15.5608 4.68032C15.841 5.45491 16.5674 5.97849 17.3909 5.99936C17.4162 6 17.4441 6 17.5 6" stroke="#f10707 " strokeWidth="1.5"/> <path d="M18.3735 15.3991C18.1965 18.054 18.108 19.3815 17.243 20.1907C16.378 21 15.0476 21 12.3868 21H11.6134C8.9526 21 7.6222 21 6.75719 20.1907C5.89218 19.3815 5.80368 18.054 5.62669 15.3991L5.16675 8.5M18.8334 8.5L18.6334 11.5" stroke="#f10707 " strokeWidth="1.5" strokeLinecap="round"/> </g></svg>
+            {/* Modificar el onClick para llamar a handleShowConfirmDeleteModal */}
+            <div className="p-2 sm:p-3 cursor-pointer hover:bg-yellow-500 rounded-md text-center" onClick={() => handleShowConfirmDeleteModal(pedidoSeleccionado)}>
+              <svg width="3vw" height="3vw" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><g id="SVGRepo_bgCarrier" strokeWidth="0"/><g id="SVGRepo_tracerCarrier" strokeLinecap="round" strokeLinejoin="round"/><g id="SVGRepo_iconCarrier"> <path d="M20.5001 6H3.5" stroke="#f10707" strokeWidth="1.5" strokeLinecap="round"/> <path d="M6.5 6C6.55588 6 6.58382 6 6.60915 5.99936C7.43259 5.97849 8.15902 5.45491 8.43922 4.68032C8.44784 4.65649 8.45667 4.62999 8.47434 4.57697L8.57143 4.28571C8.65431 4.03708 8.69575 3.91276 8.75071 3.8072C8.97001 3.38607 9.37574 3.09364 9.84461 3.01877C9.96213 3 10.0932 3 10.3553 3H13.6447C13.9068 3 14.0379 3 14.1554 3.01877C14.6243 3.09364 15.03 3.38607 15.2493 3.8072C15.3043 3.91276 15.3457 4.03708 15.4286 4.28571L15.5257 4.57697C15.5433 4.62992 15.5522 4.65651 15.5608 4.68032C15.841 5.45491 16.5674 5.97849 17.3909 5.99936C17.4162 6 17.4441 6 17.5 6" stroke="#f10707" strokeWidth="1.5"/> <path d="M18.3735 15.3991C18.1965 18.054 18.108 19.3815 17.243 20.1907C16.378 21 15.0476 21 12.3868 21H11.6134C8.9526 21 7.6222 21 6.75719 20.1907C5.89218 19.3815 5.80368 18.054 5.62669 15.3991L5.16675 8.5M18.8334 8.5L18.6334 11.5" stroke="#f10707" strokeWidth="1.5" strokeLinecap="round"/> </g></svg>
               <p className='text-center p-1 font-nunito text-[#f10707]'>Borrar</p>
             </div>
               {pedidoSeleccionado && (
@@ -735,7 +789,7 @@ const Ordenes = () => {
     className="p-2 sm:p-3 cursor-pointer hover:bg-yellow-500 rounded-md text-center"
     onClick={() => {
       if (pedidoSeleccionado.origen === 1) {
-        handleCreateOrder(pedidoSeleccionado); // 
+        handleCreateOrder(pedidoSeleccionado); 
         handleCloseOptionsModal();
       } else {
         handleEditOrder(pedidoSeleccionado);
@@ -746,7 +800,7 @@ const Ordenes = () => {
     {pedidoSeleccionado.origen === 1 ? (
       <>
         {/* Ícono Crear */}
-        <svg  width="4vw" height="4vw" fill="none" viewBox="0 0 24 24" stroke="#808b96" strokeWidth="2">
+        <svg  width="3vw" height="3vw" fill="none" viewBox="0 0 24 24" stroke="#808b96" strokeWidth="2">
           <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
         </svg>
         <p className="text-center p-1 font-nunito text-[#808b96]">Crear</p>
@@ -754,7 +808,7 @@ const Ordenes = () => {
     ) : (
       <>
         {/* Ícono Editar */}
-        <svg width="4vw" height="4vw" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <svg width="3vw" height="3vw" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
           <path d="M10 21.9948C6.58687 21.9658 4.70529 21.7764 3.46447 20.5355C2 19.0711 2 16.714 2 12C2 7.28595 2 4.92893 3.46447 3.46447C4.92893 2 7.28595 2 12 2C16.714 2 19.0711 2 20.5355 3.46447C21.5093 4.43821 21.8356 5.80655 21.9449 8" stroke="#808b96" strokeWidth="1.5" strokeLinecap="round"/>
           <path d="M2.5 7.25C2.08579 7.25 1.75 7.58579 1.75 8C1.75 8.41421 2.08579 8.75 2.5 8.75V7.25ZM22 7.25H2.5V8.75H22V7.25Z" fill="#808b96"/>
           <path d="M10.5 2.5L7 8" stroke="#808b96" strokeWidth="1.5" strokeLinecap="round"/>
@@ -767,13 +821,44 @@ const Ordenes = () => {
   </div>
 )}
             <div className="p-2 sm:p-3 cursor-pointer hover:bg-yellow-500 rounded-md text-center">
-              <svg fill="#2ad12f " height="4vw" width="4vw" version="1.1" id="Capa_1" xmlns="http://www.w3.org/2000/svg" xmlnsXlink="http://www.w3.org/1999/xlink" viewBox="0 0 220.262 220.262" xmlSpace="preserve"><g id="SVGRepo_bgCarrier" strokeWidth="0"/><g id="SVGRepo_tracerCarrier" strokeLinecap="round" strokeLinejoin="round"/><g id="SVGRepo_iconCarrier"> <g> <path d="M110.127,0C50.606,0,2.184,48.424,2.184,107.944c0,23.295,9.455,44.211,13.521,52.123 c1.893,3.685,6.416,5.135,10.099,3.243c3.684-1.893,5.136-6.415,3.243-10.099c-3.566-6.941-11.862-25.247-11.862-45.268 C17.184,56.695,58.878,15,110.127,15c51.254,0,92.951,41.695,92.951,92.944c0,51.251-41.697,92.946-92.951,92.946 c-20.044,0-35.971-6.94-41.889-9.925c-1.755-0.886-3.788-1.046-5.66-0.447l-47.242,15.097c-3.945,1.261-6.122,5.481-4.861,9.427 c1.018,3.187,3.968,5.219,7.142,5.219c0.757,0,1.526-0.115,2.285-0.358l44.391-14.186c9.287,4.311,25.633,10.173,45.834,10.173 c59.524,0,107.951-48.424,107.951-107.946C218.078,48.424,169.651,0,110.127,0z"/> <path d="M88.846,89.537c-3.285,2.523-3.902,7.231-1.38,10.517c2.523,3.285,7.23,3.903,10.517,1.38 c2.299-1.766,8.406-6.456,7.512-14.845c-0.551-4.987-5.417-11.83-9.402-16.691c-5.831-7.114-10.767-11.327-14.643-12.513 c-3.632-1.126-7.354-0.948-11.066,0.53c-7.636,3.052-13.025,8.108-15.585,14.622c-2.493,6.344-2.04,13.443,1.313,20.537 c7.827,16.522,18.288,30.791,31.093,42.413c0.05,0.047,0.101,0.093,0.152,0.139c12.987,11.48,28.352,20.325,45.675,26.293 c3.287,1.129,6.513,1.692,9.611,1.692c3.892,0,7.583-0.888,10.94-2.658c6.191-3.264,10.621-9.177,12.814-17.115 c1.056-3.848,0.82-7.564-0.689-11.024c-1.619-3.745-6.35-8.184-14.064-13.193c-5.269-3.422-12.601-7.5-17.64-7.5 c-0.003,0-0.007,0-0.011,0c-8.406,0.034-12.397,6.621-13.899,9.102c-2.146,3.543-1.014,8.155,2.529,10.301 c3.541,2.146,8.154,1.015,10.301-2.529c0.593-0.98,0.969-1.5,1.205-1.772c4.236,1.23,15.567,8.642,17.889,11.761 c0.038,0.166,0.043,0.417-0.082,0.874c-0.739,2.675-2.268,6.204-5.349,7.828c-2.879,1.516-6.312,0.863-8.677,0.051 c-15.413-5.31-29.053-13.142-40.543-23.279c-0.003-0.003-0.007-0.006-0.01-0.01c-11.377-10.308-20.693-23.023-27.688-37.788 c-1.071-2.268-2.1-5.607-0.91-8.634c1.274-3.242,4.613-5.15,7.183-6.177c0.441-0.176,0.69-0.203,0.871-0.179 c3.358,1.965,11.969,12.402,13.66,16.477C90.229,88.41,89.753,88.84,88.846,89.537z"/> </g> </g></svg>
+              <svg fill="#2ad12f " height="3vw" width="3vw" version="1.1" id="Capa_1" xmlns="http://www.w3.org/2000/svg" xmlnsXlink="http://www.w3.org/1999/xlink" viewBox="0 0 220.262 220.262" xmlSpace="preserve"><g id="SVGRepo_bgCarrier" strokeWidth="0"/><g id="SVGRepo_tracerCarrier" strokeLinecap="round" strokeLinejoin="round"/><g id="SVGRepo_iconCarrier"> <g> <path d="M110.127,0C50.606,0,2.184,48.424,2.184,107.944c0,23.295,9.455,44.211,13.521,52.123 c1.893,3.685,6.416,5.135,10.099,3.243c3.684-1.893,5.136-6.415,3.243-10.099c-3.566-6.941-11.862-25.247-11.862-45.268 C17.184,56.695,58.878,15,110.127,15c51.254,0,92.951,41.695,92.951,92.944c0,51.251-41.697,92.946-92.951,92.946 c-20.044,0-35.971-6.94-41.889-9.925c-1.755-0.886-3.788-1.046-5.66-0.447l-47.242,15.097c-3.945,1.261-6.122,5.481-4.861,9.427 c1.018,3.187,3.968,5.219,7.142,5.219c0.757,0,1.526-0.115,2.285-0.358l44.391-14.186c9.287,4.311,25.633,10.173,45.834,10.173 c59.524,0,107.951-48.424,107.951-107.946C218.078,48.424,169.651,0,110.127,0z"/> <path d="M88.846,89.537c-3.285,2.523-3.902,7.231-1.38,10.517c2.523,3.285,7.23,3.903,10.517,1.38 c2.299-1.766,8.406-6.456,7.512-14.845c-0.551-4.987-5.417-11.83-9.402-16.691c-5.831-7.114-10.767-11.327-14.643-12.513 c-3.632-1.126-7.354-0.948-11.066,0.53c-7.636,3.052-13.025,8.108-15.585,14.622c-2.493,6.344-2.04,13.443,1.313,20.537 c7.827,16.522,18.288,30.791,31.093,42.413c0.05,0.047,0.101,0.093,0.152,0.139c12.987,11.48,28.352,20.325,45.675,26.293 c3.287,1.129,6.513,1.692,9.611,1.692c3.892,0,7.583-0.888,10.94-2.658c6.191-3.264,10.621-9.177,12.814-17.115 c1.056-3.848,0.82-7.564-0.689-11.024c-1.619-3.745-6.35-8.184-14.064-13.193c-5.269-3.422-12.601-7.5-17.64-7.5 c-0.003,0-0.007,0-0.011,0c-8.406,0.034-12.397,6.621-13.899,9.102c-2.146,3.543-1.014,8.155,2.529,10.301 c3.541,2.146,8.154,1.015,10.301-2.529c0.593-0.98,0.969-1.5,1.205-1.772c4.236,1.23,15.567,8.642,17.889,11.761 c0.038,0.166,0.043,0.417-0.082,0.874c-0.739,2.675-2.268,6.204-5.349,7.828c-2.879,1.516-6.312,0.863-8.677,0.051 c-15.413-5.31-29.053-13.142-40.543-23.279c-0.003-0.003-0.007-0.006-0.01-0.01c-11.377-10.308-20.693-23.023-27.688-37.788 c-1.071-2.268-2.1-5.607-0.91-8.634c1.274-3.242,4.613-5.15,7.183-6.177c0.441-0.176,0.69-0.203,0.871-0.179 c3.358,1.965,11.969,12.402,13.66,16.477C90.229,88.41,89.753,88.84,88.846,89.537z"/> </g> </g></svg>
               <p className='text-center p-1 -ms-2 font-nunito text-[#2ad12f]'>Mensaje</p>
             </div>
           </div>
         </Modal.Body>
         <Modal.Footer className='border-t-0'>
           <Button variant="primary" className="shadow-md bg-white border-red-500 text-red-500 hover:bg-red-700 hover:border-red-700 hover:text-red-700 p-2 font-nunito" onClick={handleCloseOptionsModal}>Cerrar</Button>
+        </Modal.Footer>
+      </Modal>
+
+      {/* Modal de Confirmación de Borrado */}
+      <Modal show={showConfirmDeleteModal} onHide={handleCloseConfirmDeleteModal} size="md" backdrop="static" keyboard={false} centered>
+        
+        <Modal.Body className='bg-gray-100 font-nunito rounded-md'>
+
+          <div className=' text-gray-700 font-nunito text-xl text-center p-2'>
+          <h1>Confirmar Eliminación</h1>
+
+          </div>
+
+          <div className=' d-flex justify-content-center align-items-center -mt-2 mb-2'>
+            <svg fill="#c81d0c" width="75px" height="75px" viewBox="-5.5 0 32 32" version="1.1" xmlns="http://www.w3.org/2000/svg">
+              <g id="SVGRepo_bgCarrier" strokeWidth="0"/><g id="SVGRepo_tracerCarrier" strokeLinecap="round" strokeLinejoin="round"/><g id="SVGRepo_iconCarrier"> <path d="M10.16 25.92c-2.6 0-8.72-0.24-9.88-2.24-1.28-2.28 2.040-8.24 3.080-10.040 1.040-1.76 4.64-7.56 7.12-7.56 2.8 0 7.24 7.48 8.56 10.12 1.92 3.84 2.48 6.4 1.56 7.6-1.52 2.040-8.96 2.12-10.44 2.12zM10.48 7.72c-0.72 0-3.080 2.36-5.64 6.76-2.76 4.68-3.48 7.72-3.080 8.4 0.32 0.56 3.2 1.4 8.4 1.4 5.44 0 8.64-0.88 9.080-1.48 0.28-0.36 0.040-2.28-1.72-5.84-2.64-5.28-6.12-9.24-7.040-9.24zM10.52 19.2c-0.48 0-0.84-0.36-0.84-0.84v-6.36c0-0.48 0.36-0.84 0.84-0.84s0.84 0.36 0.84 0.84v6.32c0 0.48-0.4 0.88-0.84 0.88zM11.36 21.36c0 0.464-0.376 0.84-0.84 0.84s-0.84-0.376-0.84-0.84c0-0.464 0.376-0.84 0.84-0.84s0.84 0.376 0.84 0.84z"/> </g>
+            </svg>
+          </div>
+          <p className="text-center text-gray-600 text-sm">
+            ¿Estás seguro de que deseas eliminar el pedido número <strong>{pedidoParaBorrar?.NumeroPedido}</strong>
+            {pedidoParaBorrar?.cliente && ` de ${pedidoParaBorrar.cliente}`}?
+          </p>
+          <p className="text-center font-extrabold text-sm text-gray-900 mt-2">Esta acción no se puede deshacer.</p>
+        </Modal.Body>
+        <Modal.Footer className='bg-gray-100 border-t-0'>
+          <Button variant="secondary" onClick={handleCloseConfirmDeleteModal} className="shadow-md bg-white border-gray-500 text-gray-700 hover:text-gray-900  hover:border-gray-700 p-2 font-nunito">
+            Cancelar
+          </Button>
+          <Button variant="secondary" onClick={ejecutarBorradoConfirmado} className="shadow-md bg-white text-red-500  hover:text-red-900 border-red-500 hover:border-red-900 p-2 font-nunito ">
+            Eliminar
+          </Button>
         </Modal.Footer>
       </Modal>
       

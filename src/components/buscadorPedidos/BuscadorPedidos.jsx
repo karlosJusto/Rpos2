@@ -42,6 +42,7 @@ const BuscadorPedidos = () => {
     try {
       const pedidosRef = collection(db, 'pedidos');
       let q;
+      let clientSideFilter = null; // Para filtros que se aplican después de obtener los datos
 
       // Crear la consulta según el criterio seleccionado
       switch (criterio) {
@@ -53,7 +54,14 @@ const BuscadorPedidos = () => {
 
         case 'nombre':
           if (nombre) {
-            q = query(pedidosRef, where('cliente', '==', nombre));
+            // ADVERTENCIA: Si no hay otros filtros, esto traerá todos los pedidos
+            // y luego filtrará en el cliente. No es eficiente para colecciones grandes.
+            // Lo ideal sería tener un campo 'cliente_lowercase' en Firestore.
+            q = query(pedidosRef); // Consulta base, podría traer muchos documentos.
+            clientSideFilter = (pedidoDocData) => {
+              const clienteEnDoc = pedidoDocData.cliente || "";
+              return clienteEnDoc.toLowerCase().includes(nombre); // 'nombre' ya está en minúsculas
+            };
           }
           break;
 
@@ -88,13 +96,19 @@ const BuscadorPedidos = () => {
       // Ejecución de la consulta
       const querySnapshot = await getDocs(q);
 
-      if (querySnapshot.empty) {
+      let pedidosList = querySnapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data(),
+      }));
+
+      // Aplicar filtro del lado del cliente si está definido
+      if (clientSideFilter) {
+        pedidosList = pedidosList.filter(clientSideFilter);
+      }
+
+      if (pedidosList.length === 0) {
         setPedidos([]);
       } else {
-        const pedidosList = querySnapshot.docs.map(doc => ({
-          id: doc.id,
-          ...doc.data(),
-        }));
         setPedidos(pedidosList);
       }
     } catch (err) {

@@ -1,13 +1,12 @@
 // src/components/dashboard/ListarClientes.jsx
 import React, { useState, useEffect } from 'react';
-// Add doc, updateDoc, deleteDoc
 import { collection, query, where, orderBy, limit, getDocs, startAfter, doc, updateDoc, deleteDoc } from "firebase/firestore";
 import { db } from '../firebase/firebase';
-import { Modal, Button, Form } from 'react-bootstrap'; // Add Form for the modal
+import { Modal, Button, Form } from 'react-bootstrap';
 
 import tienda from '../../assets/tienda.png';
 import web from '../../assets/web.png';
-// SVGs for edit/delete icons (can be inlined or imported)
+
 const EditIcon = () => (
   <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="#eab308" className="w-5 h-5">
     <path strokeLinecap="round" strokeLinejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10" />
@@ -32,76 +31,99 @@ const EditIcon = () => (
 );
 
 const ListarClientes = () => {
-  // Estados para clientes
   const [clientes, setClientes] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [search, setSearch] = useState("");
-  const [clientePage, setClientePage] = useState(1); // Renombrado para claridad
-  const [lastClienteDoc, setLastClienteDoc] = useState(null); // Renombrado
+  const [search, setSearch] = useState(""); // Siempre se guardará en minúsculas
+  const [clientePage, setClientePage] = useState(1); 
+  const [lastClienteDoc, setLastClienteDoc] = useState(null); 
 
-  // Estados para pedidos (dentro del modal)
   const [pedidos, setPedidos] = useState([]);
   const [loadingPedidos, setLoadingPedidos] = useState(false);
-  const [clienteSeleccionado, setClienteSeleccionado] = useState(null); // For viewing orders
+  const [clienteSeleccionado, setClienteSeleccionado] = useState(null); 
   const [showPedidosModal, setShowPedidosModal] = useState(false);
-  // *** 1. Estados para paginación de pedidos ***
   const [pedidoPage, setPedidoPage] = useState(1);
   const [lastPedidoDoc, setLastPedidoDoc] = useState(null);
-  const [hasMorePedidos, setHasMorePedidos] = useState(true); // Para saber si hay más páginas
+  const [hasMorePedidos, setHasMorePedidos] = useState(true); 
 
-  // *** Estados para Modificar y Eliminar Cliente ***
   const [showModificarClienteModal, setShowModificarClienteModal] = useState(false);
   const [showConfirmDeleteModal, setShowConfirmDeleteModal] = useState(false);
-  const [clienteParaAccion, setClienteParaAccion] = useState(null); // Cliente para modificar o eliminar
+  const [clienteParaAccion, setClienteParaAccion] = useState(null); 
   const [formDataCliente, setFormDataCliente] = useState({
     cliente: '',
     telefono: '',
     localidad: '',
     email: '',
-    // img_perfil: null, // Omitir por ahora para simplificar
   });
-  const [mensajeAccion, setMensajeAccion] = useState(""); // Para mensajes en modales de acción
+  const [mensajeAccion, setMensajeAccion] = useState(""); 
 
   const clientesPorPagina = 10;
-  const pedidosPorPagina = 5; // Define cuántos pedidos mostrar por página en el modal
+  const pedidosPorPagina = 5; 
 
-  // --- Funciones para obtener datos ---
-  const obtenerClientes = async (resetPaginacion = false) => {
-    // ... (obtenerClientes sin cambios)
+  const obtenerClientes = async () => {
     setLoading(true);
     try {
       const clientesRef = collection(db, 'clientes');
-      let q;
-      let baseQuery = query(clientesRef, orderBy('cliente'));
+      let querySnapshot;
+      let clientesList;
+
       if (search) {
-        baseQuery = query(baseQuery, where('cliente', '>=', search), where('cliente', '<=', search + '\uf8ff'));
-      }
-      // Usa clientePage y lastClienteDoc
-      if (!resetPaginacion && clientePage > 1 && lastClienteDoc) {
-        q = query(baseQuery, startAfter(lastClienteDoc), limit(clientesPorPagina));
+        // BÚSQUEDA ACTIVA: Traer todos los clientes y filtrar en el cliente
+        console.log("[obtenerClientes] Búsqueda activa:", search, "Trayendo todos los clientes para filtrar.");
+        const qAll = query(clientesRef, orderBy('cliente')); // Ordenar para consistencia
+        querySnapshot = await getDocs(qAll);
+        const todosLosClientes = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        
+        clientesList = todosLosClientes.filter(cliente => 
+          (cliente.cliente || "").toLowerCase().includes(search) // 'search' ya está en minúsculas
+        );
+        console.log("[obtenerClientes] Clientes filtrados:", clientesList.length);
+        setLastClienteDoc(null); // No hay paginación de Firestore para resultados de búsqueda
       } else {
-        q = query(baseQuery, limit(clientesPorPagina));
-      }
-      const querySnapshot = await getDocs(q);
-      const clientesList = querySnapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
-      if (querySnapshot.docs.length > 0) {
-        setLastClienteDoc(querySnapshot.docs[querySnapshot.docs.length - 1]);
-      } else {
-        setLastClienteDoc(null);
+        // SIN BÚSQUEDA: Paginación normal
+        console.log("[obtenerClientes] Sin búsqueda. Página:", clientePage);
+        let qPaginated;
+        const baseQuery = query(clientesRef, orderBy('cliente'));
+        if (clientePage === 1) {
+            qPaginated = query(baseQuery, limit(clientesPorPagina));
+        } else if (lastClienteDoc) {
+            qPaginated = query(baseQuery, startAfter(lastClienteDoc), limit(clientesPorPagina));
+        } else {
+            // Si clientePage > 1 pero no hay lastClienteDoc (ej. después de una búsqueda),
+            // forzar a la primera página para evitar errores.
+            console.warn("[obtenerClientes] Condición de paginación inesperada, volviendo a página 1.");
+            setClientePage(1); // Esto disparará otro render y useEffect, pero es más seguro.
+            // Para evitar una llamada extra, podríamos simplemente no hacer nada aquí y esperar el re-render.
+            // O, si es la primera carga después de limpiar búsqueda, hacer la consulta de la página 1.
+            // Por ahora, lo dejamos así, el setClientePage(1) lo corregirá.
+            setLoading(false); // Evitar que el loader se quede activo
+            return; 
+        }
+        querySnapshot = await getDocs(qPaginated);
+        clientesList = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        console.log("[obtenerClientes] Clientes paginados:", clientesList.length);
+
+        if (querySnapshot.docs.length > 0) {
+            setLastClienteDoc(querySnapshot.docs[querySnapshot.docs.length - 1]);
+        } else {
+            setLastClienteDoc(null);
+        }
       }
       setClientes(clientesList);
-    } catch (error) { console.error('Error al obtener clientes: ', error); }
-    finally { setLoading(false); }
+    } catch (error) {
+      console.error('Error al obtener clientes: ', error);
+      setClientes([]);
+      setLastClienteDoc(null);
+    } finally {
+      setLoading(false);
+    }
   };
 
-  // *** 2. Modificar obtenerPedidos para paginación ***
   const obtenerPedidos = async (idCliente, page = 1, lastVisible = null) => {
-    // ... (obtenerPedidos sin cambios)
     if (!idCliente) return;
+    console.log(`[obtenerPedidos] Solicitando pedidos para idCliente: ${idCliente}, página: ${page}`);
     setLoadingPedidos(true);
-    // No limpiar pedidos si estamos paginando, solo al inicio
     if (page === 1) {
-        setPedidos([]);
+        setPedidos([]); // Limpiar pedidos solo si es la primera página del modal
     }
 
     try {
@@ -116,59 +138,69 @@ const ListarClientes = () => {
       }
 
       const querySnapshot = await getDocs(q);
-      const pedidosList = querySnapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+      const nuevosPedidos = querySnapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+      console.log(`[obtenerPedidos] Pedidos encontrados para ${idCliente} (página ${page}):`, nuevosPedidos.length);
 
-      // Actualizar el último documento visible para la paginación
       if (querySnapshot.docs.length > 0) {
         setLastPedidoDoc(querySnapshot.docs[querySnapshot.docs.length - 1]);
-        setHasMorePedidos(querySnapshot.docs.length === pedidosPorPagina); // Hay más si se llenó la página
+        setHasMorePedidos(querySnapshot.docs.length === pedidosPorPagina);
       } else {
         setLastPedidoDoc(null);
-        setHasMorePedidos(false); // No hay más páginas
+        setHasMorePedidos(false);
       }
+      // Si es la página 1, reemplaza. Si no, concatena (o decide si siempre reemplazar)
+      setPedidos(prev => page === 1 ? nuevosPedidos : [...prev, ...nuevosPedidos]);
 
-      // Si es la página 1, reemplaza los pedidos. Si no, añade a los existentes (opcional, depende de cómo quieras la paginación)
-      // Por simplicidad, reemplazaremos siempre al cambiar de página
-      setPedidos(pedidosList);
 
     } catch (error) {
       console.error('Error al obtener pedidos: ', error);
-      setHasMorePedidos(false); // Asume que no hay más en caso de error
+      setHasMorePedidos(false);
     } finally {
       setLoadingPedidos(false);
     }
   };
 
-  // --- useEffects ---
-  useEffect(() => { obtenerClientes(true); }, [search]);
-  useEffect(() => { obtenerClientes(false); }, [clientePage]); // Depende de clientePage
+  // useEffect para cargar clientes
+  useEffect(() => {
+    console.log(`[useEffect principal] Disparado. Search: "${search}", Page: ${clientePage}`);
+    obtenerClientes();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [search, clientePage]); // Depender de search y clientePage
 
-  // useEffect para cargar pedidos (ahora depende de pedidoPage también)
+
   useEffect(() => {
     if (showPedidosModal && clienteSeleccionado?.id) {
-      // Llama a obtenerPedidos con la página actual y el último doc de pedidos
-      obtenerPedidos(clienteSeleccionado.id, pedidoPage, lastPedidoDoc);
+      // Cuando se abre el modal o cambia el cliente seleccionado, o cambia la página de pedidos
+      // se llama a obtenerPedidos.
+      // Si es la primera página del modal (pedidoPage === 1), lastPedidoDoc se ignora (o es null).
+      console.log("[useEffect showPedidosModal] Abriendo modal/cambiando página de pedidos para cliente:", clienteSeleccionado.id, "Página:", pedidoPage);
+      obtenerPedidos(clienteSeleccionado.id, pedidoPage, pedidoPage > 1 ? lastPedidoDoc : null);
     }
-  }, [showPedidosModal, clienteSeleccionado, pedidoPage]); // Añadido pedidoPage
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [showPedidosModal, clienteSeleccionado, pedidoPage]); // Quitar lastPedidoDoc de aquí para evitar bucles si se actualiza en obtenerPedidos
 
-  // --- Handlers ---
   const handleSearchChange = (e) => {
-    setSearch(e.target.value);
-    setClientePage(1); // Resetea página de clientes
-    setLastClienteDoc(null);
+    const searchTerm = e.target.value.toLowerCase();
+    console.log("[handleSearchChange] Nuevo término de búsqueda (minúsculas):", searchTerm);
+    setSearch(searchTerm);
+    setClientePage(1); // Resetear la página a 1 cuando cambia el término de búsqueda
+    setLastClienteDoc(null); // También resetear el cursor
   };
 
   const handleClientePageChange = (newPage) => {
     if (newPage < 1) return;
-    setClientePage(newPage);
+    // Solo permitir cambiar de página si no hay una búsqueda activa
+    if (!search) {
+        setClientePage(newPage);
+    }
   };
 
   const handleClienteClick = (cliente) => {
+    console.log("[handleClienteClick] Cliente seleccionado:", cliente);
     setClienteSeleccionado(cliente);
-    // *** 3. Resetear paginación de pedidos al abrir modal ***
-    setPedidoPage(1);
-    setLastPedidoDoc(null);
-    setHasMorePedidos(true); // Asume que hay más al principio
+    setPedidoPage(1); // Resetear a la primera página de pedidos
+    setLastPedidoDoc(null); // Resetear el cursor de pedidos
+    setHasMorePedidos(true); // Asumir que hay más pedidos al principio
     setShowPedidosModal(true);
   };
 
@@ -176,35 +208,28 @@ const ListarClientes = () => {
     setShowPedidosModal(false);
     setClienteSeleccionado(null);
     setPedidos([]);
-    // Resetear estados de paginación de pedidos al cerrar
     setPedidoPage(1);
     setLastPedidoDoc(null);
     setHasMorePedidos(true);
   };
 
-  // *** 5. Handler para paginación de pedidos ***
   const handlePedidoPageChange = (newPage) => {
-    // ... (handlePedidoPageChange sin cambios)
-    if (newPage < 1) return; // No ir a páginas negativas
-
-    // Si vamos hacia atrás, reseteamos lastPedidoDoc.
-    // Esto es una simplificación: recargará la página anterior desde el principio,
-    // no necesariamente continuando desde donde lo dejó la página siguiente.
+    if (newPage < 1 || (newPage > pedidoPage && !hasMorePedidos)) return; 
+    
     if (newPage < pedidoPage) {
+        // Para ir a una página anterior, necesitaríamos una lógica más compleja
+        // para obtener el cursor correcto. Por ahora, simplificamos reseteando
+        // a la primera página si se intenta ir muy atrás o recargando la página actual.
+        // La forma más simple es recargar desde la primera página del modal.
+        console.warn("[handlePedidoPageChange] Paginación hacia atrás en modal no implementada de forma óptima. Recargando desde pág 1 del modal.");
+        setPedidoPage(1);
         setLastPedidoDoc(null);
-        console.warn("Paginación hacia atrás: Recargando página anterior desde el inicio (simplificado).");
-        // *** ELIMINA ESTE RETURN ***
-        // return;
+    } else {
+        setPedidoPage(newPage);
     }
-
-    // Actualiza el estado de la página de pedidos
-    setPedidoPage(newPage);
-
     // La carga de datos se hará por el useEffect que escucha pedidoPage
-    // y usará lastPedidoDoc (que será null si vamos hacia atrás)
   };
 
-  // --- Handlers para Modificar Cliente ---
   const handleOpenModificarModal = (cliente) => {
     setClienteParaAccion(cliente);
     setFormDataCliente({
@@ -212,7 +237,6 @@ const ListarClientes = () => {
       telefono: cliente.telefono || '',
       localidad: cliente.localidad || '',
       email: cliente.email || '',
-      // img_perfil: cliente.img_perfil || null, // Omitir por ahora
     });
     setMensajeAccion("");
     setShowModificarClienteModal(true);
@@ -248,11 +272,10 @@ const ListarClientes = () => {
         telefono: formDataCliente.telefono,
         localidad: formDataCliente.localidad,
         email: formDataCliente.email,
-        // img_perfil: formDataCliente.img_perfil, // Si se implementa
       });
       setMensajeAccion("Cliente actualizado con éxito.");
-      obtenerClientes(clientePage === 1); // Recargar clientes, resetear paginación si estamos en la primera página
-      setTimeout(() => { // Cerrar modal después de un breve mensaje
+      obtenerClientes(); // Recargar la vista actual (sea búsqueda o paginada)
+      setTimeout(() => { 
         handleCloseModificarModal();
       }, 1500);
     } catch (error) {
@@ -261,7 +284,6 @@ const ListarClientes = () => {
     }
   };
 
-  // --- Handlers para Eliminar Cliente ---
   const handleOpenEliminarModal = (cliente) => {
     setClienteParaAccion(cliente);
     setMensajeAccion("");
@@ -284,11 +306,11 @@ const ListarClientes = () => {
       await deleteDoc(doc(db, 'clientes', clienteParaAccion.id));
       setMensajeAccion("Cliente eliminado con éxito.");
       // Si el cliente eliminado era el último de la página actual y no es la primera página,
-      // podríamos querer retroceder una página.
-      if (clientes.length === 1 && clientePage > 1) {
-        setClientePage(clientePage - 1); // Esto disparará el useEffect para obtenerClientes
+      // y no estamos en una búsqueda, podríamos querer retroceder una página.
+      if (clientes.length === 1 && clientePage > 1 && !search) { 
+        setClientePage(clientePage - 1); 
       } else {
-        obtenerClientes(clientePage === 1); // Recargar clientes
+        obtenerClientes(); // Recargar la vista actual
       }
       setTimeout(() => {
         handleCloseEliminarModal();
@@ -301,12 +323,10 @@ const ListarClientes = () => {
 
   return (
     <div className="container mx-auto p-2 font-nunito">
-      {/* ... (Título, búsqueda, tabla de clientes - sin cambios) ... */}
        <h2 className="text-2xl text-center mb-1 font-extrabold text-gray-700">Lista de Clientes</h2>
       <p className='text-center text-gray-500 text-sm'>Mostramos el listado de todos los clientes registrados.</p>
       <p className='text-center text-gray-500 text-sm mb-4'>Haz clic en el ID para ver sus pedidos.</p>
 
-      {/* Barra de búsqueda */}
       <div className="mb-4 flex justify-center mt-3">
         <div className="relative w-full md:w-1/2">
           <input
@@ -318,7 +338,7 @@ const ListarClientes = () => {
           />
           {search && (
             <button
-              onClick={() => setSearch('')}
+              onClick={() => setSearch('')} // Limpia el estado 'search'
               className="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-500 hover:text-gray-700"
               aria-label="Limpiar búsqueda"
             >
@@ -330,10 +350,8 @@ const ListarClientes = () => {
         </div>
       </div>
 
-      {/* Indicador de carga */}
       {loading && <p className="text-center text-gray-500 my-4">Cargando clientes...</p>}
 
-      {/* Tabla de Clientes */}
       {!loading && (
         <div className="overflow-x-auto shadow-md rounded-lg font-nunito">
           <table className="min-w-full table-auto text-sm">
@@ -345,7 +363,7 @@ const ListarClientes = () => {
                 <th className="px-4 py-3 text-center">Localidad</th>
                 <th className="px-4 py-3 text-center">Correo</th>
                 <th className="px-4 py-3 text-center">ID Cliente</th>
-                <th className="px-4 py-3 text-center">Acciones</th> 
+                <th className="px-4 py-3 text-center">Acciones</th>
               </tr>
             </thead>
             <tbody>
@@ -374,7 +392,7 @@ const ListarClientes = () => {
                     >
                       {cliente.id}
                     </td>
-                    <td className="px-4 py-2 text-center"> {/* Celda para botones */}
+                    <td className="px-4 py-2 text-center">
                       <button
                         onClick={() => handleOpenModificarModal(cliente)}
                         className="p-1 text-blue-600 hover:text-blue-800 mr-2"
@@ -400,8 +418,8 @@ const ListarClientes = () => {
         </div>
       )}
 
-      {/* Paginación Clientes */}
-      {!loading && (clientes.length > 0 || clientePage > 1) && ( // Sin cambios
+      {/* Paginación Clientes (se oculta si hay una búsqueda activa) */}
+      {!loading && !search && (clientes.length > 0 || clientePage > 1) && (
         <div className="flex justify-center items-center mt-6 gap-4">
           <button onClick={() => handleClientePageChange(clientePage - 1)} disabled={clientePage === 1} className="px-4 py-2 bg-yellow-500 text-white rounded-md disabled:opacity-50 disabled:cursor-not-allowed shadow hover:bg-yellow-600 transition flex items-center gap-2">
             <svg xmlns="http://www.w3.org/2000/svg" fill="white" viewBox="0 0 24 24" className="w-5 h-5"><path d="M10.707 17.293a1 1 0 01-1.414 1.414l-5-5a1 1 0 010-1.414l5-5a1 1 0 011.414 1.414L7.414 12l3.293 3.293zM19.707 17.293a1 1 0 01-1.414 1.414l-5-5a1 1 0 010-1.414l5-5a1 1 0 011.414 1.414L16.414 12l3.293 3.293z"/></svg>
@@ -415,21 +433,16 @@ const ListarClientes = () => {
         </div>
       )}
 
-
-      {/* Modal de Pedidos */}
-      <Modal show={showPedidosModal} onHide={handleClosePedidosModal} centered size="xl"> {/* Sin cambios significativos, solo el nombre del cliente */}
-        
+      <Modal show={showPedidosModal} onHide={handleClosePedidosModal} centered size="xl">
         <Modal.Body>
             <div className='text-center text-2xl text-gray-700 text-bold p-3 mb-2'>
-            <h1> Pedidos de: {clienteSeleccionado?.cliente || 'Cliente'} (ID: {clienteSeleccionado?.id || ''})</h1> {/* Nombre del cliente */}
+            <h1> Pedidos de: {clienteSeleccionado?.cliente || 'Cliente'} (ID: {clienteSeleccionado?.id || ''})</h1>
             </div>
-        
-
           {loadingPedidos ? (
             <p className="text-center text-gray-500">Cargando pedidos...</p>
           ) : pedidos.length > 0 ? (
             <>
-              <div className="overflow-x-auto shadow-md rounded-lg mb-4"> {/* Margen inferior para separar de paginación */}
+              <div className="overflow-x-auto shadow-md rounded-lg mb-4">
                 <table className="min-w-full table-auto text-sm">
                   <thead>
                     <tr className="bg-gray-700 text-white uppercase">
@@ -468,57 +481,42 @@ const ListarClientes = () => {
                 </table>
               </div>
 
-              {/* *** 4. Controles de Paginación para Pedidos *** */}
-              {(pedidoPage > 1 || hasMorePedidos) && ( // Mostrar solo si hay más de una página o si hay más por cargar
+              {(pedidoPage > 1 || hasMorePedidos) && (
                  <div className="flex justify-center items-center mt-4 gap-4">
-                    {/* Botón Anterior (simplificado, solo funciona si no estás en la página 1) */}
                     <button
                       onClick={() => handlePedidoPageChange(pedidoPage - 1)}
                       disabled={pedidoPage === 1 || loadingPedidos}
                       className="px-4 py-2 bg-yellow-500 text-white rounded-md disabled:opacity-50 disabled:cursor-not-allowed shadow hover:bg-yellow-600 transition flex items-center gap-2"
                     >
                        <svg xmlns="http://www.w3.org/2000/svg" fill="white" viewBox="0 0 24 24" className="w-5 h-5"><path d="M10.707 17.293a1 1 0 01-1.414 1.414l-5-5a1 1 0 010-1.414l5-5a1 1 0 011.414 1.414L7.414 12l3.293 3.293zM19.707 17.293a1 1 0 01-1.414 1.414l-5-5a1 1 0 010-1.414l5-5a1 1 0 011.414 1.414L16.414 12l3.293 3.293z"/></svg>
-                     
                     </button>
                     <span className="text-gray-700">Página {pedidoPage}</span>
-                    {/* Botón Siguiente */}
                     <button
                       onClick={() => handlePedidoPageChange(pedidoPage + 1)}
                       disabled={!hasMorePedidos || loadingPedidos}
                       className="px-4 py-2 bg-yellow-500 text-white rounded-md disabled:opacity-50 disabled:cursor-not-allowed shadow hover:bg-yellow-600 transition flex items-center gap-2 font-nunito"
                     >
-                     
                       <svg xmlns="http://www.w3.org/2000/svg" fill="white" viewBox="0 0 24 24" className="w-5 h-5"><path d="M13.293 6.707a1 1 0 011.414-1.414l5 5a1 1 0 010 1.414l-5 5a1 1 0 01-1.414-1.414L16.586 12l-3.293-3.293zM4.293 6.707a1 1 0 011.414-1.414l5 5a1 1 0 010 1.414l-5 5a1 1 0 01-1.414-1.414L7.586 12 4.293 8.707z"/></svg>
                     </button>
                   </div>
               )}
-
             </>
           ) : (
             <p className="text-center text-gray-500 mt-4">No se encontraron pedidos para este cliente.</p>
           )}
-
           <div className='p-2 mt-2 flex justify-end items-center'>
-              {/* Botón Cerrar */}
               <Button variant="danger" className='bg-white text-yellow-500  border-yellow-500 hover:bg-yellow-600 hover:border-yellow-600 hover:text-yellow-600 transition' onClick={handleClosePedidosModal}>
                 Cerrar
               </Button>
           </div>
-
-
         </Modal.Body>
-      
       </Modal>
 
-      {/* Modal para Modificar Cliente */}
       <Modal show={showModificarClienteModal} onHide={handleCloseModificarModal} centered>
-       
         <Modal.Body>
-
             <div>
               <h1 className='text-gray-700 text-xl font-nunito font-bold text-center mb-4'>Modificar Cliente</h1>
             </div>
-
           {mensajeAccion && <p className={`text-sm font-bold font-nunito mb-3 text-center ${mensajeAccion.includes("Error") || mensajeAccion.startsWith("Nombre y teléfono") ? "text-red-600" : "text-green-700"}`}>{mensajeAccion}</p>}
           <Form>
             <Form.Group className="mb-3" controlId="formClienteNombre">
@@ -549,8 +547,6 @@ const ListarClientes = () => {
                   <option value="Derio">Derio</option>
                   <option value="Otros">Otros...</option>
                 </Form.Control>
-
-                  {/* Flecha SVG */}
                   <div className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-gray-400">
                     <svg
                       className="w-4 h-4"
@@ -568,53 +564,36 @@ const ListarClientes = () => {
               <Form.Label className="text-gray-500 text-sm font-extrabold font-nunitob ms-2">Email</Form.Label>
               <Form.Control type="email" name="email" value={formDataCliente.email} onChange={handleFormChangeCliente} placeholder="Email (opcional)" className="font-nunito text-sm"/>
             </Form.Group>
-            {/* Podríamos añadir input para img_perfil aquí si se decide implementar */}
           </Form>
-
           <div className='items-center justify-center flex gap-6 mt-5 mb-3'>
-
              <Button variant="secondary" onClick={handleCloseModificarModal}  className=" shadow-md bg-white border-red-500 hover:bg-red-700 hover:border-red-700 p-2 font-nunito text-red-500 hover:text-red-700">
             Cancelar
           </Button>
           <Button variant="primary" onClick={handleGuardarClienteModificado}  className="shadow-md bg-white text-yellow-500 border-yellow-500 hover:bg-yellow-600 hover:text-yellow-600 hover:border-yellow-600 p-2 font-nunito">
-            Actualizar 
+            Actualizar
           </Button>
-
-
           </div>
         </Modal.Body>
-  
       </Modal>
 
-      {/* Modal para Confirmar Eliminación de Cliente */}
       <Modal show={showConfirmDeleteModal} onHide={handleCloseEliminarModal} centered>
-      
         <Modal.Body>
-
            <div>
               <h1 className='text-gray-700 text-xl font-nunito font-bold text-center mb-4'>Confirmar Eliminación</h1>
             </div>
-
           {mensajeAccion && <p className={`text-sm font-bold font-nunito mb-3 text-center ${mensajeAccion.includes("Error") ? "text-red-600" : "text-green-700"}`}>{mensajeAccion}</p>}
           <p className="text-gray-600 font-nunito text-center">
             ¿Estás seguro de que deseas eliminar al cliente <strong className="text-gray-800">{clienteParaAccion?.cliente}</strong>? Esta acción no se puede deshacer.
           </p>
-
           <div className='items-center justify-center flex gap-6 mt-5 mb-3'>
-
             <Button variant="secondary" onClick={handleCloseEliminarModal} className=" shadow-md bg-white border-gray-500 hover:bg-gray-300 hover:border-gray-700 p-2 font-nunito text-gray-500 hover:text-gray-700">
             Cancelar
           </Button>
           <Button variant="danger" onClick={handleConfirmarEliminarCliente} className=" shadow-md bg-white border-red-500 hover:bg-red-700 hover:border-red-700 p-2 font-nunito text-red-500 hover:text-red-700">
             Sí, Eliminar
           </Button>
-
-
           </div>
-
-          
         </Modal.Body>
-
       </Modal>
     </div>
   );
