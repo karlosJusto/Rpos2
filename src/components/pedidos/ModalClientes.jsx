@@ -200,7 +200,8 @@ const ModalClientes = ({ show, handleClose, onSave, initialData,clearClientData 
                       telefono: cliente.telefono || '',
                       img_perfil: cliente.img_perfil || '',
                       // Optionally update observations if they should come from client profile:
-                      observaciones: cliente.observaciones || prevFormData.observaciones,
+                      //observaciones: cliente.observaciones || prevFormData.observaciones,
+                         observaciones: cliente.observaciones || '', // Si el nuevo cliente no tiene obs, limpiar las anteriores
                     }));
                     setFilteredClientes(clientes); // Hide list after selection
                   }}>
@@ -234,7 +235,7 @@ const ModalClientes = ({ show, handleClose, onSave, initialData,clearClientData 
               onChange={(e) => setFormData({ ...formData, observaciones: e.target.value })}
               id="observaciones"
               rows="2"
-              placeholder="Observaciones al pedido"
+              placeholder=""
               name="observaciones" // Added name attribute
             />
           </div>
