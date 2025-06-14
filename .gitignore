@@ -1,1 +1,9 @@
 node_modules
+
+# Firebase Admin SDK service account key
+key_service_account.json
+# O, de forma más genérica si tienes otros archivos JSON sensibles en la raíz del server:
+server/*.json
+nueva_key.json
+
+

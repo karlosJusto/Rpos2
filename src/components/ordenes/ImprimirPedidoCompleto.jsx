@@ -3,11 +3,9 @@ import { db } from '../firebase/firebase'; // Ajusta la ruta si es necesario
 import { collection, query, where, getDocs, doc, getDoc, setDoc, serverTimestamp, onSnapshot } from 'firebase/firestore';
 import { dataContext } from '../Context/DataContext'; // Para el API_PRINT_URL si lo tienes ahí
 
-// Podrías definir esta URL aquí o tomarla del contexto si es compartida
-const API_PRINT_URL = 'http://192.168.1.26:3000/imprimir';
-
 // Nombre de la colección en Firestore para registrar intentos de impresión
 const PRINT_RECORDS_COLLECTION = 'registrosImpresionPedidosRpos2'; // Nombre específico para tu app
+const COLA_IMPRESION_COLLECTION = 'colaImpresionRpos2'; // Nueva colección para la cola de impresión
 
 // Función para verificar si un pedido específico ya tiene un intento de impresión registrado en Firestore
 const checkIfPrintAttemptedInFirestore = async (numeroPedido) => {
@@ -39,34 +37,115 @@ const markPrintAttemptedInFirestore = async (numeroPedido) => {
   }
 };
 
+// Función para formatear el pedido: ahora devuelve un objeto con cabecera, productos y pie
+const formatPedidoForPrint = (data) => {
+  if (!data) return null; // Devuelve null si no hay datos
+
+  let cabecera = `--- PEDIDO ${data.NumeroPedido} ---\n`;
+  cabecera += `Cliente: ${data.cliente || 'N/A'}\n`;
+  cabecera += `Telefono: ${data.telefono || 'N/A'}\n`;
+  cabecera += `Hora Recogida: ${data.fechahora || 'N/A'}\n`;
+  if (data.observaciones) {
+    cabecera += `Obs: ${data.observaciones}\n`;
+  }
+  cabecera += `------------------------\n`;
+  // El servidor puede añadir el título "PRODUCTOS:" si es necesario antes de la tabla
+
+  const productosArray = data.productos.map(p => {
+    let precioFormateadoStr = 'N/A';
+    const cantidadProducto = p.cantidad !== undefined && p.cantidad !== null ? parseInt(p.cantidad, 10) : NaN;
+    const precioTotalProducto = p.precio_total !== undefined && p.precio_total !== null ? parseFloat(p.precio_total) : NaN;
+    const precioUnitario = p.precio !== undefined && p.precio !== null ? parseFloat(p.precio) : NaN;
+
+    if (!isNaN(precioTotalProducto)) {
+      precioFormateadoStr = precioTotalProducto.toFixed(2);
+    } else if (!isNaN(cantidadProducto) && !isNaN(precioUnitario)) {
+      precioFormateadoStr = (cantidadProducto * precioUnitario).toFixed(2);
+    }
+    let indicadores = '';
+    if (p.celiaco) indicadores += '(CE) ';
+    if (p.troceado) indicadores += '(TRO) ';
+    if (p.tostado) indicadores += '(TOS) ';
+    if (p.extrasalsa) indicadores += '(ES) '; // Añadido espacio
+    if (p.sinsalsa) indicadores += '(SS) ';  // Añadido espacio
+
+    return {
+      cantidad: `[${isNaN(cantidadProducto) ? 0 : cantidadProducto}x]`,
+      // Asegurarse de que la descripción no sea demasiado larga para la columna de la tabla
+      descripcion: `${p.alias} ${indicadores.trim()}`,
+      precio: precioFormateadoStr
+    };
+  });
+
+  let pie = `------------------------\n`;
+  const totalPedidoNumerico = parseFloat(data.total_pedido);
+  pie += `TOTAL PEDIDO: ${!isNaN(totalPedidoNumerico) ? totalPedidoNumerico.toFixed(2) : 'N/A'}\n`;
+  if (data.pagado) pie += `PAGADO\n`;
+  pie += `------------------------\n`;
+  // pie += `Eskerrik Asko\n`; // Puedes añadir esto en el servidor si es fijo
+
+  return { cabecera, productos: productosArray, pie };
+};
+
+// Nueva función para encolar el pedido en Firestore
+const encolarPedidoParaImpresion = async (pedidoData) => {
+  if (!pedidoData || !pedidoData.NumeroPedido) {
+    console.error("Datos del pedido o NumeroPedido faltantes para encolar en Firestore.");
+    return;
+  }
+
+  const partesDelTicket = formatPedidoForPrint(pedidoData);
+  if (!partesDelTicket) {
+    console.error("Error al formatear el pedido para la cola de impresión.");
+    return;
+  }
+
+  const payloadParaCola = {
+    numeroPedido: pedidoData.NumeroPedido.toString(),
+    // En lugar de un solo textoTicket, enviamos las partes
+    ticketCabecera: partesDelTicket.cabecera,
+    ticketProductos: partesDelTicket.productos, // Array de objetos
+    ticketPie: partesDelTicket.pie,
+    imagenURL: pedidoData.codigoQR || null, // Usamos el campo que contiene la URL del QR de Firebase Storage
+    estado: 'pendiente', // Estado inicial
+    timestampSolicitud: serverTimestamp(),
+  };
+
+  try {
+    const docRef = doc(db, COLA_IMPRESION_COLLECTION, payloadParaCola.numeroPedido);
+    await setDoc(docRef, payloadParaCola);
+    // console.log(`Pedido ${payloadParaCola.numeroPedido} encolado para impresión en Firestore con formato tabla.`);
+  } catch (e) {
+    console.error(`Error al encolar pedido ${payloadParaCola.numeroPedido} para impresión en Firestore:`, e);
+  }
+};
+
 const ImprimirPedidoCompleto = ({ numeroPedido }) => {
-  const [pedidoData, setPedidoData] = useState(null);
+  const [pedidoData, setPedidoData] = useState(null); // No es estrictamente necesario si solo encolamos
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
-  const printInitiatedForThisOrderRef = useRef(false); // Ref para evitar doble impresión
-  // const { API_PRINT_URL_CONTEXT } = useContext(dataContext); // Si usaras el contexto para la URL
-  // const resolvedApiPrintUrl = API_PRINT_URL_CONTEXT || API_PRINT_URL;
+  const printInitiatedForThisOrderRef = useRef(false);
 
   useEffect(() => {
-    printInitiatedForThisOrderRef.current = false; // Resetea el cerrojo para un nuevo numeroPedido
-    let unsubscribeFromPedido = () => {}; // Placeholder para la función de desuscripción
+    printInitiatedForThisOrderRef.current = false;
+    let unsubscribeFromPedido = () => {};
 
     const processPrintRequest = async () => {
       if (!numeroPedido) {
         setLoading(false);
         setError(null);
-        setPedidoData(null);
-        unsubscribeFromPedido(); // Limpiar suscripción si numeroPedido se vuelve nulo
+        // setPedidoData(null); // No es necesario si no se usa en el render
+        if (typeof unsubscribeFromPedido === 'function') unsubscribeFromPedido();
         return;
       }
 
       setLoading(true);
       setError(null);
-      setPedidoData(null); // Limpiar datos de un pedido anterior
+      // setPedidoData(null); // Limpiar
 
       const alreadyAttempted = await checkIfPrintAttemptedInFirestore(numeroPedido);
       if (alreadyAttempted) {
-        // console.log(`Pedido ${numeroPedido} ya tiene un intento de impresión registrado en Firestore. Omitiendo.`);
+        // console.log(`Pedido ${numeroPedido} ya tiene un intento de impresión registrado. Omitiendo.`);
         setLoading(false);
         return;
       }
@@ -77,41 +156,36 @@ const ImprimirPedidoCompleto = ({ numeroPedido }) => {
         if (docSnap.exists()) {
           const pedidoActual = { id: docSnap.id, ...docSnap.data() };
           
-          if (pedidoActual.codigoQR) {
-            // console.log(`Código QR encontrado para el pedido ${numeroPedido}: ${pedidoActual.codigoQR}`);
+          // Asumimos que 'codigoQR' es el campo en 'pedidos' que contiene la URL de la imagen del QR
+          if (pedidoActual.codigoQR) { 
+            if (typeof unsubscribeFromPedido === 'function') unsubscribeFromPedido(); 
             
-            unsubscribeFromPedido(); 
-            
-            // Cerrojo local: si ya hemos iniciado la impresión para este pedido en esta instancia, no continuar.
             if (printInitiatedForThisOrderRef.current) {
-              // console.log(`Impresión para ${numeroPedido} ya iniciada por esta instancia. Omitiendo.`);
-              setLoading(false); // Asegurarse de que el estado de carga se actualice
+              setLoading(false);
               return;
             }
-            printInitiatedForThisOrderRef.current = true; // Marcar que hemos iniciado el proceso
+            printInitiatedForThisOrderRef.current = true;
             
             const stillNotAttempted = !(await checkIfPrintAttemptedInFirestore(numeroPedido));
             
             if (stillNotAttempted) {
               await markPrintAttemptedInFirestore(numeroPedido);
-              setPedidoData(pedidoActual); 
-              await handleImprimirPedido(pedidoActual);
-            } else {
-              // console.log(`Pedido ${numeroPedido} fue marcado como intentado mientras se esperaba el QR. Omitiendo impresión duplicada.`);
+              // setPedidoData(pedidoActual); // No es necesario si solo se usa para encolar
+              await encolarPedidoParaImpresion(pedidoActual); 
             }
             setLoading(false);
           } else {
-            // console.log(`Esperando código QR para el pedido ${numeroPedido}... El listener sigue activo.`);
+            // console.log(`Esperando URL de imagen QR para el pedido ${numeroPedido}...`);
           }
         } else {
-          setError(`No se encontró el pedido con número: ${numeroPedido} (listener).`);
-          unsubscribeFromPedido(); 
+          setError(`No se encontró el pedido con número: ${numeroPedido}.`);
+          if (typeof unsubscribeFromPedido === 'function') unsubscribeFromPedido(); 
           setLoading(false);
         }
       }, (errorListener) => {
         console.error("Error en el listener de Firestore para el pedido:", errorListener);
         setError("Error escuchando el pedido.");
-        unsubscribeFromPedido(); 
+        if (typeof unsubscribeFromPedido === 'function') unsubscribeFromPedido(); 
         setLoading(false);
       });
     };
@@ -119,88 +193,17 @@ const ImprimirPedidoCompleto = ({ numeroPedido }) => {
     if (numeroPedido) {
       processPrintRequest();
     } else {
-      unsubscribeFromPedido(); 
+      if (typeof unsubscribeFromPedido === 'function') unsubscribeFromPedido(); 
       setLoading(false);
       setError(null);
-      setPedidoData(null);
+      // setPedidoData(null);
     }
 
     return () => {
-      // console.log(`Limpiando listener para pedido ${numeroPedido}`);
-      unsubscribeFromPedido();
+      if (typeof unsubscribeFromPedido === 'function') unsubscribeFromPedido();
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [numeroPedido]); 
-
-  const formatPedidoForPrint = (data) => {
-    if (!data) return "Error: No hay datos del pedido para formatear.";
-
-    let textoRecibo = `--- PEDIDO ${data.NumeroPedido} ---\n`;
-    textoRecibo += `Cliente: ${data.cliente || 'N/A'}\n`;
-    textoRecibo += `Telefono: ${data.telefono || 'N/A'}\n`;
-    textoRecibo += `Hora Recogida: ${data.fechahora || 'N/A'}\n`; 
-    if (data.observaciones) {
-      textoRecibo += `Obs: ${data.observaciones}\n`;
-    }
-    textoRecibo += `------------------------\n`;
-    textoRecibo += `PRODUCTOS:\n`;
-    data.productos.forEach(p => {
-      let precioFormateado = 'N/A';
-      const cantidadProducto = p.cantidad !== undefined && p.cantidad !== null ? parseInt(p.cantidad, 10) : NaN;
-      const precioTotalProducto = p.precio_total !== undefined && p.precio_total !== null ? parseFloat(p.precio_total) : NaN;
-      const precioUnitario = p.precio !== undefined && p.precio !== null ? parseFloat(p.precio) : NaN;
-
-      if (!isNaN(precioTotalProducto)) {
-        precioFormateado = precioTotalProducto.toFixed(2);
-      } else if (!isNaN(cantidadProducto) && !isNaN(precioUnitario)) {
-        precioFormateado = (cantidadProducto * precioUnitario).toFixed(2);
-      }
-      let indicadores = '';
-      if (p.celiaco) indicadores += '(CE) ';
-      if (p.troceado) indicadores += '(TRO) ';
-      if (p.tostado) indicadores += '(TOS) ';
-      if (p.extrasalsa) indicadores += '(ES)';
-      if (p.sinsalsa) indicadores += '(SS)';
-
-      textoRecibo += `[${isNaN(cantidadProducto) ? 0 : cantidadProducto}x] - ${p.alias} ${indicadores.trim()} - ${precioFormateado}\n`;
-    });
-    textoRecibo += `------------------------\n`;
-    const totalPedidoNumerico = parseFloat(data.total_pedido);
-    textoRecibo += `TOTAL PEDIDO: ${!isNaN(totalPedidoNumerico) ? totalPedidoNumerico.toFixed(2) : 'N/A'}\n`;
-    if (data.pagado) textoRecibo += `PAGADO\n`;
-    textoRecibo += `------------------------\n`;
-    //textoRecibo += `Eskerrik Asko\n`;
-    return textoRecibo;
-  };
-
-  const handleImprimirPedido = async (dataToPrint) => {
-    const textoFormateado = formatPedidoForPrint(dataToPrint);
-    const payload = {
-      texto: textoFormateado,
-      numeroPedido: dataToPrint.NumeroPedido, 
-    };
-
-    /*if (dataToPrint.codigoQR) {
-      payload.qrUrl = dataToPrint.codigoQR;
-    }*/
-    
-    try {
-      const response = await fetch(API_PRINT_URL, { 
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      });
-
-      const responseBodyText = await response.text();
-      if (!response.ok) {
-        console.error(`Error del servidor al imprimir pedido #${dataToPrint.NumeroPedido}: ${response.status}`, responseBodyText);
-      } else {
-        // console.log(`Pedido #${dataToPrint.NumeroPedido} enviado a imprimir. Servidor: ${responseBodyText}`);
-      }
-    } catch (networkError) {
-      console.error(`Error de red al imprimir pedido #${dataToPrint.NumeroPedido}:`, networkError);
-    }
-  };
 
   return null; 
 };
