@@ -149,7 +149,9 @@ const ListarClientes = () => {
         setHasMorePedidos(false);
       }
       // Si es la página 1, reemplaza. Si no, concatena (o decide si siempre reemplazar)
-      setPedidos(prev => page === 1 ? nuevosPedidos : [...prev, ...nuevosPedidos]);
+      //setPedidos(prev => page === 1 ? nuevosPedidos : [...prev, ...nuevosPedidos]);
+       // Siempre reemplazar con los pedidos de la página actual para una paginación correcta
+      setPedidos(nuevosPedidos);
 
 
     } catch (error) {
