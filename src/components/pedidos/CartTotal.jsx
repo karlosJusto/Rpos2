@@ -651,7 +651,7 @@ const CartTotal = ({ datosCliente, setDatosCliente, orderToEdit }) => { // order
            productos: mappedProducts, total_pedido: totalPedidoCalculado.toFixed(2), paraOtroDia: esParaOtroDia,
            empleado: empleadoNombre || "No identificado",
            orderCreationToken: newOrderCreationToken,
-           webListenerProcessed: false,
+           webListenerProcessed: true,
            origen: orderToEdit?.origen ?? 0,
            fechahora_realizado: nowString, // Usar el string formateado como en PedidoRapido
            fecha_filtro: fechaFiltroParaPedido, // Añadir fecha_filtro
@@ -807,12 +807,12 @@ const CartTotal = ({ datosCliente, setDatosCliente, orderToEdit }) => { // order
       if (!esOperacionDeActualizacion) { // Pedido Nuevo
           // --- MODIFICADO: Los pedidos nuevos (origen 0) ahora son procesados por el GlobalOrderListener.jsx ---
           console.log(`[CalendarUpdate] Pedido nuevo (origen 0). La actualización del calendario de pollos será manejada por GlobalOrderListener.jsx.`);
-          // if (finalEsParaHoy && currentCalendarQty > 0) {
-          //     console.log(`[CalendarUpdate] Nuevo pedido para hoy. Sumando ${currentCalendarQty} unidades al calendario para ${currentOrderDateTime.format("YYYY-MM-DD HH:mm")}.`);
-          //     await updateCalendarInterval(currentOrderDateTime, currentCalendarQty);
-          // } else {
-          //     console.log(`[CalendarUpdate] Nuevo pedido ${finalEsParaHoy ? `sin productos relevantes para calendario de pollos (${currentCalendarQty} unidades)` : 'para otro día'}. No se actualiza calendario de pollos de hoy.`);
-          // }
+           if (finalEsParaHoy && currentCalendarQty > 0) {
+               console.log(`[CalendarUpdate] Nuevo pedido para hoy. Sumando ${currentCalendarQty} unidades al calendario para ${currentOrderDateTime.format("YYYY-MM-DD HH:mm")}.`);
+               await updateCalendarInterval(currentOrderDateTime, currentCalendarQty);
+           } else {
+               console.log(`[CalendarUpdate] Nuevo pedido ${finalEsParaHoy ? `sin productos relevantes para calendario de pollos (${currentCalendarQty} unidades)` : 'para otro día'}. No se actualiza calendario de pollos de hoy.`);
+           }
       } else { // Edición de Pedido
           // --- Ediciones (origen 0 o 1) son manejadas por CartTotal.jsx ---
           console.log(`[CalendarUpdate] Editando pedido (Pollos). Original Qty: ${originalCalendarQty}, Current Qty: ${currentCalendarQty}`);
