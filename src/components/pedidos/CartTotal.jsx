@@ -14,24 +14,23 @@ dayjs.extend(customParseFormat);
 dayjs.extend(isSameOrAfter);
 
 
-// --- Función para Actualizar Contadores de Ensaladas/Ensaladillas ---
-const updateSaladCounters = async (cartItems) => {
-    const todayId = dayjs().format("DD-MM-YYYY");
-    const docRef = doc(db, "ensaladas", todayId);
-    console.log(`Preparando actualización de contadores de ensaladas para ${todayId}...`);
+// --- Función Auxiliar para Contar Ensaladas por Tipo ---
+const countSaladsByType = (items) => {
+    const counts = {
+        ensaladaGrande: 0,
+        ensaladaPequena: 0,
+        ensaladillaGrande: 0,
+        ensaladillaPequena: 0,
+    };
 
-    let incrementEnsaladaGrande = 0;
-    let incrementEnsaladaPequena = 0;
-    let incrementEnsaladillaGrande = 0;
-    let incrementEnsaladillaPequena = 0;
+    if (!items || items.length === 0) return counts;
 
-    cartItems.forEach(item => {
-        const itemId = item.id; // Usar item.id consistentemente
+    items.forEach(item => {
         const itemName = item.name || item.nombre || ""; // Aceptar 'nombre' también
         const itemCantidad = item.cantidad ?? 0;
 
         if (!itemName || typeof itemCantidad !== 'number' || itemCantidad <= 0) {
-            console.warn("Item inválido o sin cantidad en updateSaladCounters, omitiendo:", item);
+            // console.warn("Item inválido o sin cantidad en countSaladsByType, omitiendo:", item);
             return;
         }
 
@@ -40,38 +39,55 @@ const updateSaladCounters = async (cartItems) => {
         const isPequena = nameLower.includes("1/2") || nameLower.includes("media");
 
         if (nameLower.includes("ensaladilla")) {
-            if (isPequena) incrementEnsaladillaPequena += cantidad;
-            else incrementEnsaladillaGrande += cantidad;
+            if (isPequena) counts.ensaladillaPequena += cantidad;
+            else counts.ensaladillaGrande += cantidad;
         } else if (nameLower.includes("ensalada")) {
-             if (isPequena) incrementEnsaladaPequena += cantidad;
-             else incrementEnsaladaGrande += cantidad;
+            if (isPequena) counts.ensaladaPequena += cantidad;
+            else counts.ensaladaGrande += cantidad;
         }
     });
+    return counts;
+};
 
-    if (incrementEnsaladaGrande === 0 && incrementEnsaladaPequena === 0 && incrementEnsaladillaGrande === 0 && incrementEnsaladillaPequena === 0) {
-        console.log("No se encontraron ensaladas/saladillas en el pedido. Omitiendo actualización de contadores.");
+// --- Función para Actualizar Contadores de Ensaladas/Ensaladillas (Modificada) ---
+const updateSaladCounters = async (currentCartItems, originalCartItems = []) => {
+    const todayId = dayjs().format("DD-MM-YYYY");
+    const docRef = doc(db, "ensaladas", todayId);
+    console.log(`Preparando actualización de contadores de ensaladas para ${todayId}...`, {currentCartItems, originalCartItems});
+
+    const currentCounts = countSaladsByType(currentCartItems);
+    const originalCounts = countSaladsByType(originalCartItems);
+
+    const diffEnsaladaGrande = currentCounts.ensaladaGrande - originalCounts.ensaladaGrande;
+    const diffEnsaladaPequena = currentCounts.ensaladaPequena - originalCounts.ensaladaPequena;
+    const diffEnsaladillaGrande = currentCounts.ensaladillaGrande - originalCounts.ensaladillaGrande;
+    const diffEnsaladillaPequena = currentCounts.ensaladillaPequena - originalCounts.ensaladillaPequena;
+
+    if (diffEnsaladaGrande === 0 && diffEnsaladaPequena === 0 && diffEnsaladillaGrande === 0 && diffEnsaladillaPequena === 0) {
+        console.log("No hay cambios netos en ensaladas/saladillas. Omitiendo actualización de contadores.");
         return;
     }
 
-    console.log("Incrementos calculados:", {
-        ensaladaG: incrementEnsaladaGrande, ensaladaP: incrementEnsaladaPequena,
-        ensaladillaG: incrementEnsaladillaGrande, ensaladillaP: incrementEnsaladillaPequena
+    console.log("Diferencias de ensaladas a aplicar:", {
+        ensaladaG: diffEnsaladaGrande, ensaladaP: diffEnsaladaPequena,
+        ensaladillaG: diffEnsaladillaGrande, ensaladillaP: diffEnsaladillaPequena
     });
 
     try {
         await runTransaction(db, async (transaction) => {
             const docSnap = await transaction.get(docRef);
+            const updateData = {};
 
             if (!docSnap.exists()) {
                 console.log(`Documento ${todayId} no existe en 'ensaladas'. Creando...`);
                 const initialData = {
                     ensaladas: {
-                        grandes: { pedidas: incrementEnsaladaGrande, preparadas: 0 },
-                        pequenas: { pedidas: incrementEnsaladaPequena, preparadas: 0 }
+                        grandes: { pedidas: Math.max(0, diffEnsaladaGrande), preparadas: 0 }, // Asegurar no negativos al crear
+                        pequenas: { pedidas: Math.max(0, diffEnsaladaPequena), preparadas: 0 }
                     },
                     ensaladillas: {
-                        grandes: { pedidas: incrementEnsaladillaGrande, preparadas: 0 },
-                        pequenas: { pedidas: incrementEnsaladillaPequena, preparadas: 0 }
+                        grandes: { pedidas: Math.max(0, diffEnsaladillaGrande), preparadas: 0 },
+                        pequenas: { pedidas: Math.max(0, diffEnsaladillaPequena), preparadas: 0 }
                     },
                 };
                 transaction.set(docRef, initialData);
@@ -79,11 +95,10 @@ const updateSaladCounters = async (cartItems) => {
 
             } else {
                 console.log(`Documento ${todayId} existe. Actualizando contadores...`);
-                const updateData = {};
-                if (incrementEnsaladaGrande > 0) updateData['ensaladas.grandes.pedidas'] = increment(incrementEnsaladaGrande);
-                if (incrementEnsaladaPequena > 0) updateData['ensaladas.pequenas.pedidas'] = increment(incrementEnsaladaPequena);
-                if (incrementEnsaladillaGrande > 0) updateData['ensaladillas.grandes.pedidas'] = increment(incrementEnsaladillaGrande);
-                if (incrementEnsaladillaPequena > 0) updateData['ensaladillas.pequenas.pedidas'] = increment(incrementEnsaladillaPequena);
+                if (diffEnsaladaGrande !== 0) updateData['ensaladas.grandes.pedidas'] = increment(diffEnsaladaGrande);
+                if (diffEnsaladaPequena !== 0) updateData['ensaladas.pequenas.pedidas'] = increment(diffEnsaladaPequena);
+                if (diffEnsaladillaGrande !== 0) updateData['ensaladillas.grandes.pedidas'] = increment(diffEnsaladillaGrande);
+                if (diffEnsaladillaPequena !== 0) updateData['ensaladillas.pequenas.pedidas'] = increment(diffEnsaladillaPequena);
 
                 if (Object.keys(updateData).length > 0) {
                     transaction.update(docRef, updateData);
@@ -618,13 +633,60 @@ const CartTotal = ({ datosCliente, setDatosCliente, orderToEdit }) => { // order
           console.log("No se requirieron actualizaciones de stock.");
       }
 
-      console.log("Iniciando actualización de contadores de ensaladas/ensaladillas...");
-      try {
-        await updateSaladCounters(mappedProducts);
-        console.log("Actualización de contadores de ensaladas/ensaladillas intentada.");
+      // --- Lógica de Actualización de Contadores de Ensaladas ---
+      console.log("Determinando si se actualizan contadores de ensaladas...");
+      const originalProductsForSaladCount = esOperacionDeActualizacion ? (orderToEdit.productos || []) : [];
+      const currentProductsForSaladCount = mappedProducts;
+
+      // originalParaOtroDia se refiere a si el pedido *original* era para un día que no es hoy.
+      // Si es un pedido nuevo, no hay "original", por lo que no era para otro día (en el contexto de una edición).
+      const originalEraParaHoy = esOperacionDeActualizacion ? !(orderToEdit.paraOtroDia === true) : false;
+      const finalEsParaHoy = !finalParaOtroDia; // finalParaOtroDia ya está calculado para el estado actual del pedido
+
+      let debeActualizarSaladCounters = false;
+      let currentSaladsArg = [];
+      let originalSaladsArg = [];
+
+      if (!esOperacionDeActualizacion) { // Pedido Nuevo
+          if (finalEsParaHoy) { // Pedido nuevo para hoy
+              debeActualizarSaladCounters = true;
+              currentSaladsArg = currentProductsForSaladCount;
+              originalSaladsArg = []; // No hay originales
+              console.log("Actualización ensaladas (Nuevo Pedido para Hoy): Sumar actuales.");
+          } else { // Pedido nuevo para otro día
+              console.log("Actualización ensaladas (Nuevo Pedido para Otro Día): Omitir.");
+          }
+      } else { // Edición de Pedido
+          if (originalEraParaHoy && finalEsParaHoy) { // Hoy -> Hoy
+              debeActualizarSaladCounters = true;
+              currentSaladsArg = currentProductsForSaladCount;
+              originalSaladsArg = originalProductsForSaladCount;
+              console.log("Actualización ensaladas (Edición Hoy -> Hoy): Aplicar diferencia.");
+          } else if (originalEraParaHoy && !finalEsParaHoy) { // Hoy -> Mañana
+              debeActualizarSaladCounters = true;
+              currentSaladsArg = []; // Nada nuevo para hoy
+              originalSaladsArg = originalProductsForSaladCount; // Restar originales de hoy
+              console.log("Actualización ensaladas (Edición Hoy -> Mañana): Restar originales de hoy.");
+          } else if (!originalEraParaHoy && finalEsParaHoy) { // Mañana -> Hoy
+              debeActualizarSaladCounters = true;
+              currentSaladsArg = currentProductsForSaladCount; // Sumar actuales a hoy
+              originalSaladsArg = []; // Nada original que restar de hoy (ya que el original no era para hoy)
+              console.log("Actualización ensaladas (Edición Mañana -> Hoy): Sumar actuales a hoy.");
+          } else { // Mañana -> Mañana (o cualquier combinación que no involucre hoy)
+              console.log("Actualización ensaladas (Edición Mañana -> Mañana): Omitir, no afecta a hoy.");
+          }
       }
-      catch (saladError) {
-        console.error(`Error no crítico al llamar a updateSaladCounters para pedido ${pedidoId}:`, saladError);
+
+      if (debeActualizarSaladCounters) {
+          console.log("Iniciando actualización de contadores de ensaladas/ensaladillas...");
+          try {
+              await updateSaladCounters(currentSaladsArg, originalSaladsArg);
+              console.log("Actualización de contadores de ensaladas/ensaladillas intentada.");
+          } catch (saladError) {
+              console.error(`Error no crítico al llamar a updateSaladCounters para pedido ${pedidoId}:`, saladError);
+          }
+      } else {
+          console.log("No se requiere actualización de contadores de ensaladas para este caso.");
       }
 
       console.log(`%c---- ÉXITO TOTAL Pedido ID: ${pedidoId} ---- Limpiando estado y navegando...`, 'color: green; font-weight: bold; font-size: 1.1em;');
