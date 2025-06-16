@@ -316,12 +316,15 @@ const Cocina = () => {
                return;
             }
             const orderLineId = `${pedido.id}-${originalProdId}-${prod.uniqueId || index}`;
+            const orderTimeDayjs = dayjs(pedido.fechahora, 'DD/MM/YYYY HH:mm', 'es', true).tz('Europe/Madrid',true); // Parsear una vez
+
             const orderData = {
               idPedido: pedido.id,
               idProducto: originalProdId,
               orderLineId: orderLineId,
               producto: { ...prod, listo: prod.listo ?? false, nuevoCocina: prod.nuevoCocina ?? 0 },
               hora: pedido.fechahora,
+              orderTimeDayjs: orderTimeDayjs, // Almacenar el objeto Dayjs parseado
               nombre: pedido.cliente || 'Sin nombre',
               cantidad: (originalProdId === 48) ? (quantityForHeader * 0.5) : quantityForHeader,
               descripcion: pedido.observaciones || "",
@@ -355,19 +358,53 @@ const Cocina = () => {
     };
   }, [selectedDateStr, cocinaProducts, productosStockMap, isToday, getTurnoActual, isLoadingCocina, playNotificationSound]);
 
+  // Función para resetear los contadores de ensaladas para el turno de tarde
+  const resetSaladCountsForAfternoonShift = useCallback(async (docId) => {
+    const saladsRef = doc(db, SALADS_COLLECTION_NAME, docId);
+    console.log(`[Salad Reset] Attempting to reset salad counts for afternoon shift for doc: ${docId}`);
+    try {
+      const docSnap = await getDoc(saladsRef);
+      if (docSnap.exists()) {
+        const dataToUpdate = {
+          'ensaladas.grandes.preparadas': 0,
+          'ensaladas.grandes.pedidas': 0,
+          'ensaladas.pequenas.preparadas': 0,
+          'ensaladas.pequenas.pedidas': 0,
+          'ensaladillas.grandes.preparadas': 0,
+          'ensaladillas.grandes.pedidas': 0,
+          'ensaladillas.pequenas.preparadas': 0,
+          'ensaladillas.pequenas.pedidas': 0,
+          afternoonResetDone: true, // Marcar que el reseteo se ha hecho
+        };
+        await updateDoc(saladsRef, dataToUpdate);
+        console.log(`[Salad Reset] Salad counts and 'pedidas' reset successfully for ${docId}. afternoonResetDone set to true.`);
+      } else {
+        console.warn(`[Salad Reset] Document ${docId} does not exist. Cannot reset counts. Consider creating it with defaults if this is unexpected.`);
+        // Opcionalmente, podríamos crear el documento aquí con setDoc y { merge: true } si es el comportamiento deseado.
+        // Por ahora, solo advertimos.
+      }
+    } catch (error) {
+      console.error(`[Salad Reset] Error resetting salad counts for ${docId}:`, error);
+    }
+  }, []);
+
 
   useEffect(() => {
     console.log("[Cocina - Effect B] mostrarBarra (del DataContext) valor actual:", mostrarBarra);
   }, [mostrarBarra]);
 
+  // Mover la declaración de todayDocId aquí, antes de que se use en el siguiente useEffect
+  const todayDocId = formatDate(dateToPass).replace(/\//g, '-'); // Usa dateToPass del contexto
+
   useEffect(() => {
     if (isLoadingPedidosAndProcessing || !productsData || productsData.length === 0) { return; }
-    const now = dayjs(currentTimeTick);
+    const now = dayjs(currentTimeTick).tz('Europe/Madrid'); // Asegurar timezone
     let flagsOrOrderChanged = false;
     const updatedProductsData = productsData.map(product => {
         let productFlagsChanged = false;
         const updatedOrders = product.orders.map(order => {
-            const orderTimeDayjs = dayjs(order.hora, 'DD/MM/YYYY HH:mm', 'es', true).tz('Europe/Madrid',true);
+            // Usar el objeto order.orderTimeDayjs pre-parseado
+            const orderTime = order.orderTimeDayjs; // Ya es un objeto dayjs
             let newNeedsCookingAlert = false;
             const nombreProdLower = order.producto?.nombre ? order.producto.nombre.toLowerCase() : '';
             const productId = order.idProducto;
@@ -377,13 +414,13 @@ const Cocina = () => {
             } else if (nombreProdLower.includes('chorizo') || nombreProdLower.includes('morcilla')) {
                 alertTimeWindowMins = 15;
             }
-            if (alertTimeWindowMins > 0 && orderTimeDayjs.isValid() && !order.producto.listo) {
-                const alertStartTime = orderTimeDayjs.subtract(alertTimeWindowMins, 'minute');
-                if (now.isBetween(alertStartTime, orderTimeDayjs, null, '[]')) {
+            if (alertTimeWindowMins > 0 && orderTime.isValid() && !order.producto.listo) {
+                const alertStartTime = orderTime.subtract(alertTimeWindowMins, 'minute');
+                if (now.isBetween(alertStartTime, orderTime, null, '[]')) {
                     newNeedsCookingAlert = true;
                 }
             }
-            const newIsOverdue = orderTimeDayjs.isValid() && now.isAfter(orderTimeDayjs) && !order.producto.listo;
+            const newIsOverdue = orderTime.isValid() && now.isAfter(orderTime) && !order.producto.listo;
             if (newNeedsCookingAlert !== order.needsCookingAlert || newIsOverdue !== order.isOverdue) {
                 productFlagsChanged = true;
             }
@@ -391,8 +428,8 @@ const Cocina = () => {
         });
         const originalOrderIds = product.orders.map(o => o.orderLineId).join(',');
         updatedOrders.sort((a, b) => {
-            const timeA = dayjs(a.hora, "DD/MM/YYYY HH:mm", 'es', true).tz('Europe/Madrid',true);
-            const timeB = dayjs(b.hora, "DD/MM/YYYY HH:mm", 'es', true).tz('Europe/Madrid',true);
+            const timeA = a.orderTimeDayjs; // Usar objetos Dayjs pre-parseados
+            const timeB = b.orderTimeDayjs; // Usar objetos Dayjs pre-parseados
             if (timeA.isValid() && timeB.isValid()) {
                 const timeDiff = timeA.diff(timeB);
                 if (timeDiff !== 0) return timeDiff;
@@ -413,12 +450,34 @@ const Cocina = () => {
         }
     });
     if (flagsOrOrderChanged) {
-        console.log("[Effect C] Flags or order changed, updating productsData state.");
+        // console.log("[Effect C] Flags or order changed, updating productsData state."); // Comentado para reducir logs
         setProductsData(updatedProductsData);
     }
-  }, [currentTimeTick, productsData, isLoadingPedidosAndProcessing]);
 
-  const todayDocId = formatDate(dateToPass).replace(/\//g, '-'); // Usa dateToPass del contexto
+    // Lógica para resetear ensaladas al inicio del turno de tarde (18:00)
+    if (isToday) { // Solo resetear para el día actual
+      const HORA_RESETEO_TARDE = 18;
+      // todayDocId ya está disponible y se calcula basado en dateToPass (que será null para isToday)
+
+      if (now.hour() >= HORA_RESETEO_TARDE) {
+        const currentSaladDocData = saladsData && saladsData.length > 0 ? saladsData[0] : null;
+
+        if (currentSaladDocData && !currentSaladDocData.afternoonResetDone) {
+          console.log(`[Cocina - Salad Reset Check] Hora (${now.format('HH:mm')}) >= ${HORA_RESETEO_TARDE}:00 y afternoonResetDone es false o no existe para ${todayDocId}. Iniciando reseteo.`);
+          resetSaladCountsForAfternoonShift(todayDocId);
+        } else if (currentSaladDocData && currentSaladDocData.afternoonResetDone) {
+          // console.log(`[Cocina - Salad Reset Check] Reseteo de tarde para ${todayDocId} ya realizado.`);
+        } else if (!currentSaladDocData && now.hour() >= HORA_RESETEO_TARDE) {
+          // Esto puede ocurrir si el documento de ensaladas aún no se ha creado para el día.
+          // La función resetSaladCountsForAfternoonShift intentará actualizarlo.
+          // Si el documento no existe, la función registrará una advertencia.
+          console.log(`[Cocina - Salad Reset Check] Documento de ensaladas para ${todayDocId} no encontrado, pero es hora de resetear (${now.format('HH:mm')}). Intentando reset.`);
+          resetSaladCountsForAfternoonShift(todayDocId);
+        }
+      }
+    }
+
+  }, [currentTimeTick, productsData, isLoadingPedidosAndProcessing, isToday, todayDocId, saladsData, resetSaladCountsForAfternoonShift]);
 
   useEffect(() => {
     const saladsRef = doc(db, SALADS_COLLECTION_NAME, todayDocId);
@@ -443,7 +502,12 @@ const Cocina = () => {
     };
   }, [todayDocId]);
 
-  const updateSaladCount = async (type, size, amount) => {
+  const updateSaladCount = useCallback(async (type, size, amount) => {
+    // todayDocId se deriva de dateToPass, así que dateToPass es una dependencia.
+    // Para asegurar que usamos el valor más actual de dateToPass dentro del callback,
+    // recalculamos docId aquí o lo pasamos como dependencia si fuera un estado separado.
+    const docId = formatDate(dateToPass).replace(/\//g, '-');
+
     const sizeKey = size.toLowerCase().startsWith('grande') ? 'grandes' : 'pequenas';
     const currentAmount = parseInt(amount, 10);
     if (isNaN(currentAmount)) {
@@ -451,21 +515,21 @@ const Cocina = () => {
         return;
     }
     const newAmount = Math.max(0, currentAmount);
-    const saladsRef = doc(db, SALADS_COLLECTION_NAME, todayDocId); // todayDocId ya usa dateToPass
+    const saladsRef = doc(db, SALADS_COLLECTION_NAME, docId);
     const updatePath = `${type}.${sizeKey}.preparadas`;
-    console.log(`[Update Salad Count] Updating ${updatePath} to ${newAmount} in ${todayDocId}`);
+    console.log(`[Update Salad Count] Updating ${updatePath} to ${newAmount} in ${docId}`);
     try {
       const docSnap = await getDoc(saladsRef);
       if (docSnap.exists()) {
           await updateDoc(saladsRef, { [updatePath]: newAmount });
           console.log(`[Update Salad Count] ${updatePath} updated successfully.`);
       } else {
-          console.warn(`[Update Salad Count] Document ${todayDocId} does not exist. Cannot update preparadas count.`);
+          console.warn(`[Update Salad Count] Document ${docId} does not exist. Cannot update preparadas count.`);
       }
     } catch (error) {
       console.error(`Error updating ${updatePath}:`, error);
     }
-  };
+  }, [dateToPass]); // dateToPass es la dependencia ya que todayDocId se deriva de él.
 
   const productCountForGrid = Math.min(productsData.length, 9);
   let gridClass = '';
