@@ -65,12 +65,13 @@ const GlobalOrderListener = () => {
           const callId = Math.random().toString(36).substring(7); // ID único para esta llamada
 
           // Modificado: No procesar pedidos con origen 0 (online) aquí, ya que se manejan desde la app.
-          // Este listener DEBE procesar solo origen 1 (online) para actualizar calendarios.
-          if (newOrderData.origen === 0) { // <-- Changed condition to process ONLY origin 1
-            console.log(`%c[Listener] ---> PEDIDO CON ORIGEN ${newOrderData.origen} [${orderId}] (Num: ${newOrderData.NumeroPedido || 'N/A'}) DETECTADO. Procesando...`, 'color: orange; font-weight: bold;');
+          // Este listener procesa pedidos de origen 0 (TPV/Rapidos) y origen 1 (Web externa).
+          // CartTotal.jsx ya NO actualiza el calendario para pedidos nuevos (origen 0).
+          if (newOrderData.origen === 0) { 
+            console.log(`%c[Listener] ---> PEDIDO CON ORIGEN ${newOrderData.origen} [${orderId}] (Num: ${newOrderData.NumeroPedido || 'N/A'}) DETECTADO. Procesando calendarios...`, 'color: orange; font-weight: bold;');
             handleFirestoreUpdateLikeCartTotal(newOrderData, orderId, callId); // Pasar el callId
           } else {
-            console.log(`%c[Listener] ---> PEDIDO CON ORIGEN ${newOrderData.origen} [${orderId}] (Num: ${newOrderData.NumeroPedido || 'N/A'}) DETECTADO. IGNORADO por este listener.`, 'color: gray;');
+            console.log(`%c[Listener] ---> PEDIDO CON ORIGEN ${newOrderData.origen} [${orderId}] (Num: ${newOrderData.NumeroPedido || 'N/A'}) DETECTADO. IGNORADO por este listener (no es origen 1).`, 'color: gray;');
           }
         }
         // Ignorar cambios 'modified' o 'removed' para esta lógica
