@@ -115,6 +115,94 @@ const updateSaladCounters = async (currentCartItems, originalCartItems = []) => 
     }
 };
 
+// --- Función Auxiliar para Calcular Unidades Relevantes para chicken_calendar_daily ---
+const getCalendarRelevantQuantity = (items) => {
+    let totalCalendarUnits = 0;
+    if (!items || items.length === 0) return totalCalendarUnits;
+
+    items.forEach(item => {
+        const itemId = item.id; // En el carrito/pedido, el ID del producto es 'id'
+        const itemCantidad = Number(item.cantidad ?? 0);
+        // item.name, item.nombre, item.alias son para el nombre del producto
+
+        if (!itemId || itemCantidad <= 0 || isNaN(itemCantidad)) {
+            // console.warn("[CalendarQty] Item inválido en getCalendarRelevantQuantity:", item);
+            return;
+        }
+
+        let units = 0;
+        if (itemId === 1) { // Pollo Asado
+            units = itemCantidad * 1.0;
+        } else if (itemId === 2) { // 1/2 Pollo Asado
+            units = itemCantidad * 0.5;
+        } else if (itemId === 39) { // Costilla (asumimos 0.5 unidades de espacio de pollo)
+            units = itemCantidad * 0.5;
+        } else if (itemId === 40) { // Codillo (asumimos 0.5 unidades de espacio de pollo)
+            units = itemCantidad * 0.5;
+        }
+        // Considerar Menús si contienen pollo y no se desglosan en el carrito.
+        // Ejemplo: if (itemId === ID_MENU_CON_MEDIO_POLLO) units = itemCantidad * 0.5;
+
+        totalCalendarUnits += units;
+    });
+    // console.log("[CalendarQty] Total de unidades calculadas para el calendario:", totalCalendarUnits, "de items:", items);
+    return totalCalendarUnits;
+};
+
+// --- Función para Actualizar un Intervalo en chicken_calendar_daily ---
+const updateCalendarInterval = async (dateTime, quantityChange) => {
+    if (quantityChange === 0) {
+        console.log(`[CalendarUpdate] Cambio de cantidad es 0 para ${dateTime.format("YYYY-MM-DD HH:mm")}. No se actualiza calendario.`);
+        return;
+    }
+
+    const dateStr = dateTime.format("YYYY-MM-DD"); // Formato YYYY-MM-DD para el ID del documento
+    const timeStr = dateTime.format("HH:mm");    // Formato HH:mm para el 'start' del intervalo
+    const calendarDocRef = doc(db, "chicken_calendar_daily", dateStr);
+    console.log(`[CalendarUpdate] Intentando actualizar intervalo para ${dateStr} ${timeStr} con cambio: ${quantityChange}`);
+
+    try {
+        await runTransaction(db, async (transaction) => {
+            const calendarSnap = await transaction.get(calendarDocRef);
+            if (!calendarSnap.exists()) {
+                console.warn(`[CalendarUpdate] Documento de calendario para ${dateStr} no existe. No se puede actualizar.`);
+                return; // No continuar si el documento del día no existe
+            }
+
+            const calendarData = calendarSnap.data();
+            // Asegurarse de que 'intervals' sea un array antes de proceder
+            if (!Array.isArray(calendarData?.intervals)) {
+                console.warn(`[CalendarUpdate] El campo 'intervals' en ${dateStr} no es un array o no existe. No se puede actualizar.`);
+                // Podríamos decidir crear el array aquí si es necesario, o simplemente retornar.
+                // Por ahora, retornamos para evitar errores.
+                return;
+            }
+
+            // Crear una copia profunda del array de intervalos para modificarla
+            let intervalsCopy = JSON.parse(JSON.stringify(calendarData.intervals));
+
+            const intervalIndex = intervalsCopy.findIndex(interval => interval.start === timeStr);
+
+            if (intervalIndex === -1) {
+                console.warn(`[CalendarUpdate] Intervalo ${timeStr} no encontrado en ${dateStr}. No se puede actualizar.`);
+                return; // No continuar si el intervalo específico no existe
+            }
+
+            // Modificar el orderedCount en la copia
+            const currentCount = Number(intervalsCopy[intervalIndex].orderedCount) || 0;
+            intervalsCopy[intervalIndex].orderedCount = currentCount + quantityChange;
+            // Aquí se podría añadir lógica de maxAllowed si fuera necesario, similar a GlobalOrderListener
+
+            // Actualizar el documento con el array de intervalos modificado
+            transaction.update(calendarDocRef, { intervals: intervalsCopy });
+        });
+        console.log(`[CalendarUpdate] Transacción para ${dateStr} ${timeStr} (cambio: ${quantityChange}) completada.`);
+        
+    } catch (error) {
+        console.error(`[CalendarUpdate] Error Crítico en transacción para chicken_calendar_daily (${dateStr} ${timeStr}, cambio: ${quantityChange}):`, error);
+        // Considerar si este error debe ser fatal. Por ahora, solo log.
+    }
+};
 
 // --- Componente Principal ---
 const CartTotal = ({ datosCliente, setDatosCliente, orderToEdit }) => { // orderToEdit es orderBeingEdited del contexto, pasado como prop
@@ -542,8 +630,8 @@ const CartTotal = ({ datosCliente, setDatosCliente, orderToEdit }) => { // order
           celiaco: clienteData.celiaco, idCliente: clienteId, fechahora: horaPedidoParaGuardar,
           observaciones: clienteData.observaciones,
           pagado: clienteData.pagado,
-          productos: mappedProducts, total_pedido: totalPedidoCalculado.toFixed(2), paraOtroDia: esParaOtroDia,
-          fechahora_modificado: nowString,
+          productos: mappedProducts, total_pedido: totalPedidoCalculado.toFixed(2), paraOtroDia: esParaOtroDia, // esParaOtroDia se usa aquí
+          fechahora_modificado: serverTimestamp(), // Usar serverTimestamp
           origen: orderToEdit.origen ?? 0,
         };
         await updateDoc(pedidoRef, updateData);
@@ -561,7 +649,7 @@ const CartTotal = ({ datosCliente, setDatosCliente, orderToEdit }) => { // order
            orderCreationToken: newOrderCreationToken,
            webListenerProcessed: false,
            origen: orderToEdit?.origen ?? 0,
-           fechahora_realizado: nowString,
+           fechahora_realizado: serverTimestamp(), // Usar serverTimestamp
         };
         await setDoc(doc(db, "pedidos", pedidoId.toString()), pedidoData);
         console.log(`Firestore: Pedido nuevo ID ${pedidoId} creado.`);
@@ -570,7 +658,7 @@ const CartTotal = ({ datosCliente, setDatosCliente, orderToEdit }) => { // order
 
       console.log("Iniciando lógica de actualización de stock...");
       
-      const finalParaOtroDia = esParaOtroDia;
+      const finalParaOtroDia = esParaOtroDia; // Reafirmar para claridad en esta sección
       let stockChanges = {};
 
       if (esOperacionDeActualizacion) {
@@ -687,6 +775,66 @@ const CartTotal = ({ datosCliente, setDatosCliente, orderToEdit }) => { // order
           }
       } else {
           console.log("No se requiere actualización de contadores de ensaladas para este caso.");
+      }
+      
+      // --- Lógica para actualizar chicken_calendar_daily (REESCRITA) ---
+      console.log("Determinando si se actualiza chicken_calendar_daily...");
+
+      const currentCalendarQty = getCalendarRelevantQuantity(mappedProducts);
+      console.log("[CalendarUpdate] Contenido de orderToEdit.productos ANTES de calcular originalCalendarQty:", JSON.parse(JSON.stringify(orderToEdit?.productos || [])));
+      console.log("[CalendarUpdate] mappedProducts (para currentCalendarQty):", JSON.parse(JSON.stringify(mappedProducts)));
+
+      const originalCalendarQty = esOperacionDeActualizacion ? getCalendarRelevantQuantity(orderToEdit.productos || []) : 0;
+      console.log(`[CalendarUpdate] Calculado currentCalendarQty: ${currentCalendarQty}, Calculado originalCalendarQty: ${originalCalendarQty}`);
+
+      const currentOrderDateTime = parsedHoraPedido; // Ya parseado y validado
+      const originalOrderDateTime = esOperacionDeActualizacion && orderToEdit.fechahora
+          ? dayjs(orderToEdit.fechahora, "DD/MM/YYYY HH:mm", true) // Asegurar que el parseo sea robusto
+          : null;
+
+      if (esOperacionDeActualizacion && orderToEdit.fechahora && (!originalOrderDateTime || !originalOrderDateTime.isValid())) {
+          console.warn(`[CalendarUpdate] Fecha/hora original del pedido ${orderToEdit.NumeroPedido} ('${orderToEdit.fechahora}') es inválida. No se podrán hacer ajustes precisos al calendario para el estado original.`);
+      }
+
+      // finalEsParaHoy ya está calculado y se basa en `finalParaOtroDia` (que es `esParaOtroDia`)
+      // originalEraParaHoy ya está calculado
+
+      if (!esOperacionDeActualizacion) { // Pedido Nuevo
+          // --- MODIFICADO: Los pedidos nuevos (origen 0) ahora son procesados por el GlobalOrderListener.jsx ---
+          console.log(`[CalendarUpdate] Pedido nuevo (origen 0). La actualización del calendario de pollos será manejada por GlobalOrderListener.jsx.`);
+          // if (finalEsParaHoy && currentCalendarQty > 0) {
+          //     console.log(`[CalendarUpdate] Nuevo pedido para hoy. Sumando ${currentCalendarQty} unidades al calendario para ${currentOrderDateTime.format("YYYY-MM-DD HH:mm")}.`);
+          //     await updateCalendarInterval(currentOrderDateTime, currentCalendarQty);
+          // } else {
+          //     console.log(`[CalendarUpdate] Nuevo pedido ${finalEsParaHoy ? `sin productos relevantes para calendario de pollos (${currentCalendarQty} unidades)` : 'para otro día'}. No se actualiza calendario de pollos de hoy.`);
+          // }
+      } else { // Edición de Pedido
+          // --- Ediciones (origen 0 o 1) son manejadas por CartTotal.jsx ---
+          console.log(`[CalendarUpdate] Editando pedido (Pollos). Original Qty: ${originalCalendarQty}, Current Qty: ${currentCalendarQty}`);
+          const originalDateIsValidAndPresent = originalOrderDateTime && originalOrderDateTime.isValid();
+
+          if (originalEraParaHoy && finalEsParaHoy) { // Transición Hoy -> Hoy
+              if (originalDateIsValidAndPresent && currentOrderDateTime.isSame(originalOrderDateTime, 'minute')) { // Mismo slot
+                  const diffQty = currentCalendarQty - originalCalendarQty;
+                  if (diffQty !== 0) {
+                    console.log(`[CalendarUpdate] Edición Hoy -> Hoy (mismo slot ${currentOrderDateTime.format("YYYY-MM-DD HH:mm")}). Aplicando diferencia: ${diffQty} unidades.`);
+                    await updateCalendarInterval(currentOrderDateTime, diffQty);
+                  } else { console.log("[CalendarUpdate] Misma cantidad, mismo slot. Sin cambios para calendario de pollos.");}
+              } else if (originalDateIsValidAndPresent) { // Diferente slot dentro de hoy (o cantidad cambió también)
+                  console.log(`[CalendarUpdate] Edición Hoy -> Hoy (cambio de slot). Original: ${originalOrderDateTime.format("YYYY-MM-DD HH:mm")}, Nuevo: ${currentOrderDateTime.format("YYYY-MM-DD HH:mm")}.`);
+                  if (originalCalendarQty > 0) await updateCalendarInterval(originalOrderDateTime, -originalCalendarQty);
+                  if (currentCalendarQty > 0) await updateCalendarInterval(currentOrderDateTime, currentCalendarQty);
+              } else if (currentCalendarQty > 0) { // Fecha original no válida o no presente, pero la actual sí y es para hoy
+                  console.log(`[CalendarUpdate] Edición Hoy -> Hoy (fecha original inválida/ausente). Sumando ${currentCalendarQty} al slot actual ${currentOrderDateTime.format("YYYY-MM-DD HH:mm")}.`);
+                  await updateCalendarInterval(currentOrderDateTime, currentCalendarQty);
+              }
+          } else if (originalEraParaHoy && !finalEsParaHoy) { // Transición Hoy -> Otro Día
+              if (originalDateIsValidAndPresent && originalCalendarQty > 0) await updateCalendarInterval(originalOrderDateTime, -originalCalendarQty);
+          } else if (!originalEraParaHoy && finalEsParaHoy) { // Transición Otro Día -> Hoy
+              if (currentCalendarQty > 0) await updateCalendarInterval(currentOrderDateTime, currentCalendarQty);
+          } else { // Transición Otro Día -> Otro Día (o casos no cubiertos)
+              console.log(`[CalendarUpdate] Edición no afecta calendario de pollos de hoy (ej. Otro Día -> Otro Día).`);
+          }
       }
 
       console.log(`%c---- ÉXITO TOTAL Pedido ID: ${pedidoId} ---- Limpiando estado y navegando...`, 'color: green; font-weight: bold; font-size: 1.1em;');
