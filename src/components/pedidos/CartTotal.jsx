@@ -653,7 +653,7 @@ const CartTotal = ({ datosCliente, setDatosCliente, orderToEdit }) => { // order
            orderCreationToken: newOrderCreationToken,
            webListenerProcessed: false,
            origen: orderToEdit?.origen ?? 0,
-           fechahora_realizado: serverTimestamp(), // Usar serverTimestamp
+           fechahora_realizado: nowString, // Usar el string formateado como en PedidoRapido
            fecha_filtro: fechaFiltroParaPedido, // Añadir fecha_filtro
         };
         await setDoc(doc(db, "pedidos", pedidoId.toString()), pedidoData);
