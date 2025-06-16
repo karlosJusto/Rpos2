@@ -3,8 +3,7 @@ import { doc, setDoc, updateDoc, getDoc } from 'firebase/firestore';
 import { db } from '../firebase/firebase';
 import dayjs from 'dayjs';
 import { Modal, Button } from "react-bootstrap"; // Asumiendo que usas react-bootstrap
-
-const PedidoRapido = forwardRef(({ datosCliente }, ref) => {
+const PedidoRapido = forwardRef(({ datosCliente, fechaFiltroDocumento }, ref) => {
 
   const [showModal2, setShowModal2] = useState(false); // Visibilidad Modal Error/Aviso Genérico
   const handleCloseModal2 = () => setShowModal2(false);
@@ -167,6 +166,7 @@ const PedidoRapido = forwardRef(({ datosCliente }, ref) => {
           precio: (productData.price || 0).toFixed(2),
           total: (productData.price || 0).toFixed(2),
         }],
+        fecha_filtro: fechaFiltroDocumento, // Añadir el campo fecha_filtro
         total_pedido: (productData.price || 0).toFixed(2),
         //fechahora_realizado: new Date().toLocaleDateString('es-ES') + ' ' + new Date().toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' }),
          fechahora_realizado : dayjs().format('DD/MM/YYYY HH:mm')
