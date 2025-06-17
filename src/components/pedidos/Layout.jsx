@@ -10,7 +10,7 @@ import { Swiper, SwiperSlide } from "swiper/react";
 import "swiper/css";
 import "swiper/css/scrollbar";
 import "swiper/css/mousewheel";
-import { doc, onSnapshot } from "firebase/firestore"; // Importar onSnapshot en lugar de getDoc
+import { doc, onSnapshot, collection, query, updateDoc } from "firebase/firestore"; // Añadir updateDoc
 import { db } from "../firebase/firebase";
 import { dataContext } from '../Context/DataContext';
 
@@ -32,6 +32,7 @@ const Layout = () => {
   const [calendarData, setCalendarData] = useState(null);
   const [loadingCalendar, setLoadingCalendar] = useState(true);
   const [errorCalendar, setErrorCalendar] = useState(null); // Para manejar errores del listener
+  const [totalPollosPedidosHoy, setTotalPollosPedidosHoy] = useState(0); // Estado para el conteo de pollos de pedidos
 
   const today = new Date();
   const formattedDate = today.toISOString().split("T")[0];
@@ -117,6 +118,143 @@ const Layout = () => {
       unsubscribe(); // Retorna la función de desuscripción
     };
   }, [formattedDate]); // Dependencia: formattedDate. Si cambia el día, se vuelve a ejecutar y limpia el listener anterior.
+
+  // --- Efecto para validar/corroborar los datos del calendario cuando se actualizan ---
+  useEffect(() => {
+    if (calendarData && calendarData.intervals && Array.isArray(calendarData.intervals) && calendarData.intervals.length > 0) {
+      console.log("Layout (Calendar Aggregation): Datos de calendario recibidos/actualizados. Calculando conteo total para corroboración.");
+
+      // Sumar todos los 'orderedCount' de todos los intervalos.
+      // Se asume que 'orderedCount' en cada intervalo ya representa las cantidades
+      // para los productos relevantes que este calendario gestiona (ej. pollos, IDs 1, 2, 39, 40).
+      const totalOrderedInCalendar = calendarData.intervals.reduce((sum, interval) => {
+        return sum + (Number(interval.orderedCount) || 0); // Asegura que se sume un número
+      }, 0);
+
+      console.log(`Layout (Calendar Aggregation): Conteo total de items programados en todas las franjas horarias del día actual (relevante para productos como IDs 1, 2, 39, 40): ${totalOrderedInCalendar}.`);
+      console.log("Layout (Calendar Aggregation): Este valor puede ser usado para corroborar si los datos recibidos del calendario son correctos según las expectativas.");
+
+      // Aquí podrías añadir lógica de comparación más avanzada si tuvieras:
+      // 1. Una fuente externa para el total esperado de estos productos.
+      // 2. Umbrales definidos para 'totalOrderedInCalendar'.
+      // Ejemplo:
+      // const expectedTotalForCriticalProducts = obtenerTotalEsperadoDeOtraFuente();
+      // if (totalOrderedInCalendar !== expectedTotalForCriticalProducts) {
+      //   console.warn(`Layout (Calendar Aggregation): Discrepancia detectada. Total del calendario: ${totalOrderedInCalendar}, Esperado: ${expectedTotalForCriticalProducts}`);
+      // }
+    } else if (calendarData && (!calendarData.intervals || calendarData.intervals.length === 0)) {
+      console.log("Layout (Calendar Aggregation): Datos de calendario recibidos, pero no hay intervalos para procesar o los intervalos están vacíos.");
+    }
+  }, [calendarData]); // Dependencia: calendarData. Se ejecuta cada vez que calendarData cambia.
+
+  // --- Efecto para contar pollos del día actual desde la colección 'pedidos' ---
+  useEffect(() => {
+    console.log(`Layout (Pedidos Pollos): Configurando listener para contar pollos en pedidos del día ${formattedDate}.`);
+    setTotalPollosPedidosHoy(0); // Resetear al cambiar de día o al montar
+
+    // Helper para convertir "DD/MM/YYYY HH:MM" a "YYYY-MM-DD"
+    const convertirFechaPedidoAYYYYMMDD = (fechaDDMMYYYYConHora) => {
+      if (!fechaDDMMYYYYConHora || typeof fechaDDMMYYYYConHora !== 'string' || !fechaDDMMYYYYConHora.includes(' ')) return null;
+      const [datePart] = fechaDDMMYYYYConHora.split(' ');
+      const partes = datePart.split('/');
+      if (partes.length !== 3) return null;
+      const [dia, mes, ano] = partes;
+      return `${ano}-${mes.padStart(2, '0')}-${dia.padStart(2, '0')}`;
+    };
+
+    const pedidosRef = collection(db, "pedidos");
+    // NOTA: Escuchar toda la colección y filtrar en cliente puede ser ineficiente para colecciones grandes.
+    // Lo ideal sería tener un campo de fecha normalizado (ej. YYYY-MM-DD) en los documentos 'pedidos'
+    // para filtrar directamente en la query de Firestore.
+    const qPedidos = query(pedidosRef); // Por ahora, obtenemos todos los pedidos.
+
+    const unsubscribePedidos = onSnapshot(qPedidos, (querySnapshot) => {
+      let pollosHoy = 0;
+      // Objeto para almacenar conteos por franjas específicas
+      const pollosPorFranjaEspecifica = {
+        "21:30": 0,
+        "21:45": 0,
+        "22:00": 0,
+      };
+
+      querySnapshot.forEach((doc) => {
+        const orderData = doc.data();
+        const fechaPedidoFormatoComparar = convertirFechaPedidoAYYYYMMDD(orderData.fechahora);
+
+        if (fechaPedidoFormatoComparar === formattedDate) {
+          const horaPedido = orderData.fechahora ? orderData.fechahora.split(' ')[1] : null; // Extraer HH:MM
+          if (Array.isArray(orderData.productos)) {
+            orderData.productos.forEach(producto => {
+              const productId = Number(producto.id); // Asegurar que productId sea un número
+              const cantidadPedido = Number(producto.cantidad) || 0;
+
+              if (productId === 1) { // Pollo entero
+                pollosHoy += 1 * cantidadPedido;
+                if (horaPedido && pollosPorFranjaEspecifica.hasOwnProperty(horaPedido)) {
+                  pollosPorFranjaEspecifica[horaPedido] += 1 * cantidadPedido;
+                }
+              } else if (productId === 2 || productId === 39 || productId === 40) { // Medio pollo o equivalentes
+                pollosHoy += 0.5 * cantidadPedido;
+                if (horaPedido && pollosPorFranjaEspecifica.hasOwnProperty(horaPedido)) {
+                  pollosPorFranjaEspecifica[horaPedido] += 0.5 * cantidadPedido;
+                }
+              }
+            });
+          }
+        }
+      });
+      setTotalPollosPedidosHoy(pollosHoy);
+      console.log(`Layout (Pedidos Pollos): TOTAL DIARIO de pollos (IDs 1,2,39,40) para ${formattedDate} desde 'pedidos': ${pollosHoy}`);
+      
+      // Log de los conteos para las franjas específicas
+      console.log(`Layout (Pedidos Pollos Franjas Específicas) para ${formattedDate}:`);
+      console.log(`  └─ 21:30 -> Pollos: ${pollosPorFranjaEspecifica["21:30"]}`);
+      console.log(`  └─ 21:45 -> Pollos: ${pollosPorFranjaEspecifica["21:45"]}`);
+      console.log(`  └─ 22:00 -> Pollos: ${pollosPorFranjaEspecifica["22:00"]}`);
+
+      // --- Lógica para sobrescribir el calendario si hay discrepancias ---
+      if (calendarData && calendarData.intervals && Array.isArray(calendarData.intervals)) {
+        const calendarDocRef = doc(db, "chicken_calendar_daily", formattedDate);
+        let intervalsWereUpdated = false;
+        // Es crucial trabajar con una copia para no mutar el estado directamente antes de setearlo (si fuera el caso)
+        // y para preparar el objeto de actualización para Firestore.
+        const newIntervalsArray = JSON.parse(JSON.stringify(calendarData.intervals)); 
+
+        const franjasACorregir = ["21:30", "21:45", "22:00"];
+
+        franjasACorregir.forEach(horaFranja => {
+          const conteoCalculadoDesdePedidos = pollosPorFranjaEspecifica[horaFranja];
+          const intervalIndex = newIntervalsArray.findIndex(interval => interval.start === horaFranja);
+
+          if (intervalIndex !== -1) {
+            const currentOrderedCountInCalendar = Number(newIntervalsArray[intervalIndex].orderedCount) || 0;
+            if (currentOrderedCountInCalendar !== conteoCalculadoDesdePedidos) {
+              console.warn(`Layout (Corrección Calendario): Discrepancia para ${horaFranja}. Calendario: ${currentOrderedCountInCalendar}, Pedidos (Layout): ${conteoCalculadoDesdePedidos}. SOBREESCRIBIENDO CALENDARIO.`);
+              newIntervalsArray[intervalIndex].orderedCount = conteoCalculadoDesdePedidos;
+              intervalsWereUpdated = true;
+            }
+          } else {
+            console.warn(`Layout (Corrección Calendario): Franja ${horaFranja} no encontrada en los intervalos del calendario actual. No se puede corregir.`);
+          }
+        });
+
+        if (intervalsWereUpdated) {
+          updateDoc(calendarDocRef, { intervals: newIntervalsArray })
+            .then(() => console.log(`Layout (Corrección Calendario): Documento chicken_calendar_daily/${formattedDate} actualizado con los conteos corregidos por Layout.`))
+            .catch(error => console.error(`Layout (Corrección Calendario): Error al actualizar chicken_calendar_daily/${formattedDate}:`, error));
+        }
+      } else {
+        console.warn("Layout (Corrección Calendario): calendarData o sus intervalos no están disponibles en este momento. No se puede intentar la corrección del calendario.");
+      }
+    }, (error) => {
+      console.error("Layout (Pedidos Pollos): Error en el listener de la colección 'pedidos':", error);
+    });
+
+    return () => {
+      console.log(`Layout (Pedidos Pollos): Limpiando listener de 'pedidos' para ${formattedDate}.`);
+      unsubscribePedidos();
+    };
+  }, [formattedDate, calendarData]); // Añadir calendarData como dependencia
 
   const morningIntervals =
     calendarData?.intervals?.filter((interval) => interval.start < "18:00") || [];
