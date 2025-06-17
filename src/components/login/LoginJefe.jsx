@@ -56,48 +56,77 @@ const Login = () => {
         return  {diaSemana , fecha} ;
         };
 
-  const [stock, setStock] = useState(null);  
- 
-  const obtenerStockProducto = async (productId) => {
-   try {
-     const docRef = doc(db, 'productos', `${productId}`);
-     const docSnap = await getDoc(docRef); // Esperamos a que se obtenga el documento
- 
-     if (docSnap.exists()) {
-       const data = docSnap.data();
-       const stockValue = data.stock; // Extraemos el stock
-       setStock(stockValue); // Actualizamos el estado con el valor de stock
-     } else {
-       console.log('No se encontró el producto');
-       setStock(null); // Si no se encuentra el producto, asignamos null
-     }
-   } catch (error) {
-     console.error("Error al obtener el stock del producto:", error);
-     setStock(null); // En caso de error, podemos asignar null
-   }
- };
- 
- 
- 
- // Usamos useEffect para obtener el stock cuando el componente se monta
- useEffect(() => {
-   obtenerStockProducto(1); // Llamamos a la función para obtener el stock del producto con product_id = 1
- }, []); // El array vacío hace que se ejecute solo una vez cuando el componente se monta
-
   const generarEstadisticasDiarias = async () => {
-    if (stock === null) {
-      console.log('Esperando stock...');
-      return; // Salimos si el stock aún no está disponible
+    let currentStock = null;
+    try {
+      // Fetch current stock for product ID '1'
+      const productRef = doc(db, 'productos', '1');
+      const productSnap = await getDoc(productRef);
+
+      if (productSnap.exists()) {
+        currentStock = productSnap.data().stock;
+      } else {
+        console.error('Producto con ID 1 no encontrado para obtener stock inicial.');
+        setErrorMessage("No se pudo obtener el stock inicial para las estadísticas.");
+        return;
+      }
+    } catch (error) {
+      console.error("Error al obtener el stock del producto para estadísticas:", error);
+      setErrorMessage("Error obteniendo stock para estadísticas.");
+      return;
     }
-  
+
+    if (currentStock === null || typeof currentStock === 'undefined') {
+      console.log('Stock no disponible (null o undefined) para generar estadísticas.');
+      setErrorMessage("Stock no válido para generar estadísticas.");
+      return;
+    }
+
     try {
       const { fecha, diaSemana } = obtenerFechaEspana(); // Obtenemos la fecha y el día de la semana
       const docRef = doc(db, "estadisticas_diarias", fecha); // Usamos la fecha como ID para el documento
-  
+
       // Verificamos si el documento ya existe
       const docSnapshot = await getDoc(docRef);
-  
       if (!docSnapshot.exists()) {
+        // Lógica para el día anterior (ayer)
+        const fechaAyer = dayjs().tz('Europe/Madrid').subtract(1, 'day');
+        const fechaAyerStr = fechaAyer.format('DD-MM-YYYY');
+        const diaSemanaAyer = fechaAyer.format('dddd');
+        const docAyerRef = doc(db, "estadisticas_diarias", fechaAyerStr); // Referencia al documento de ayer
+        let docAyerSnapshot = await getDoc(docAyerRef); // Intenta obtener el documento de ayer
+
+        // Si el documento de AYER no existe, lo creamos
+        if (!docAyerSnapshot.exists()) {
+          console.log(`El documento de estadísticas para AYER (${fechaAyerStr}) no existe. Creándolo...`);
+          const fechaAnteayer = dayjs().tz('Europe/Madrid').subtract(2, 'day');
+          const fechaAnteayerStr = fechaAnteayer.format('DD-MM-YYYY');
+          const docAnteayerRef = doc(db, "estadisticas_diarias", fechaAnteayerStr);
+          const docAnteayerSnapshot = await getDoc(docAnteayerRef);
+
+          const stockInicialAyer = docAnteayerSnapshot.exists()
+            ? (docAnteayerSnapshot.data().stock_final ?? docAnteayerSnapshot.data().stock ?? 0)
+            : 0;
+          
+          const stockAnteriorDeAnteayer = docAnteayerSnapshot.exists()
+            ? (docAnteayerSnapshot.data().stock_anterior ?? 0)
+            : 0;
+
+          await setDoc(docAyerRef, {
+            diasemana: diaSemanaAyer,
+            enbarra: 0, libresManana: 0, libresTarde: 0, vm: 0, vt: 0, vd: 0,
+            stock: stockInicialAyer, 
+            stock_anterior: stockAnteriorDeAnteayer, 
+            entran: 0, baja: 0, devueltos: 0,
+          });
+          console.log(`Documento de estadísticas para AYER (${fechaAyerStr}) creado.`);
+          docAyerSnapshot = await getDoc(docAyerRef); 
+        }
+
+        const stockAnteriorParaHoy = docAyerSnapshot.exists()
+          ? (docAyerSnapshot.data().stock_final ?? docAyerSnapshot.data().stock ?? 0)
+          : 0;
+
         await setDoc(docRef, {
           diasemana: diaSemana,
           enbarra: 0,
@@ -106,19 +135,16 @@ const Login = () => {
           vm: 0,
           vt: 0,
           vd: 0,
-          stock: stock, // Usamos el valor de stock
-          stock_anterior: stock,
-          //stockactualizado:0,
-          //stockfinal:0,
+          stock: currentStock, 
+          stock_anterior: stockAnteriorParaHoy, 
           entran: 0,
           baja: 0,
           devueltos: 0,
         });
-        console.log("Datos guardados exitosamente para el día", fecha);
+        console.log("Datos de HOY guardados exitosamente para el día", fecha);
       } else {
-        console.log("Ya existen datos para el día", fecha);
+        console.log("Ya existen datos para el día de HOY", fecha);
       }
-  
     } catch (e) {
       console.error("Error al generar las estadísticas diarias: ", e);
     }
