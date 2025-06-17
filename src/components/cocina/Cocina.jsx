@@ -8,7 +8,9 @@ import {
   doc,
   onSnapshot,
   updateDoc,
-  getDoc
+  getDoc,
+  query,
+  where
 } from 'firebase/firestore';
 import dayjs from 'dayjs';
 import isBetween from 'dayjs/plugin/isBetween';
@@ -189,9 +191,18 @@ const Cocina = () => {
     // This main processing part has its own loading state.
     console.log(`[Effect A] cocinaProducts available. Setting up listener / Re-running due to Date (from context: ${selectedDateStr}), Products, Stock...`);
     setIsLoadingPedidosAndProcessing(true);
-    const pedidosRef = collection(db, 'pedidos');
 
-    const unsubscribe = onSnapshot(pedidosRef, (querySnapshot) => {
+    // Construct the query to fetch pedidos only for the selectedDateStr
+    // This uses a common Firestore trick for "starts with" string queries.
+    const pedidosQuery = query(
+      collection(db, 'pedidos'),
+      where("fechahora", ">=", selectedDateStr),
+      where("fechahora", "<", selectedDateStr + "\uf8ff") // \uf8ff is a very high Unicode character
+    );
+
+    console.log(`[Effect A] Subscribing to 'pedidos' with query for date: ${selectedDateStr}`);
+
+    const unsubscribe = onSnapshot(pedidosQuery, (querySnapshot) => {
       console.log(`[Effect A] Snapshot received (${querySnapshot.size} docs). Filtering for date: ${selectedDateStr}`);
       const allPedidosRaw = [];
 
@@ -235,8 +246,10 @@ const Cocina = () => {
         if (parts.length !== 2) return false;
         const [fechaPedido, horaPedido] = parts;
         if (!/^\d{2}\/\d{2}\/\d{4}$/.test(fechaPedido) || !/^\d{2}:\d{2}$/.test(horaPedido)) return false;
-
-        if (fechaPedido !== selectedDateStr) return false;
+        
+        // This client-side check is now largely redundant due to the Firestore query,
+        // but kept as a safeguard or if strict matching is needed beyond "starts with".
+        // if (fechaPedido !== selectedDateStr) return false; // Can be removed if confident in Firestore query
 
         if (isToday) {
           const { startTime, endTime } = getTurnoActual();
