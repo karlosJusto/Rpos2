@@ -442,6 +442,8 @@ const CartTotal = ({ datosCliente, setDatosCliente, orderToEdit }) => { // order
       const clienteData = sanitizeClientData(datosCliente);
       const horaPedidoParaGuardar = fechahoraFinalPedido;
       const parsedHoraPedido = dayjs(horaPedidoParaGuardar, "DD/MM/YYYY HH:mm", true);
+      const fechaFiltroParaPedido = parsedHoraPedido.format("DD-MM-YYYY");
+
 
       if (!parsedHoraPedido.isValid()) {
            throw new Error(`El formato de la fecha/hora final del pedido es inválido: ${horaPedidoParaGuardar}. Use DD/MM/YYYY HH:mm`);
@@ -545,6 +547,7 @@ const CartTotal = ({ datosCliente, setDatosCliente, orderToEdit }) => { // order
           productos: mappedProducts, total_pedido: totalPedidoCalculado.toFixed(2), paraOtroDia: esParaOtroDia,
           fechahora_modificado: nowString,
           origen: orderToEdit.origen ?? 0,
+          fecha_filtro: fechaFiltroParaPedido,
         };
         await updateDoc(pedidoRef, updateData);
         console.log(`Firestore: Pedido ID ${pedidoId} actualizado.`);
@@ -562,6 +565,7 @@ const CartTotal = ({ datosCliente, setDatosCliente, orderToEdit }) => { // order
            webListenerProcessed: false,
            origen: orderToEdit?.origen ?? 0,
            fechahora_realizado: nowString,
+           fecha_filtro: fechaFiltroParaPedido,
         };
         await setDoc(doc(db, "pedidos", pedidoId.toString()), pedidoData);
         console.log(`Firestore: Pedido nuevo ID ${pedidoId} creado.`);

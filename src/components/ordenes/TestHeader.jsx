@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useContext } from 'react';
 import { dataContext } from '../Context/DataContext';
 import { db } from '../firebase/firebase';
 import {
-  doc, getDoc, updateDoc, setDoc, collection, onSnapshot,
+  doc, getDoc, updateDoc, setDoc, collection, onSnapshot, query, where,
   serverTimestamp
 } from 'firebase/firestore';
 
@@ -47,6 +47,7 @@ const TestHeader = ({ mostrarElementosDeOrdenes }) => {
 
   const { dateToPass, setDateToPass } = useContext(dataContext);
 
+  const fechaParaPedidoRapidoDocId = (dateToPass ? dayjs(dateToPass) : dayjs()).format('DD-MM-YYYY');
   const pedidoRapidoRef = useRef(null);
   const datosClienteParaPedidoHeader = {
     cliente: 'AAgenerico',
@@ -137,7 +138,10 @@ const TestHeader = ({ mostrarElementosDeOrdenes }) => {
     const dynamicDocIdEstadisticas = diaObjetivo.format('DD-MM-YYYY');
     const docRefEstadisticas = doc(db, COLLECTION_ESTADISTICAS, dynamicDocIdEstadisticas);
 
-    pedidosUnsubscribe = onSnapshot(collection(db, COLLECTION_PEDIDOS),
+    // Apply fecha_filtro to the pedidos query
+    const pedidosCollectionRef = collection(db, COLLECTION_PEDIDOS);
+    const pedidosQuery = query(pedidosCollectionRef, where("fecha_filtro", "==", dynamicDocIdEstadisticas));
+    pedidosUnsubscribe = onSnapshot(pedidosQuery,
       (pedidosSnapshot) => {
         if (!isMountedRef.current) return;
         setIsListenerUpdating(true);
@@ -342,7 +346,11 @@ const TestHeader = ({ mostrarElementosDeOrdenes }) => {
 
   return (
     <>
-      <PedidoRapido ref={pedidoRapidoRef} datosCliente={datosClienteParaPedidoHeader} />
+      <PedidoRapido
+        ref={pedidoRapidoRef}
+        datosCliente={datosClienteParaPedidoHeader}
+        fechaFiltroDocumento={fechaParaPedidoRapidoDocId} // Pass the date string for fecha_filtro
+      />
       <div className="w-full relative">
         {/* Barra principal (amarilla) - Siempre visible */}
         <div className={`grid grid-cols-12 gap-2 w-full fixed top-0 bg-white p-2 z-20 h-[12vh] items-center`}>
@@ -603,3 +611,4 @@ TestHeader.defaultProps = {
 };
 
 export default TestHeader;
+

@@ -141,6 +141,10 @@ const PedidoRapido = forwardRef(({ datosCliente }, ref) => {
         positionValue = 2;
       }
 
+      const horaPedidoParaGuardar = clienteData.fechahora; // Esta ya está en formato DD/MM/YYYY HH:mm
+      const parsedHoraPedido = dayjs(horaPedidoParaGuardar, "DD/MM/YYYY HH:mm", true);
+      const fechaFiltroParaPedido = parsedHoraPedido.format("DD-MM-YYYY");
+
       const productoRapidoData = {
         NumeroPedido: nextId,
         cliente: clienteData.cliente,
@@ -169,7 +173,8 @@ const PedidoRapido = forwardRef(({ datosCliente }, ref) => {
         }],
         total_pedido: (productData.price || 0).toFixed(2),
         //fechahora_realizado: new Date().toLocaleDateString('es-ES') + ' ' + new Date().toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' }),
-         fechahora_realizado : dayjs().format('DD/MM/YYYY HH:mm')
+         fechahora_realizado : dayjs().format('DD/MM/YYYY HH:mm'),
+         fecha_filtro: fechaFiltroParaPedido,
       };
 
        //console.log(fechahora_realizado);
