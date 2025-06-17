@@ -1,4 +1,4 @@
-import { useState, useEffect, useContext } from "react";
+import { useState, useEffect, useContext, useRef } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import Sidebar from "./Sidebar";
 import Navbar from "./Navbar";
@@ -33,6 +33,13 @@ const Layout = () => {
   const [loadingCalendar, setLoadingCalendar] = useState(true);
   const [errorCalendar, setErrorCalendar] = useState(null); // Para manejar errores del listener
   const [totalPollosPedidosHoy, setTotalPollosPedidosHoy] = useState(0); // Estado para el conteo de pollos de pedidos
+  // Estado para almacenar los conteos calculados directamente desde la colección 'pedidos'
+  // para las franjas horarias específicas que se corrigen.
+  // Formato: { "HH:MM": count, ... }
+  const [calculatedSlotCounts, setCalculatedSlotCounts] = useState({});
+
+  // Ref para el timeout de la actualización del calendario
+  const updateCalendarTimeoutRef = useRef(null);
 
   const today = new Date();
   const formattedDate = today.toISOString().split("T")[0];
@@ -151,7 +158,14 @@ const Layout = () => {
   useEffect(() => {
     console.log(`Layout (Pedidos Pollos): Configurando listener para contar pollos en pedidos del día ${formattedDate}.`);
     setTotalPollosPedidosHoy(0); // Resetear al cambiar de día o al montar
+    setCalculatedSlotCounts({}); // Resetear conteos calculados al cambiar de día
 
+    // Limpiar cualquier timeout pendiente si el efecto se re-ejecuta (ej. cambio de fecha)
+    // Esto también se hace en la función de limpieza del return, pero es bueno tenerlo aquí
+    // por si acaso, aunque la lógica principal de limpieza está en el return.
+    if (updateCalendarTimeoutRef.current) {
+      clearTimeout(updateCalendarTimeoutRef.current);
+    }
     // Helper para convertir "DD/MM/YYYY HH:MM" a "YYYY-MM-DD"
     const convertirFechaPedidoAYYYYMMDD = (fechaDDMMYYYYConHora) => {
       if (!fechaDDMMYYYYConHora || typeof fechaDDMMYYYYConHora !== 'string' || !fechaDDMMYYYYConHora.includes(' ')) return null;
@@ -206,6 +220,9 @@ const Layout = () => {
       setTotalPollosPedidosHoy(pollosHoy);
       console.log(`Layout (Pedidos Pollos): TOTAL DIARIO de pollos (IDs 1,2,39,40) para ${formattedDate} desde 'pedidos': ${pollosHoy}`);
       
+      // Actualizar el estado con los conteos calculados desde 'pedidos' para las franjas específicas
+      setCalculatedSlotCounts(pollosPorFranjaEspecifica);
+      
       // Log de los conteos para las franjas específicas
       console.log(`Layout (Pedidos Pollos Franjas Específicas) para ${formattedDate}:`);
       console.log(`  └─ 21:30 -> Pollos: ${pollosPorFranjaEspecifica["21:30"]}`);
@@ -239,9 +256,18 @@ const Layout = () => {
         });
 
         if (intervalsWereUpdated) {
-          updateDoc(calendarDocRef, { intervals: newIntervalsArray })
-            .then(() => console.log(`Layout (Corrección Calendario): Documento chicken_calendar_daily/${formattedDate} actualizado con los conteos corregidos por Layout.`))
-            .catch(error => console.error(`Layout (Corrección Calendario): Error al actualizar chicken_calendar_daily/${formattedDate}:`, error));
+          // Limpiar cualquier timeout existente para la corrección del calendario
+          if (updateCalendarTimeoutRef.current) {
+            clearTimeout(updateCalendarTimeoutRef.current);
+          }
+          // Establecer un nuevo timeout para actualizar el documento
+          console.log(`Layout (Corrección Calendario): Discrepancia detectada. Programando actualización para chicken_calendar_daily/${formattedDate} en 3 segundos.`);
+          updateCalendarTimeoutRef.current = setTimeout(() => {
+            updateDoc(calendarDocRef, { intervals: newIntervalsArray })
+              .then(() => console.log(`Layout (Corrección Calendario TIMEOUT EJECUTADO): Documento chicken_calendar_daily/${formattedDate} actualizado.`))
+              .catch(error => console.error(`Layout (Corrección Calendario TIMEOUT EJECUTADO): Error al actualizar chicken_calendar_daily/${formattedDate}:`, error));
+          }, 3000); // 3000 milisegundos = 3 segundos
+
         }
       } else {
         console.warn("Layout (Corrección Calendario): calendarData o sus intervalos no están disponibles en este momento. No se puede intentar la corrección del calendario.");
@@ -253,6 +279,10 @@ const Layout = () => {
     return () => {
       console.log(`Layout (Pedidos Pollos): Limpiando listener de 'pedidos' para ${formattedDate}.`);
       unsubscribePedidos();
+      // Asegurarse de limpiar el timeout si el componente se desmonta o las dependencias cambian
+      if (updateCalendarTimeoutRef.current) {
+        clearTimeout(updateCalendarTimeoutRef.current);
+      }
     };
   }, [formattedDate, calendarData]); // Añadir calendarData como dependencia
 
@@ -298,28 +328,40 @@ const Layout = () => {
                   >
                     <SwiperSlide>
                       <div className="flex flex-wrap gap-2">
-                        {(isMorning ? morningIntervals : afternoonIntervals).map(
-                          (interval, index) => (
-                            <button
-                              key={`${interval.start}-${index}-${interval.orderedCount}`} // Key más única para forzar re-render si orderedCount cambia
-                              className={`px-2 py-1 ms-4 border rounded whitespace-nowrap font-nunito transition-colors duration-150
-                                ${selectedSlotTime === interval.start ? 'bg-yellow-400 border-yellow-600 ring-2 ring-yellow-300' : 'hover:bg-gray-200'}`}
-                              onClick={() => setSelectedSlotTime(interval.start)}
-                            >
-                              {interval.start} [
-                              <span
-                                className={
-                                  interval.orderedCount >= interval.maxAllowed
-                                    ? "text-red-500 font-extrabold"
-                                    : "text-green-700 font-extrabold"
-                                }
+                        {(isMorning ? morningIntervals : afternoonIntervals).map((interval, index) => {
+                            // Determinar el conteo a mostrar:
+                            // Priorizar calculatedSlotCounts para las franjas críticas, si está disponible.
+                            let displayCount = interval.orderedCount; // Valor por defecto desde calendarData
+                            const criticalSlotsForDisplay = ["21:30", "21:45", "22:00"];
+
+                            if (
+                              criticalSlotsForDisplay.includes(interval.start) &&
+                              calculatedSlotCounts.hasOwnProperty(interval.start)
+                            ) {
+                              displayCount = calculatedSlotCounts[interval.start];
+                            }
+
+                            return (
+                              <button
+                                key={`${interval.start}-${index}-${displayCount}`} // Usar displayCount en la key
+                                className={`px-2 py-1 ms-4 border rounded whitespace-nowrap font-nunito transition-colors duration-150
+                                  ${selectedSlotTime === interval.start ? 'bg-yellow-400 border-yellow-600 ring-2 ring-yellow-300' : 'hover:bg-gray-200'}`}
+                                onClick={() => setSelectedSlotTime(interval.start)}
                               >
-                                {interval.orderedCount}
-                              </span>
-                              ]
-                            </button>
-                          )
-                        )}
+                                {interval.start} [
+                                <span
+                                  className={
+                                    displayCount >= interval.maxAllowed // Usar displayCount para el estilo
+                                      ? "text-red-500 font-extrabold"
+                                      : "text-green-700 font-extrabold"
+                                  }
+                                >
+                                  {displayCount} {/* Mostrar displayCount */}
+                                </span>
+                                ]
+                              </button>
+                            );
+                          })}
                       </div>
                     </SwiperSlide>
                   </Swiper>
