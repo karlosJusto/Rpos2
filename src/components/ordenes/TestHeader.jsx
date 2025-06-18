@@ -138,6 +138,10 @@ const TestHeader = ({ mostrarElementosDeOrdenes }) => {
     const dynamicDocIdEstadisticas = diaObjetivo.format('DD-MM-YYYY');
     const docRefEstadisticas = doc(db, COLLECTION_ESTADISTICAS, dynamicDocIdEstadisticas);
 
+    // Determina si el día que se está visualizando es realmente el día actual.
+    // Esto es diferente de `esHoy`, que solo indica si se ha seleccionado una fecha específica o no.
+    const isViewingToday = diaObjetivo.isSame(dayjs().tz('Europe/Madrid'), 'day');
+
     // Apply fecha_filtro to the pedidos query
     const pedidosCollectionRef = collection(db, COLLECTION_PEDIDOS);
     const pedidosQuery = query(pedidosCollectionRef, where("fecha_filtro", "==", dynamicDocIdEstadisticas));
@@ -217,14 +221,45 @@ const TestHeader = ({ mostrarElementosDeOrdenes }) => {
           libres_base_from_db = statsData.libres_base ?? 0;
         }
         const salesToUse = currentSalesRef.current;
+        let pollosLibresCalculados;
+
+        const baseLibres = libres_base_from_db || 0;
+        const ventasMananaActuales = salesToUse.vm || 0;
+        const ventasDiaActuales = salesToUse.vd || 0;
+        const pollosEntregadosActuales = salesToUse.totalPollosEntregados || 0;
+
+        if (isViewingToday) {
+          // Si estamos viendo el día actual, aplicar lógica horaria para "Libres"
+          const now = dayjs().tz('Europe/Madrid');
+          if (now.hour() < 18) {
+            // Por la mañana, "Libres" solo descuenta las ventas de la mañana (vm)
+            pollosLibresCalculados = baseLibres - ventasMananaActuales;
+          } else {
+            // Por la tarde, "Libres" descuenta todas las ventas del día (vd)
+            pollosLibresCalculados = baseLibres - ventasDiaActuales;
+          }
+        } else {
+          // Si estamos viendo un día pasado o futuro, "Libres" descuenta todas las ventas del día (vd)
+          pollosLibresCalculados = baseLibres - ventasDiaActuales;
+        }
+
         if (isMountedRef.current) {
-          setNumeroEnBarra(enbarra_base_from_db - (salesToUse.totalPollosEntregados || 0));
-          setNumeroLibres(libres_base_from_db - (salesToUse.vd || 0));
-          if (ventasManana !== (salesToUse.vm || 0)) setVentasManana(salesToUse.vm || 0);
-          if (ventasTarde !== (salesToUse.vt || 0)) setVentasTarde(salesToUse.vt || 0);
-          if (ventasDia !== (salesToUse.vd || 0)) setVentasDia(salesToUse.vd || 0);
+          setNumeroEnBarra((enbarra_base_from_db || 0) - pollosEntregadosActuales);
+          setNumeroLibres(pollosLibresCalculados);
+          // Las ventas (vm, vt, vd) se actualizan desde el listener de pedidos,
+          // aquí solo nos aseguramos de que los contadores principales estén sincronizados.
+          // Si es necesario forzar la actualización de ventasManana, ventasTarde, ventasDia aquí,
+          // se puede hacer, pero currentSalesRef.current ya debería tener los valores más recientes.
+          // Ejemplo:
+          // if (ventasManana !== ventasMananaActuales) setVentasManana(ventasMananaActuales);
+          // if (ventasTarde !== (salesToUse.vt || 0)) setVentasTarde(salesToUse.vt || 0); // Asumiendo que vt también está en salesToUse
+          // if (ventasDia !== ventasDiaActuales) setVentasDia(ventasDiaActuales);
+
+          // Asegurar que los estados de carga se manejen correctamente
           if (isPageLoading) setIsPageLoading(false);
-          if (isListenerUpdating) setIsListenerUpdating(false); // Puede que ya esté en false por el listener de pedidos
+          // isListenerUpdating se maneja principalmente por el listener de pedidos,
+          // pero podemos asegurarnos de que se ponga a false si este listener termina después.
+          if (isListenerUpdating && !isPageLoading) setIsListenerUpdating(false);
         }
       },
       (error) => {
@@ -611,4 +646,3 @@ TestHeader.defaultProps = {
 };
 
 export default TestHeader;
-

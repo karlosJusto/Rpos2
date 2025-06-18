@@ -380,6 +380,11 @@ const Ticket = (props) => {
         </Modal.Footer>
       </Modal>
       {/* --- FIN NUEVO MODAL --- */}
+
+      {/* Sección de Versión */}
+      <div className="absolute bottom-0 right-0 p-2 text-xs text-gray-400 font-nunito">
+        v0.1.0
+      </div>
     </>
   );
 };

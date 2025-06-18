@@ -40,6 +40,7 @@ const Layout = () => {
 
   // Ref para el timeout de la actualización del calendario
   const updateCalendarTimeoutRef = useRef(null);
+  const [refreshTrigger, setRefreshTrigger] = useState(0); // Para forzar actualización manual
 
   const today = new Date();
   const formattedDate = today.toISOString().split("T")[0];
@@ -124,7 +125,12 @@ const Layout = () => {
       console.log(`Layout (Calendar): Limpiando listener para chicken_calendar_daily/${formattedDate}.`);
       unsubscribe(); // Retorna la función de desuscripción
     };
-  }, [formattedDate]); // Dependencia: formattedDate. Si cambia el día, se vuelve a ejecutar y limpia el listener anterior.
+  }, [formattedDate, refreshTrigger]); // Añadir refreshTrigger para actualización manual
+
+  const handleManualRefresh = () => {
+    console.log("Layout: Disparando actualización manual de datos.");
+    setRefreshTrigger(prev => prev + 1);
+  };
 
   // --- Efecto para validar/corroborar los datos del calendario cuando se actualizan ---
   useEffect(() => {
@@ -159,13 +165,8 @@ const Layout = () => {
     console.log(`Layout (Pedidos Pollos): Configurando listener para contar pollos en pedidos del día ${formattedDate}.`);
     setTotalPollosPedidosHoy(0); // Resetear al cambiar de día o al montar
     setCalculatedSlotCounts({}); // Resetear conteos calculados al cambiar de día
+    // The updateCalendarTimeoutRef is now managed by the calendar correction effect
 
-    // Limpiar cualquier timeout pendiente si el efecto se re-ejecuta (ej. cambio de fecha)
-    // Esto también se hace en la función de limpieza del return, pero es bueno tenerlo aquí
-    // por si acaso, aunque la lógica principal de limpieza está en el return.
-    if (updateCalendarTimeoutRef.current) {
-      clearTimeout(updateCalendarTimeoutRef.current);
-    }
     // Helper para convertir "DD/MM/YYYY HH:MM" a "YYYY-MM-DD"
     const convertirFechaPedidoAYYYYMMDD = (fechaDDMMYYYYConHora) => {
       if (!fechaDDMMYYYYConHora || typeof fechaDDMMYYYYConHora !== 'string' || !fechaDDMMYYYYConHora.includes(' ')) return null;
@@ -198,6 +199,9 @@ const Layout = () => {
         "11:00": 0, "11:15": 0, "11:30": 0, "11:45": 0,
         "12:00": 0, "12:15": 0, "12:30": 0, "12:45": 0,
         "13:00": 0, "13:15": 0, "13:30": 0, "13:45": 0,
+        "14:00": 0, "14:15": 0, "14:30": 0, "14:45": 0, // Añadido para contexto alrededor de las 15:00
+        "15:00": 0, "15:15": 0, "15:30": 0, "15:45": 0, // Específicamente para depurar 15:00 y su contexto
+        "16:00": 0, "16:15": 0, "16:30": 0, "16:45": 0, // Añadido para contexto
         "21:30": 0,
         "21:45": 0,
         "22:00": 0,
@@ -220,17 +224,23 @@ const Layout = () => {
               // console.log(`Layout (Pedidos Pollos - DEBUG): Pedido ID ${doc.id}, Producto ID: ${productId}, Cantidad: ${cantidadPedido}, Hora Pedido: ${horaPedido}`);
 
               if (productId === 1) { // Pollo entero
-                pollosHoy += 1 * cantidadPedido;
                 if (horaPedido && pollosPorFranjaEspecifica.hasOwnProperty(horaPedido)) {
                   pollosPorFranjaEspecifica[horaPedido] += 1 * cantidadPedido;
+                  if (horaPedido.startsWith("15:")) {
+                    console.log(`LOG_1500_DEBUG: (Pedidos Listener) Pedido ${doc.id}, Producto ID ${productId} (Pollo Entero), Cantidad: ${cantidadPedido}. Sumado 1 pollo a ${horaPedido}. Nuevo total para ${horaPedido}: ${pollosPorFranjaEspecifica[horaPedido]}`);
+                  }
                   // console.log(`Layout (Pedidos Pollos - DEBUG): Sumado 1 pollo a ${horaPedido}. Nuevo total para ${horaPedido}: ${pollosPorFranjaEspecifica[horaPedido]}`);
                 }
+                pollosHoy += 1 * cantidadPedido; // Mover suma total aquí para evitar doble conteo si no está en franja específica
               } else if (productId === 2 || productId === 39 || productId === 40) { // Medio pollo o equivalentes
-                pollosHoy += 0.5 * cantidadPedido;
                 if (horaPedido && pollosPorFranjaEspecifica.hasOwnProperty(horaPedido)) {
                   pollosPorFranjaEspecifica[horaPedido] += 0.5 * cantidadPedido;
+                  if (horaPedido.startsWith("15:")) {
+                    console.log(`LOG_1500_DEBUG: (Pedidos Listener) Pedido ${doc.id}, Producto ID ${productId} (Medio Pollo), Cantidad: ${cantidadPedido}. Sumado 0.5 pollo a ${horaPedido}. Nuevo total para ${horaPedido}: ${pollosPorFranjaEspecifica[horaPedido]}`);
+                  }
                   // console.log(`Layout (Pedidos Pollos - DEBUG): Sumado 0.5 pollo a ${horaPedido}. Nuevo total para ${horaPedido}: ${pollosPorFranjaEspecifica[horaPedido]}`);
                 }
+                pollosHoy += 0.5 * cantidadPedido; // Mover suma total aquí
               }
             });
           }
@@ -239,6 +249,7 @@ const Layout = () => {
       setTotalPollosPedidosHoy(pollosHoy);
       // console.log(`Layout (Pedidos Pollos): TOTAL DIARIO de pollos (IDs 1,2,39,40) para ${formattedDate} desde 'pedidos': ${pollosHoy}`); // Log general eliminado
 
+      console.log(`LOG_1500_DEBUG: (Pedidos Listener) pollosPorFranjaEspecifica["15:00"] ANTES de setCalculatedSlotCounts: ${pollosPorFranjaEspecifica["15:00"]}`);
       console.log("Layout (Pedidos Pollos - DEBUG): pollosPorFranjaEspecifica FINAL CALCULADO:", JSON.parse(JSON.stringify(pollosPorFranjaEspecifica)));
       // Actualizar el estado con los conteos calculados desde 'pedidos' para las franjas específicas
       setCalculatedSlotCounts(pollosPorFranjaEspecifica);
@@ -252,6 +263,96 @@ const Layout = () => {
       console.log(`Layout (Pedidos Pollos - DEBUG): Conteo para 11:15 -> ${pollosPorFranjaEspecifica["11:15"] ?? 'No definido en pollosPorFranjaEspecifica'}`);
       console.log(`Layout (Pedidos Pollos - DEBUG): Conteo para 11:30 -> ${pollosPorFranjaEspecifica["11:30"] ?? 'No definido en pollosPorFranjaEspecifica'}`);
 
+      // The calendar correction logic is moved to a separate useEffect
+    }, (error) => {
+      console.error("Layout (Pedidos Pollos): Error en el listener de la colección 'pedidos':", error);
+    });
+
+    return () => {
+      console.log(`Layout (Pedidos Pollos): Limpiando listener de 'pedidos' para ${formattedDate}.`);
+      unsubscribePedidos();
+      // No need to clear updateCalendarTimeoutRef here, it's managed by the other effect
+    };
+}, [formattedDate, refreshTrigger]); // Añadir refreshTrigger para actualización manual
+
+  // --- Effect for correcting calendar data based on calculatedSlotCounts ---
+  useEffect(() => {
+    // Clear any pending timeout from previous runs of this specific effect
+    if (updateCalendarTimeoutRef.current) {
+        clearTimeout(updateCalendarTimeoutRef.current);
+    }
+
+    // Ensure all necessary data is available
+    if (
+        calendarData &&
+        calendarData.intervals &&
+        Array.isArray(calendarData.intervals) &&
+        Object.keys(calculatedSlotCounts).length > 0 // Ensure calculatedSlotCounts is populated
+    ) {
+        const calendarInterval1500 = calendarData.intervals.find(interval => interval.start === "15:00");
+        const calculatedCount1500 = calculatedSlotCounts["15:00"];
+        console.log(`LOG_1500_DEBUG: (Corrección Calendario INICIO) Para 15:00 - Valor en CalendarData: ${calendarInterval1500?.orderedCount}, Valor en CalculatedSlotCounts: ${calculatedCount1500}`);
+
+
+
+        const calendarDocRef = doc(db, "chicken_calendar_daily", formattedDate);
+        let intervalsWereUpdated = false;
+        // Create a deep copy to modify, to avoid mutating state directly
+        const newIntervalsArray = JSON.parse(JSON.stringify(calendarData.intervals));
+
+        // Iterate over the intervals from the calendar
+        newIntervalsArray.forEach(intervalInCalendar => {
+            const horaFranja = intervalInCalendar.start;
+            const conteoCalculadoDesdePedidos = calculatedSlotCounts[horaFranja];
+
+            // Only proceed if calculatedSlotCounts has an entry for this slot
+            if (conteoCalculadoDesdePedidos !== undefined) {
+                const currentOrderedCountInCalendar = Number(intervalInCalendar.orderedCount) || 0;
+                const conteoPedidosNumerico = Number(conteoCalculadoDesdePedidos);
+
+                if (currentOrderedCountInCalendar !== conteoPedidosNumerico) {
+                    const logPrefix = horaFranja === "15:00" ? "LOG_1500_DEBUG: " : "";
+                    console.warn(`${logPrefix}Layout (Corrección Calendario SEPARADO): Discrepancia para ${horaFranja}. Calendario: ${currentOrderedCountInCalendar}, Pedidos (Calculado): ${conteoPedidosNumerico}. SOBREESCRIBIENDO CALENDARIO.`);
+                    intervalInCalendar.orderedCount = conteoPedidosNumerico; // Update the count in our copy
+                    intervalsWereUpdated = true;
+                    if (horaFranja === "15:00") {
+                        console.log(`LOG_1500_DEBUG: (Corrección Calendario) Franja 15:00 actualizada en newIntervalsArray a ${conteoPedidosNumerico}.`);
+                    }
+                }
+            }
+        });
+
+        if (intervalsWereUpdated) {
+            const interval1500AfterPotentialChange = newIntervalsArray.find(i => i.start === "15:00");
+            console.log(`LOG_1500_DEBUG: (Corrección Calendario) Discrepancia(s) detectada(s). Valor para 15:00 en newIntervalsArray ANTES de programar updateDoc: ${interval1500AfterPotentialChange?.orderedCount}. Programando actualización para chicken_calendar_daily/${formattedDate} en 3 segundos.`);
+            // console.log(`Layout (Corrección Calendario SEPARADO): Discrepancia(s) detectada(s). Programando actualización para chicken_calendar_daily/${formattedDate} en 3 segundos.`);
+            updateCalendarTimeoutRef.current = setTimeout(() => {
+                const finalValueFor1500InUpdate = newIntervalsArray.find(i => i.start === "15:00")?.orderedCount;
+                console.log(`LOG_1500_DEBUG: (Corrección Calendario TIMEOUT EJECUTADO) Actualizando Firestore. Valor para 15:00 que se enviará: ${finalValueFor1500InUpdate}`);
+                updateDoc(calendarDocRef, { intervals: newIntervalsArray })
+                    .then(() => {
+                        console.log(`LOG_1500_DEBUG: (Corrección Calendario TIMEOUT EJECUTADO) Documento chicken_calendar_daily/${formattedDate} actualizado con éxito. El valor para 15:00 debería ser ${finalValueFor1500InUpdate}.`);
+                    })
+                    .catch(error => console.error(`LOG_1500_DEBUG: (Corrección Calendario TIMEOUT EJECUTADO) Error al actualizar chicken_calendar_daily/${formattedDate} (para 15:00 y otros):`, error));
+            }, 3000); // 3 seconds delay
+        } else {
+            // console.log(`Layout (Corrección Calendario SEPARADO - DEBUG): No se detectaron discrepancias que requieran actualizar el calendario.`);
+        }
+    } else {
+        // console.log("Layout (Corrección Calendario SEPARADO): calendarData, sus intervalos, o calculatedSlotCounts no están listos. No se puede intentar la corrección.");
+    }
+
+    // Cleanup function for this effect
+    return () => {
+        if (updateCalendarTimeoutRef.current) {
+            clearTimeout(updateCalendarTimeoutRef.current);
+        }
+    }; // eslint-disable-next-line react-hooks/exhaustive-deps
+}, [calendarData, calculatedSlotCounts, formattedDate]); // Removí db de las dependencias ya que es estable y no debería causar re-ejecuciones.
+
+  // --- Original calendar correction logic (now moved into the new useEffect above) ---
+  // This block was previously inside the 'pedidos' useEffect, it's removed from there
+  /*
       if (calendarData && calendarData.intervals && Array.isArray(calendarData.intervals)) {
         const calendarDocRef = doc(db, "chicken_calendar_daily", formattedDate);
         let intervalsWereUpdated = false;
@@ -317,19 +418,7 @@ const Layout = () => {
       } else {
         console.warn("Layout (Corrección Calendario): calendarData o sus intervalos no están disponibles en este momento. No se puede intentar la corrección del calendario.");
       }
-    }, (error) => {
-      console.error("Layout (Pedidos Pollos): Error en el listener de la colección 'pedidos':", error);
-    });
-
-    return () => {
-      console.log(`Layout (Pedidos Pollos): Limpiando listener de 'pedidos' para ${formattedDate}.`);
-      unsubscribePedidos();
-      // Asegurarse de limpiar el timeout si el componente se desmonta o las dependencias cambian
-      if (updateCalendarTimeoutRef.current) {
-        clearTimeout(updateCalendarTimeoutRef.current);
-      }
-    };
-  }, [formattedDate, calendarData]); // Añadir calendarData como dependencia
+  */
 
   const morningIntervals =
     calendarData?.intervals?.filter((interval) => interval.start < "18:00") || [];
@@ -360,6 +449,15 @@ const Layout = () => {
                 <Card />
               </div>
                <div className="w-[90%] pt-[1vh] ms-[3.8vw] border-white rounded p-4 bg-white ">
+                <div className="flex justify-end items-center mb-2">
+                  <button
+                    onClick={handleManualRefresh}
+                    className="p-2 hover:bg-gray-200 rounded-full text-xl"
+                    title="Actualizar horarios manualmente"
+                  >
+                    🔄
+                  </button>
+                </div>
                 {loadingCalendar ? (
                   <p>Cargando horarios...</p>
                 ) : errorCalendar ? (
