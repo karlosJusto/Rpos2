@@ -183,6 +183,7 @@ const Layout = () => {
     const qPedidos = query(pedidosRef); // Por ahora, obtenemos todos los pedidos.
 
     const unsubscribePedidos = onSnapshot(qPedidos, (querySnapshot) => {
+      console.log(`Layout (Pedidos Pollos - DEBUG): INICIO onSnapshot de 'pedidos'. Procesando ${querySnapshot.size} documentos.`);
       let pollosHoy = 0;
       // Objeto para almacenar conteos por franjas específicas
       // Incluimos las franjas de la mañana solicitadas y mantenemos las de la noche.
@@ -192,6 +193,11 @@ const Layout = () => {
         "09:15": 0,
         "09:30": 0,
         "09:45": 0,
+        // Añadimos más franjas de la mañana para depuración si es necesario
+        "10:00": 0, "10:15": 0, "10:30": 0, "10:45": 0,
+        "11:00": 0, "11:15": 0, "11:30": 0, "11:45": 0,
+        "12:00": 0, "12:15": 0, "12:30": 0, "12:45": 0,
+        "13:00": 0, "13:15": 0, "13:30": 0, "13:45": 0,
         "21:30": 0,
         "21:45": 0,
         "22:00": 0,
@@ -201,6 +207,7 @@ const Layout = () => {
       querySnapshot.forEach((doc) => {
         const orderData = doc.data();
         const fechaPedidoFormatoComparar = convertirFechaPedidoAYYYYMMDD(orderData.fechahora);
+        // console.log(`Layout (Pedidos Pollos - DEBUG): Procesando pedido ID ${doc.id}, fecha_filtro: ${orderData.fecha_filtro}, fechahora: ${orderData.fechahora}, fechaPedidoFormatoComparar: ${fechaPedidoFormatoComparar}, formattedDate (hoy): ${formattedDate}`);
 
         if (fechaPedidoFormatoComparar === formattedDate) {
           const horaPedido = orderData.fechahora ? orderData.fechahora.split(' ')[1] : null; // Extraer HH:MM
@@ -209,15 +216,20 @@ const Layout = () => {
               const productId = Number(producto.id); // Asegurar que productId sea un número
               const cantidadPedido = Number(producto.cantidad) || 0;
 
+              // Log para cada producto dentro de un pedido del día actual
+              // console.log(`Layout (Pedidos Pollos - DEBUG): Pedido ID ${doc.id}, Producto ID: ${productId}, Cantidad: ${cantidadPedido}, Hora Pedido: ${horaPedido}`);
+
               if (productId === 1) { // Pollo entero
                 pollosHoy += 1 * cantidadPedido;
                 if (horaPedido && pollosPorFranjaEspecifica.hasOwnProperty(horaPedido)) {
                   pollosPorFranjaEspecifica[horaPedido] += 1 * cantidadPedido;
+                  // console.log(`Layout (Pedidos Pollos - DEBUG): Sumado 1 pollo a ${horaPedido}. Nuevo total para ${horaPedido}: ${pollosPorFranjaEspecifica[horaPedido]}`);
                 }
               } else if (productId === 2 || productId === 39 || productId === 40) { // Medio pollo o equivalentes
                 pollosHoy += 0.5 * cantidadPedido;
                 if (horaPedido && pollosPorFranjaEspecifica.hasOwnProperty(horaPedido)) {
                   pollosPorFranjaEspecifica[horaPedido] += 0.5 * cantidadPedido;
+                  // console.log(`Layout (Pedidos Pollos - DEBUG): Sumado 0.5 pollo a ${horaPedido}. Nuevo total para ${horaPedido}: ${pollosPorFranjaEspecifica[horaPedido]}`);
                 }
               }
             });
@@ -226,67 +238,63 @@ const Layout = () => {
       });
       setTotalPollosPedidosHoy(pollosHoy);
       // console.log(`Layout (Pedidos Pollos): TOTAL DIARIO de pollos (IDs 1,2,39,40) para ${formattedDate} desde 'pedidos': ${pollosHoy}`); // Log general eliminado
-      
+
+      console.log("Layout (Pedidos Pollos - DEBUG): pollosPorFranjaEspecifica FINAL CALCULADO:", JSON.parse(JSON.stringify(pollosPorFranjaEspecifica)));
       // Actualizar el estado con los conteos calculados desde 'pedidos' para las franjas específicas
       setCalculatedSlotCounts(pollosPorFranjaEspecifica);
-      
+      console.log("Layout (Pedidos Pollos - DEBUG): Estado calculatedSlotCounts actualizado.");
+
       // Log de los conteos para las franjas específicas
 
       // --- Lógica para sobrescribir el calendario si hay discrepancias ---
+      // Logs específicos solicitados (se mantienen, pero el log de arriba es más completo)
+      console.log(`Layout (Pedidos Pollos - DEBUG): Conteo para 11:00 -> ${pollosPorFranjaEspecifica["11:00"] ?? 'No definido en pollosPorFranjaEspecifica'}`);
+      console.log(`Layout (Pedidos Pollos - DEBUG): Conteo para 11:15 -> ${pollosPorFranjaEspecifica["11:15"] ?? 'No definido en pollosPorFranjaEspecifica'}`);
+      console.log(`Layout (Pedidos Pollos - DEBUG): Conteo para 11:30 -> ${pollosPorFranjaEspecifica["11:30"] ?? 'No definido en pollosPorFranjaEspecifica'}`);
+
       if (calendarData && calendarData.intervals && Array.isArray(calendarData.intervals)) {
         const calendarDocRef = doc(db, "chicken_calendar_daily", formattedDate);
         let intervalsWereUpdated = false;
-        // Es crucial trabajar con una copia para no mutar el estado directamente antes de setearlo (si fuera el caso)
+        // Es crucial trabajar con una copia para no mutar el estado directamente antes de setearlo
         // y para preparar el objeto de actualización para Firestore.
-        const newIntervalsArray = JSON.parse(JSON.stringify(calendarData.intervals)); 
+        const newIntervalsArray = JSON.parse(JSON.stringify(calendarData.intervals));
 
-        // Determinar si es horario de mañana o tarde para la corrección
-        const currentHourForCorrection = new Date().getHours();
-        const esHorarioMatutinoParaCorreccion = currentHourForCorrection < 18;
+        // Definimos las franjas a corregir directamente desde todos los intervalos del calendario.
+        // Ya no filtramos por mañana/tarde aquí, ya que el listener de pedidos es para todo el día.
+        const franjasDelCalendario = calendarData.intervals.map(interval => interval.start);
+        console.log(`Layout (Corrección Calendario - DEBUG): Franjas del calendario a considerar para corrección:`, franjasDelCalendario);
 
-        let franjasDelCalendarioFiltradas;
-        if (esHorarioMatutinoParaCorreccion) {
-          franjasDelCalendarioFiltradas = calendarData.intervals.filter(interval => interval.scheduleType === "morning");
-        } else {
-          franjasDelCalendarioFiltradas = calendarData.intervals.filter(interval => interval.scheduleType === "evening");
-        }
-
-        const franjasACorregir = franjasDelCalendarioFiltradas.map(interval => interval.start);
-        // console.log(`Layout (Corrección Calendario): Es ${esHorarioMatutinoParaCorreccion ? 'MAÑANA' : 'TARDE'}. Franjas a corregir (filtradas por scheduleType y hora actual):`, franjasACorregir); // Log eliminado
-
-        franjasACorregir.forEach(horaFranja => {
+        franjasDelCalendario.forEach(horaFranja => {
+          console.log(`Layout (Corrección Calendario - DEBUG): Procesando franja del calendario: ${horaFranja}`);
           // Asegúrate de que esta línea esté presente y correcta.
           const conteoCalculadoDesdePedidos = pollosPorFranjaEspecifica[horaFranja];
+          console.log(`Layout (Corrección Calendario - DEBUG): Para ${horaFranja}, conteoCalculadoDesdePedidos es: ${conteoCalculadoDesdePedidos}`);
 
-          // Determinar el conteo real de pedidos para esta franja.
-          // Si es undefined (la franja no estaba en pollosPorFranjaEspecifica o no tuvo pedidos y no fue inicializada a 0),
-          // entonces el conteo de pedidos para la corrección es 0.
-          // Corregido: usar conteoCalculadoDesdePedidos
-          const conteoRealPedidosParaCorreccion = (conteoCalculadoDesdePedidos === undefined) ? 0 : conteoCalculadoDesdePedidos;
+          // Si conteoCalculadoDesdePedidos es undefined para esta horaFranja del calendario,
+          // significa que no hay pedidos registrados para esa franja específica.
+          // En este caso, NO MODIFICAMOS el calendario. Dejamos su valor actual.
+          if (conteoCalculadoDesdePedidos !== undefined) {
+            console.log(`Layout (Corrección Calendario - DEBUG): ${horaFranja} tiene un conteo definido (${conteoCalculadoDesdePedidos}). Procediendo a comparar con calendario.`);
+            const intervalIndex = newIntervalsArray.findIndex(interval => interval.start === horaFranja);
+            console.log(`Layout (Corrección Calendario - DEBUG): Para ${horaFranja}, intervalIndex en newIntervalsArray es: ${intervalIndex}`);
 
-          // Corregido: usar conteoCalculadoDesdePedidos
-          if (conteoCalculadoDesdePedidos === undefined) {
-            // Log informativo si la franja del calendario no tiene conteo explícito en pollosPorFranjaEspecifica
-            // console.log(`Layout (Corrección Calendario): Para la franja del calendario ${horaFranja}, no se encontraron datos en pollosPorFranjaEspecifica. Se asume un conteo de 0 pedidos para la corrección.`);
-          }
+            if (intervalIndex !== -1) {
+              const currentOrderedCountInCalendar = Number(newIntervalsArray[intervalIndex].orderedCount) || 0;
+              // Convertimos el conteo de pedidos a número, ya que sabemos que no es undefined.
+              const conteoPedidosNumerico = Number(conteoCalculadoDesdePedidos);
+              console.log(`Layout (Corrección Calendario - DEBUG): Para ${horaFranja}, currentOrderedCountInCalendar: ${currentOrderedCountInCalendar}, conteoPedidosNumerico: ${conteoPedidosNumerico}`);
 
-
-          const intervalIndex = newIntervalsArray.findIndex(interval => interval.start === horaFranja);
-
-          if (intervalIndex !== -1) {
-            const currentOrderedCountInCalendar = Number(newIntervalsArray[intervalIndex].orderedCount) || 0;
-            
-            if (currentOrderedCountInCalendar !== conteoRealPedidosParaCorreccion) {
-              console.warn(`Layout (Corrección Calendario): Discrepancia para ${horaFranja} (${esHorarioMatutinoParaCorreccion ? 'MAÑANA' : 'TARDE'}). Calendario: ${currentOrderedCountInCalendar}, Pedidos (Calculado/Asumido): ${conteoRealPedidosParaCorreccion}. SOBREESCRIBIENDO CALENDARIO.`);
-              newIntervalsArray[intervalIndex].orderedCount = conteoRealPedidosParaCorreccion;
-              intervalsWereUpdated = true;
+              if (currentOrderedCountInCalendar !== conteoPedidosNumerico) {
+                console.warn(`Layout (Corrección Calendario): Discrepancia para ${horaFranja}. Calendario: ${currentOrderedCountInCalendar}, Pedidos (Calculado): ${conteoPedidosNumerico}. SOBREESCRIBIENDO CALENDARIO.`);
+                newIntervalsArray[intervalIndex].orderedCount = conteoPedidosNumerico;
+                intervalsWereUpdated = true;
+                console.log(`Layout (Corrección Calendario - DEBUG): ${horaFranja} actualizada en newIntervalsArray a ${conteoPedidosNumerico}. intervalsWereUpdated = true.`);
+              }
+            } else {
+              console.error(`Layout (Corrección Calendario): INCONSISTENCIA INTERNA. La franja horaria ${horaFranja} del calendario no se encontró en la copia de trabajo de los intervalos. No se puede corregir esta franja.`);
             }
-          } else {
-            // Este bloque se ejecuta si una horaFranja (que viene de calendarData.intervals)
-            // no se encuentra en newIntervalsArray (que es una copia de calendarData.intervals).
-            // Esto indicaría un problema en la lógica de copia o una modificación inesperada de newIntervalsArray.
-            console.error(`Layout (Corrección Calendario): INCONSISTENCIA INTERNA. La franja horaria ${horaFranja} del calendario no se encontró en la copia de trabajo de los intervalos. No se puede corregir esta franja.`);
           }
+          // Si conteoCalculadoDesdePedidos es undefined, no se hace nada, el calendario para esa franja no se toca.
         });
 
         if (intervalsWereUpdated) {
@@ -294,6 +302,7 @@ const Layout = () => {
           if (updateCalendarTimeoutRef.current) {
             clearTimeout(updateCalendarTimeoutRef.current);
           }
+          console.log(`Layout (Corrección Calendario - DEBUG): Se detectaron actualizaciones. newIntervalsArray ANTES de programar updateDoc:`, JSON.parse(JSON.stringify(newIntervalsArray)));
           // Establecer un nuevo timeout para actualizar el documento
           console.log(`Layout (Corrección Calendario): Discrepancia(s) detectada(s). Programando actualización para chicken_calendar_daily/${formattedDate} en 3 segundos.`);
           updateCalendarTimeoutRef.current = setTimeout(() => {
@@ -302,6 +311,8 @@ const Layout = () => {
               .catch(error => console.error(`Layout (Corrección Calendario TIMEOUT EJECUTADO): Error al actualizar chicken_calendar_daily/${formattedDate}:`, error));
           }, 3000); // 3000 milisegundos = 3 segundos
 
+        } else {
+          console.log(`Layout (Corrección Calendario - DEBUG): No se detectaron discrepancias que requieran actualizar el calendario.`);
         }
       } else {
         console.warn("Layout (Corrección Calendario): calendarData o sus intervalos no están disponibles en este momento. No se puede intentar la corrección del calendario.");
