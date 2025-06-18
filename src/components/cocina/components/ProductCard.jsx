@@ -46,19 +46,22 @@ const ProductCard = memo(({ product }) => {
                         // Escenario 1: Primer clic en un ítem "nuevo" (azul)
                         updatedProd.nuevoCocina = 1;
                         // 'listo' permanece como está (debería ser false)
-                        // 'entregado' permanece como está (debería ser 0 o el valor inicial)
-                        console.log(`[ProductCard Click] Pedido ${order.idPedido}, Producto ${prod.id}: nuevoCocina -> 1. listo: ${updatedProd.listo}, entregado: ${updatedProd.entregado}`);
+                        // 'entregado' permanece como está (debería ser 0 o el valor inicial que tenga)
+                        console.log(`[ProductCard Click] Pedido ${order.idPedido}, Producto ${updatedProd.id}: nuevoCocina -> 1. listo: ${updatedProd.listo}, entregado: ${updatedProd.entregado}`);
                     } else if (updatedProd.nuevoCocina === 1) {
                         // Escenario 2: Clic en un ítem ya "visto" (no azul)
                         updatedProd.listo = !updatedProd.listo; // Invertir 'listo'
 
                         if (updatedProd.listo === true) {
-                            updatedProd.entregado = 1; // Si 'listo' es true, 'entregado' es 1
-                            console.log(`[ProductCard Click] Pedido ${order.idPedido}, Producto ${prod.id}: listo -> TRUE, entregado -> 1.`);
+                            // Si 'listo' es true, 'entregado' se establece a la cantidad total del producto en esta línea.
+                            // Aseguramos que la cantidad sea un número, por si acaso.
+                            const cantidadNumerica = Number(updatedProd.cantidad) || 0;
+                            updatedProd.entregado = cantidadNumerica;
+                            console.log(`[ProductCard Click] Pedido ${order.idPedido}, Producto ${updatedProd.id}: listo -> TRUE, entregado -> ${cantidadNumerica}.`);
                         } else {
                             // Si 'listo' es false, 'entregado' vuelve a 0 (o estado no entregado)
-                            updatedProd.entregado = 0; 
-                            console.log(`[ProductCard Click] Pedido ${order.idPedido}, Producto ${prod.id}: listo -> FALSE, entregado -> 0.`);
+                            updatedProd.entregado = 0;
+                            console.log(`[ProductCard Click] Pedido ${order.idPedido}, Producto ${updatedProd.id}: listo -> FALSE, entregado -> 0.`);
                         }
                     }
 
