@@ -21,8 +21,12 @@ import React, { useState, useEffect } from 'react';
       [size]: { ...prev[size], preparadas: newCount },
     }));
   };
+
   const grandesEnDeficit = values.grandes && values.grandes.pedidas > values.grandes.preparadas;
+  const grandesIgualesYNoCero = values.grandes && values.grandes.preparadas === values.grandes.pedidas && values.grandes.pedidas > 0;
   const pequenasEnDeficit = values.pequenas && values.pequenas.pedidas > values.pequenas.preparadas;
+  const pequenasIgualesYNoCero = values.pequenas && values.pequenas.preparadas === values.pequenas.pedidas && values.pequenas.pedidas > 0;
+
   return (
     <div className="overflow-x-auto rounded-lg -mt-5 ">
       <table className="min-w-full table-auto border-collapse  border border-gray-300 bg-white shadow-sm font-nunito">
@@ -64,7 +68,9 @@ import React, { useState, useEffect } from 'react';
             <td className={`border px-4 py-2 text-center ${
               grandesEnDeficit
                 ? 'bg-red-500 text-white border-red-600'
-                : 'border-gray-900'
+                : grandesIgualesYNoCero
+                  ? 'bg-yellow-300 text-neutral-800 border-yellow-400'
+                  : 'border-gray-300'
             }`}>
               <div className="flex items-center justify-center space-x-2 text-xl ">
                 <button
@@ -77,12 +83,16 @@ import React, { useState, useEffect } from 'react';
                   className={`px-3 py-2 text-xl border rounded ${
                     grandesEnDeficit
                       ? 'border-white hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-white'
-                      : 'hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-gray-300'
+                      : grandesIgualesYNoCero
+                        ? 'border-neutral-700 text-neutral-800 hover:bg-yellow-400 focus:outline-none focus:ring-2 focus:ring-neutral-700'
+                        : 'hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-gray-300'
                   }`}
                 >
                   -
                 </button>
-                <span className={`text-xl font-medium ${grandesEnDeficit ? 'text-white' : ''}`}>
+                <span className={`text-xl font-medium ${
+                  grandesEnDeficit ? 'text-white' : grandesIgualesYNoCero ? 'text-neutral-800' : ''
+                }`}>
                   {values.grandes.preparadas}
                 </span>
                 <button
@@ -92,7 +102,9 @@ import React, { useState, useEffect } from 'react';
                   className={`px-3 py-2 text-xl border rounded ${
                     grandesEnDeficit
                       ? 'border-white hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-white'
-                      : 'hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-gray-300'
+                      : grandesIgualesYNoCero
+                        ? 'border-neutral-700 text-neutral-800 hover:bg-yellow-400 focus:outline-none focus:ring-2 focus:ring-neutral-700'
+                        : 'hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-gray-300'
                   }`}
                 >
                   +
@@ -107,7 +119,9 @@ import React, { useState, useEffect } from 'react';
             <td className={`border px-4 py-2 text-center ${
               pequenasEnDeficit
                 ? 'bg-red-500 text-white border-red-600'
-                : 'border-gray-300'
+                : pequenasIgualesYNoCero
+                  ? 'bg-yellow-300 text-neutral-800 border-yellow-400'
+                  : 'border-gray-300'
             }`}>
               <div className="flex items-center justify-center space-x-2 ">
                 <button
@@ -120,12 +134,16 @@ import React, { useState, useEffect } from 'react';
                   className={`px-3 py-2 text-xl border rounded ${
                     pequenasEnDeficit
                       ? 'border-white hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-white'
-                      : 'hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-gray-300'
+                      : pequenasIgualesYNoCero
+                        ? 'border-neutral-700 text-neutral-800 hover:bg-yellow-400 focus:outline-none focus:ring-2 focus:ring-neutral-700'
+                        : 'hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-gray-300'
                   }`}
                 >
                   -
                 </button>
-                <span className={`text-xl font-medium ${pequenasEnDeficit ? 'text-white' : ''}`}>
+                <span className={`text-xl font-medium ${
+                  pequenasEnDeficit ? 'text-white' : pequenasIgualesYNoCero ? 'text-neutral-800' : ''
+                }`}>
                   {values.pequenas.preparadas}
                 </span>
                 <button
@@ -135,7 +153,9 @@ import React, { useState, useEffect } from 'react';
                   className={`px-3 py-2 text-xl border rounded ${
                     pequenasEnDeficit
                       ? 'border-white hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-white'
-                      : 'hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-gray-300'
+                      : pequenasIgualesYNoCero
+                        ? 'border-neutral-700 text-neutral-800 hover:bg-yellow-400 focus:outline-none focus:ring-2 focus:ring-neutral-700'
+                        : 'hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-gray-300'
                   }`}
                 >
                   +
