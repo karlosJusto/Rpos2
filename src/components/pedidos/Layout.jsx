@@ -428,6 +428,16 @@ const Layout = () => {
   const currentHour = today.getHours();
   const isMorning = currentHour < 18;
 
+  // Efecto para loggear los intervalos que se contemplan para el Swiper para el día actual
+  useEffect(() => {
+    if (!loadingCalendar && calendarData) {
+      console.log(`Layout (Swiper Intervals Log): Intervalos de MAÑANA contemplados para HOY (${formattedDate}):`, morningIntervals.map(i => i.start));
+      console.log(`Layout (Swiper Intervals Log): Intervalos de TARDE contemplados para HOY (${formattedDate}):`, afternoonIntervals.map(i => i.start));
+    } else if (loadingCalendar) {
+      console.log("Layout (Swiper Intervals Log): Esperando carga del calendario para loggear intervalos del Swiper.");
+    }
+  }, [morningIntervals, afternoonIntervals, formattedDate, loadingCalendar, calendarData]);
+
   return (
     <>
       <div
@@ -471,7 +481,7 @@ const Layout = () => {
                   >
                     <SwiperSlide>
                       <div className="flex flex-wrap gap-2">
-                        {(isMorning ? morningIntervals : afternoonIntervals).map((interval, index) => {
+                        {(isMorning ? morningIntervals : afternoonIntervals).map((interval, index) => { // Revertido a lógica original
                             // Determinar el conteo a mostrar:
                             // Priorizar calculatedSlotCounts para las franjas críticas, si está disponible.
                             let displayCount = Number(interval.orderedCount) || 0; // Valor por defecto desde calendarData
