@@ -10,7 +10,7 @@ import { Swiper, SwiperSlide } from "swiper/react";
 import "swiper/css";
 import "swiper/css/scrollbar";
 import "swiper/css/mousewheel";
-import { doc, onSnapshot, collection, query, updateDoc } from "firebase/firestore"; // Añadir updateDoc
+import { doc, onSnapshot, collection, query, updateDoc, where } from "firebase/firestore";
 import { db } from "../firebase/firebase";
 import { dataContext } from '../Context/DataContext';
 
@@ -31,19 +31,27 @@ const Layout = () => {
   const [isOrderLoadedInCart, setIsOrderLoadedInCart] = useState(false);
   const [calendarData, setCalendarData] = useState(null);
   const [loadingCalendar, setLoadingCalendar] = useState(true);
-  const [errorCalendar, setErrorCalendar] = useState(null); // Para manejar errores del listener
-  const [totalPollosPedidosHoy, setTotalPollosPedidosHoy] = useState(0); // Estado para el conteo de pollos de pedidos
-  // Estado para almacenar los conteos calculados directamente desde la colección 'pedidos'
-  // para las franjas horarias específicas que se corrigen.
-  // Formato: { "HH:MM": count, ... }
+  const [errorCalendar, setErrorCalendar] = useState(null);
+  const [totalPollosPedidosHoy, setTotalPollosPedidosHoy] = useState(0);
   const [calculatedSlotCounts, setCalculatedSlotCounts] = useState({});
 
-  // Ref para el timeout de la actualización del calendario
   const updateCalendarTimeoutRef = useRef(null);
-  const [refreshTrigger, setRefreshTrigger] = useState(0); // Para forzar actualización manual
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
 
   const today = new Date();
-  const formattedDate = today.toISOString().split("T")[0];
+  
+  // ==================================================================
+  // ========= INICIO DE LA CORRECCIÓN APLICADA =======================
+  // ==================================================================
+  // Se modifica la generación de 'formattedDate' para que coincida con
+  // el formato "DD-MM-YYYY" que existe en la base de datos.
+  const dia = String(today.getDate()).padStart(2, '0');
+  const mes = String(today.getMonth() + 1).padStart(2, '0'); // +1 porque los meses son 0-11
+  const anio = today.getFullYear();
+  const formattedDate = `${dia}-${mes}-${anio}`; // Produce "27-06-2025"
+  // ==================================================================
+  // ========= FIN DE LA CORRECCIÓN APLICADA ==========================
+  // ==================================================================
 
   useEffect(() => {
     if (isEditingOrder && orderBeingEdited && !isOrderLoadedInCart && data && data.length > 0) {
@@ -94,58 +102,46 @@ const Layout = () => {
     }
   }, [location.pathname, isEditingOrder, setOrderBeingEdited, setCart]);
 
-  // --- Efecto para cargar los datos del calendario desde Firestore con onSnapshot ---
   useEffect(() => {
-    console.log(`Layout (Calendar): Configurando listener para chicken_calendar_daily/${formattedDate}`);
+    // La fecha del calendario se genera con formato YYYY-MM-DD
+    const calendarDate = today.toISOString().split("T")[0];
+    console.log(`Layout (Calendar): Configurando listener para chicken_calendar_daily/${calendarDate}`);
     setLoadingCalendar(true);
-    setErrorCalendar(null); // Limpiar errores previos
-    setCalendarData(null); // Limpiar datos viejos al cambiar de fecha o iniciar
+    setErrorCalendar(null);
+    setCalendarData(null);
 
-    const docRef = doc(db, "chicken_calendar_daily", formattedDate);
+    const docRef = doc(db, "chicken_calendar_daily", calendarDate);
 
-    // Usar onSnapshot para escuchar cambios en tiempo real
     const unsubscribe = onSnapshot(docRef, (docSnap) => {
       if (docSnap.exists()) {
-        console.log(`Layout (Calendar): Datos de calendario recibidos/actualizados para ${formattedDate}.`);
+        console.log(`Layout (Calendar): Datos de calendario recibidos/actualizados para ${calendarDate}.`);
         setCalendarData(docSnap.data());
       } else {
-        console.warn(`Layout (Calendar): Documento de calendario para la fecha ${formattedDate} no existe.`);
-        setCalendarData(null); // Asegurar que no haya datos viejos si el documento no existe o es borrado.
+        console.warn(`Layout (Calendar): Documento de calendario para la fecha ${calendarDate} no existe.`);
+        setCalendarData(null);
       }
-      setLoadingCalendar(false); // Finalizar carga una vez que se recibe el primer snapshot o se confirma que no existe.
+      setLoadingCalendar(false);
     }, (error) => {
       console.error("Layout (Calendar): Error en el listener de calendario:", error);
-      setErrorCalendar("Error cargando calendario."); // Establecer mensaje de error
+      setErrorCalendar("Error cargando calendario.");
       setCalendarData(null);
-      setLoadingCalendar(false); // Aunque haya error, marcamos como no cargando.
+      setLoadingCalendar(false);
     });
 
-    // Limpiar el listener cuando el componente se desmonte o cuando formattedDate cambie
     return () => {
-      console.log(`Layout (Calendar): Limpiando listener para chicken_calendar_daily/${formattedDate}.`);
-      unsubscribe(); // Retorna la función de desuscripción
+      console.log(`Layout (Calendar): Limpiando listener para chicken_calendar_daily/${calendarDate}.`);
+      unsubscribe();
     };
-  }, [formattedDate, refreshTrigger]); // Añadir refreshTrigger para actualización manual
+  }, [refreshTrigger]); // `today` se quita como dependencia si no queremos que cambie al pasar de medianoche
 
-  const handleManualRefresh = () => {
-    console.log("Layout: Disparando actualización manual de datos.");
-    setRefreshTrigger(prev => prev + 1);
-  };
 
-  // --- Efecto para validar/corroborar los datos del calendario cuando se actualizan ---
+
   useEffect(() => {
     if (calendarData && calendarData.intervals && Array.isArray(calendarData.intervals) && calendarData.intervals.length > 0) {
-      console.log("Layout (Calendar Aggregation): Datos de calendario recibidos/actualizados. Calculando conteo total para corroboración.");
-
       const totalOrderedInCalendar = calendarData.intervals.reduce((sum, interval) => {
         return sum + (Number(interval.orderedCount) || 0);
       }, 0);
-
-      console.log(`Layout (Calendar Aggregation): Conteo total de items programados en todas las franjas horarias del día actual (relevante para productos como IDs 1, 2, 39, 40): ${totalOrderedInCalendar}.`);
-      console.log("Layout (Calendar Aggregation): Este valor puede ser usado para corroborar si los datos recibidos del calendario son correctos según las expectativas.");
-
-    } else if (calendarData && (!calendarData.intervals || calendarData.intervals.length === 0)) {
-      console.log("Layout (Calendar Aggregation): Datos de calendario recibidos, pero no hay intervalos para procesar o los intervalos están vacíos.");
+      console.log(`Layout (Calendar Aggregation): Conteo total en calendario: ${totalOrderedInCalendar}.`);
     }
   }, [calendarData]);
 
@@ -154,92 +150,52 @@ const Layout = () => {
     console.log(`Layout (Pedidos Pollos): Configurando listener para contar pollos en pedidos del día ${formattedDate}.`);
     setTotalPollosPedidosHoy(0);
     setCalculatedSlotCounts({});
-    
-    const convertirFechaPedidoAYYYYMMDD = (fechaDDMMYYYYConHora) => {
-      if (!fechaDDMMYYYYConHora || typeof fechaDDMMYYYYConHora !== 'string' || !fechaDDMMYYYYConHora.includes(' ')) return null;
-      const [datePart] = fechaDDMMYYYYConHora.split(' ');
-      const partes = datePart.split('/');
-      if (partes.length !== 3) return null;
-      const [dia, mes, ano] = partes;
-      return `${ano}-${mes.padStart(2, '0')}-${dia.padStart(2, '0')}`;
-    };
 
     const pedidosRef = collection(db, "pedidos");
-    const qPedidos = query(pedidosRef);
+    const qPedidos = query(pedidosRef, where("fecha_filtro", "==", formattedDate));
 
     const unsubscribePedidos = onSnapshot(qPedidos, (querySnapshot) => {
-      console.log(`Layout (Pedidos Pollos - DEBUG): INICIO onSnapshot de 'pedidos'. Procesando ${querySnapshot.size} documentos.`);
+      console.log(`Layout (Pedidos Pollos): Snapshot recibido, la consulta encontró ${querySnapshot.size} pedidos para la fecha ${formattedDate}.`);
+
       let pollosHoy = 0;
-      
-      // Objeto para almacenar conteos por franjas específicas
-      // AÑADIDAS LAS FRANJAS 20:30, 20:45, 21:00 SOLICITADAS.
       const pollosPorFranjaEspecifica = {
-        
-        
         "11:00": 0, "11:15": 0, "11:30": 0, "11:45": 0,
         "12:00": 0, "12:15": 0, "12:30": 0, "12:45": 0,
         "13:00": 0, "13:15": 0, "13:30": 0, "13:45": 0,
         "14:00": 0, "14:15": 0, "14:30": 0, "14:45": 0,
         "15:00": 0, "15:15": 0, "15:30": 0, 
-        "20:30": 0, 
-        "20:15": 0, 
-        "20:00": 0, 
-        "19:45": 0, 
-        "19:30": 0, 
-        "19:15": 0, 
-        "19:00": 0, 
-        "20:45": 0, 
-        "21:00": 0, 
-        "21:30": 0,
-        "21:45": 0,
-        "22:00": 0,
+        "19:00": 0, "19:15": 0, "19:30": 0, "19:45": 0,
+        "20:00": 0, "20:15": 0, "20:30": 0, "20:45": 0,
+        "21:00": 0, "21:30": 0, "21:45": 0, "22:00": 0,
       };
-
-      const franjasDeInteres = ["20:30", "20:45", "21:00"];
 
       querySnapshot.forEach((doc) => {
         const orderData = doc.data();
-        const fechaPedidoFormatoComparar = convertirFechaPedidoAYYYYMMDD(orderData.fechahora);
+        const horaPedido = orderData.fechahora ? orderData.fechahora.split(' ')[1] : null;
+        if (Array.isArray(orderData.productos)) {
+          orderData.productos.forEach(producto => {
+            const productId = Number(producto.id);
+            const cantidadPedido = Number(producto.cantidad) || 0;
+            let cantidadAfectada = 0;
 
-        if (fechaPedidoFormatoComparar === formattedDate) {
-          const horaPedido = orderData.fechahora ? orderData.fechahora.split(' ')[1] : null;
-          if (Array.isArray(orderData.productos)) {
-            orderData.productos.forEach(producto => {
-              const productId = Number(producto.id);
-              const cantidadPedido = Number(producto.cantidad) || 0;
-              let cantidadAfectada = 0;
+            if (productId === 1) { // Pollo Entero
+              cantidadAfectada = 1 * cantidadPedido;
+            } else if (productId === 2 || productId === 39 || productId === 40) { // Medio Pollo o promociones
+              cantidadAfectada = 0.5 * cantidadPedido;
+            }
 
-              if (productId === 1) {
-                cantidadAfectada = 1 * cantidadPedido;
-              } else if (productId === 2 || productId === 39 || productId === 40) {
-                cantidadAfectada = 0.5 * cantidadPedido;
-              }
-
-              if (cantidadAfectada > 0) {
-                 pollosHoy += cantidadAfectada;
-                 if (horaPedido && pollosPorFranjaEspecifica.hasOwnProperty(horaPedido)) {
-                    pollosPorFranjaEspecifica[horaPedido] += cantidadAfectada;
-
-                    // CONSOLE LOG AÑADIDO: Notifica si un pedido afecta a las franjas de interés.
-                    if (franjasDeInteres.includes(horaPedido)) {
-                        console.log(`DEBUG_FRANJAS: Pedido #${doc.id} (${orderData.observaciones}) afecta a la franja ${horaPedido}. Sumando ${cantidadAfectada}. Nuevo total para la franja: ${pollosPorFranjaEspecifica[horaPedido]}`);
-                    }
-                 }
-              }
-            });
-          }
+            if (cantidadAfectada > 0) {
+               pollosHoy += cantidadAfectada;
+               if (horaPedido && pollosPorFranjaEspecifica.hasOwnProperty(horaPedido)) {
+                  pollosPorFranjaEspecifica[horaPedido] += cantidadAfectada;
+               }
+            }
+          });
         }
       });
       
       setTotalPollosPedidosHoy(pollosHoy);
       setCalculatedSlotCounts(pollosPorFranjaEspecifica);
-
-      // CONSOLE LOGS AÑADIDOS: Muestra el resultado final del cálculo para las franjas de interés.
-      console.log("---------- DEBUG CÁLCULO FRANJAS NOCTURNAS ----------");
-      console.log(`DEBUG_FRANJAS: Conteo final desde 'pedidos' para 20:30 -> ${pollosPorFranjaEspecifica["20:30"]}`);
-      console.log(`DEBUG_FRANJAS: Conteo final desde 'pedidos' para 20:45 -> ${pollosPorFranjaEspecifica["20:45"]}`);
-      console.log(`DEBUG_FRANJAS: Conteo final desde 'pedidos' para 21:00 -> ${pollosPorFranjaEspecifica["21:00"]}`);
-      console.log("----------------------------------------------------");
 
     }, (error) => {
       console.error("Layout (Pedidos Pollos): Error en el listener de la colección 'pedidos':", error);
@@ -256,6 +212,9 @@ const Layout = () => {
     if (updateCalendarTimeoutRef.current) {
         clearTimeout(updateCalendarTimeoutRef.current);
     }
+    
+    // La fecha del calendario se genera con formato YYYY-MM-DD
+    const calendarDate = today.toISOString().split("T")[0];
 
     if (
         calendarData &&
@@ -263,7 +222,7 @@ const Layout = () => {
         Array.isArray(calendarData.intervals) &&
         Object.keys(calculatedSlotCounts).length > 0
     ) {
-        const calendarDocRef = doc(db, "chicken_calendar_daily", formattedDate);
+        const calendarDocRef = doc(db, "chicken_calendar_daily", calendarDate);
         let intervalsWereUpdated = false;
         const newIntervalsArray = JSON.parse(JSON.stringify(calendarData.intervals));
 
@@ -277,10 +236,6 @@ const Layout = () => {
 
                 if (currentOrderedCountInCalendar !== conteoPedidosNumerico) {
                     console.warn(`Layout (Corrección Calendario): Discrepancia para ${horaFranja}. Calendario: ${currentOrderedCountInCalendar}, Pedidos (Calculado): ${conteoPedidosNumerico}. SOBREESCRIBIENDO CALENDARIO.`);
-                    
-                    // CONSOLE LOG AÑADIDO: Notifica específicamente sobre la corrección en franjas de interés.
-
-
                     intervalInCalendar.orderedCount = conteoPedidosNumerico;
                     intervalsWereUpdated = true;
                 }
@@ -288,13 +243,13 @@ const Layout = () => {
         });
 
         if (intervalsWereUpdated) {
-            console.log(`Layout (Corrección Calendario): Discrepancia(s) detectada(s). Programando actualización para chicken_calendar_daily/${formattedDate} en 3 segundos.`);
+            console.log(`Layout (Corrección Calendario): Discrepancia(s) detectada(s). Programando actualización para chicken_calendar_daily/${calendarDate} en 3 segundos.`);
             updateCalendarTimeoutRef.current = setTimeout(() => {
                 updateDoc(calendarDocRef, { intervals: newIntervalsArray })
                     .then(() => {
-                        console.log(`Layout (Corrección Calendario TIMEOUT EJECUTADO): Documento chicken_calendar_daily/${formattedDate} actualizado con éxito.`);
+                        console.log(`Layout (Corrección Calendario TIMEOUT EJECUTADO): Documento chicken_calendar_daily/${calendarDate} actualizado con éxito.`);
                     })
-                    .catch(error => console.error(`Layout (Corrección Calendario TIMEOUT EJECUTADO): Error al actualizar chicken_calendar_daily/${formattedDate}:`, error));
+                    .catch(error => console.error(`Layout (Corrección Calendario TIMEOUT EJECUTADO): Error al actualizar chicken_calendar_daily/${calendarDate}:`, error));
             }, 3000);
         }
     }
@@ -304,7 +259,7 @@ const Layout = () => {
             clearTimeout(updateCalendarTimeoutRef.current);
         }
     };
-  }, [calendarData, calculatedSlotCounts, formattedDate]);
+  }, [calendarData, calculatedSlotCounts]);
 
 
   const morningIntervals =
@@ -317,12 +272,10 @@ const Layout = () => {
 
   useEffect(() => {
     if (!loadingCalendar && calendarData) {
-      console.log(`Layout (Swiper Intervals Log): Intervalos de MAÑANA contemplados para HOY (${formattedDate}):`, morningIntervals.map(i => i.start));
-      console.log(`Layout (Swiper Intervals Log): Intervalos de TARDE contemplados para HOY (${formattedDate}):`, afternoonIntervals.map(i => i.start));
-    } else if (loadingCalendar) {
-      console.log("Layout (Swiper Intervals Log): Esperando carga del calendario para loggear intervalos del Swiper.");
+      console.log(`Layout (Swiper Intervals Log): Intervalos de MAÑANA para HOY:`, morningIntervals.map(i => i.start));
+      console.log(`Layout (Swiper Intervals Log): Intervalos de TARDE para HOY:`, afternoonIntervals.map(i => i.start));
     }
-  }, [morningIntervals, afternoonIntervals, formattedDate, loadingCalendar, calendarData]);
+  }, [morningIntervals, afternoonIntervals, loadingCalendar, calendarData]);
 
   return (
     <>
@@ -346,13 +299,7 @@ const Layout = () => {
               </div>
                <div className="w-[90%] pt-[1vh] ms-[3.8vw] border-white rounded p-4 bg-white ">
                 <div className="flex justify-end items-center mb-2">
-                  <button
-                    onClick={handleManualRefresh}
-                    className="p-2 hover:bg-gray-200 rounded-full text-xl"
-                    title="Actualizar horarios manualmente"
-                  >
-                    🔄
-                  </button>
+
                 </div>
                 {loadingCalendar ? (
                   <p>Cargando horarios...</p>
@@ -369,6 +316,7 @@ const Layout = () => {
                       <div className="flex flex-wrap gap-2">
                         {(isMorning ? morningIntervals : afternoonIntervals).map((interval, index) => {
                             let displayCount = Number(interval.orderedCount) || 0;
+                            // Se prioriza el conteo calculado en tiempo real si existe
                             if (
                               calculatedSlotCounts.hasOwnProperty(interval.start)
                             ) {

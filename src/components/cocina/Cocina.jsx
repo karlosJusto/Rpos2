@@ -16,7 +16,6 @@ import dayjs from 'dayjs';
 import isBetween from 'dayjs/plugin/isBetween';
 import customParseFormat from 'dayjs/plugin/customParseFormat';
 import { dataContext } from '../Context/DataContext';
-import isEqual from 'lodash/isEqual';
 
 // Asegúrate que la ruta a TestHeader sea correcta desde Cocina.jsx
 import TestHeader from '../ordenes/TestHeader';
@@ -45,6 +44,7 @@ const Cocina = () => {
   const [cocinaProducts, setCocinaProducts] = useState([]);
   const [productsData, setProductsData] = useState([]);
   const [saladsData, setSaladsData] = useState([]);
+  const [calculatedSaladCounts, setCalculatedSaladCounts] = useState(null);
   const [productosStockMap, setProductosStockMap] = useState(new Map());
   const [currentTimeTick, setCurrentTimeTick] = useState(Date.now());
   const [isLoadingCocina, setIsLoadingCocina] = useState(true);
@@ -53,9 +53,9 @@ const Cocina = () => {
   const [pedidosDelTurnoState, setPedidosDelTurnoState] = useState([]);
 
   // ELIMINAMOS el estado local [selectedDate, setSelectedDate]
-  // const [selectedDate, setSelectedDate] = useState(new Date());
 
   const audioRef = useRef(null);
+  const updateSaladsTimeoutRef = useRef(null);
   const previousPedidosDelTurnoIdsRef = useRef(new Set());
   const initialLoadDoneRef = useRef(false);
 
@@ -150,12 +150,23 @@ const Cocina = () => {
     }
     return { startTime, endTime };
   }, []);
-
+  
+  // ==================================================================
+  // ========= INICIO DE LA CORRECCIÓN APLICADA =======================
+  // ==================================================================
+  
   // selectedDateStr, isToday y showSupervisionHeader ahora dependen de dateToPass (del contexto)
   const selectedDateStr = formatDate(dateToPass); // dateToPass es null para hoy, formatDate lo manejará
   const isToday = !dateToPass; // Si dateToPass es null, es hoy
   const showSupervisionHeader = !!dateToPass; // Mostrar si dateToPass tiene un valor (no es null)
+  
+  // Declaración de `todayDocId` movida aquí, ANTES de que cualquier useEffect la utilice.
+  // Esto resuelve el error "Cannot access 'todayDocId' before initialization".
+  const todayDocId = formatDate(dateToPass).replace(/\//g, '-'); // Usa dateToPass del contexto
 
+  // ==================================================================
+  // ========= FIN DE LA CORRECCIÓN APLICADA ==========================
+  // ==================================================================
 
   const handleCloseSupervision = () => {
     // setSelectedDate(new Date()); // Ya no se usa el estado local
@@ -371,6 +382,78 @@ const Cocina = () => {
     };
   }, [selectedDateStr, cocinaProducts, productosStockMap, isToday, getTurnoActual, isLoadingCocina, playNotificationSound]);
 
+  // --- Effect to count salads from 'pedidos' collection for double-checking ---
+  useEffect(() => {
+    // todayDocId is in DD-MM-YYYY format, which matches `fecha_filtro`
+    const pedidosCollectionRef = collection(db, 'pedidos');
+    const q = query(pedidosCollectionRef, where('fecha_filtro', '==', todayDocId));
+
+    console.log(`[Cocina - SaladCheck] Setting up listener for 'pedidos' on date: ${todayDocId}`);
+
+    const unsubscribe = onSnapshot(q, (querySnapshot) => {
+      console.log(`[Cocina - SaladCheck] Received ${querySnapshot.size} orders for ${todayDocId}.`);
+      
+      // Si no es hoy, contamos todo el día. Si es hoy, filtramos por turno.
+      const { startTime, endTime } = isToday ? getTurnoActual() : { startTime: null, endTime: null };
+      if (isToday) {
+        console.log(`[Cocina - SaladCheck] Filtering for current shift: ${startTime.format('HH:mm')} - ${endTime.format('HH:mm')}`);
+      }
+
+      const totals = {
+        ensaladas: { grandes: { pedidas: 0 }, pequenas: { pedidas: 0 } },
+        ensaladillas: { grandes: { pedidas: 0 }, pequenas: { pedidas: 0 } },
+      };
+
+      querySnapshot.forEach(doc => {
+        const orderData = doc.data();
+
+        // Si es hoy, filtramos los pedidos para que solo cuente los del turno actual.
+        if (isToday) {
+          const orderDateTime = dayjs(orderData.fechahora, 'DD/MM/YYYY HH:mm', 'es', true).tz('Europe/Madrid', true);
+          if (!orderDateTime.isValid() || !orderDateTime.isBetween(startTime, endTime, null, '[]')) {
+            return; // Omitir este pedido, no pertenece al turno actual.
+          }
+        }
+
+        if (orderData.productos && Array.isArray(orderData.productos)) {
+          orderData.productos.forEach(product => {
+            const name = (product.name || product.nombre || '').toLowerCase();
+            const quantity = Number(product.cantidad) || 0;
+
+            if (quantity <= 0) return;
+
+            const isPequena = name.includes('1/2') || name.includes('media');
+
+            if (name.includes('ensaladilla')) {
+              if (isPequena) {
+                totals.ensaladillas.pequenas.pedidas += quantity;
+              } else {
+                totals.ensaladillas.grandes.pedidas += quantity;
+              }
+            } else if (name.includes('ensalada')) {
+              if (isPequena) {
+                totals.ensaladas.pequenas.pedidas += quantity;
+              } else {
+                totals.ensaladas.grandes.pedidas += quantity;
+              }
+            }
+          });
+        }
+      });
+
+      console.log('[Cocina - SaladCheck] Calculated totals from pedidos for current view/shift:', totals);
+      setCalculatedSaladCounts(totals);
+
+    }, (error) => {
+      console.error(`[Cocina - SaladCheck] Error in 'pedidos' listener for date ${todayDocId}:`, error);
+    });
+
+    return () => {
+      console.log(`[Cocina - SaladCheck] Cleaning up 'pedidos' listener for ${todayDocId}.`);
+      unsubscribe();
+    };
+  }, [todayDocId, isToday, getTurnoActual, currentTimeTick]); // Re-run when date, "isToday" status, or time ticks over.
+
   // Función para resetear los contadores de ensaladas para el turno de tarde
   const resetSaladCountsForAfternoonShift = useCallback(async (docId) => {
     const saladsRef = doc(db, SALADS_COLLECTION_NAME, docId);
@@ -405,9 +488,6 @@ const Cocina = () => {
   useEffect(() => {
     console.log("[Cocina - Effect B] mostrarBarra (del DataContext) valor actual:", mostrarBarra);
   }, [mostrarBarra]);
-
-  // Mover la declaración de todayDocId aquí, antes de que se use en el siguiente useEffect
-  const todayDocId = formatDate(dateToPass).replace(/\//g, '-'); // Usa dateToPass del contexto
 
   useEffect(() => {
     if (isLoadingPedidosAndProcessing || !productsData || productsData.length === 0) { return; }
@@ -490,7 +570,7 @@ const Cocina = () => {
       }
     }
 
-  }, [currentTimeTick, productsData, isLoadingPedidosAndProcessing, isToday, todayDocId, saladsData, resetSaladCountsForAfternoonShift]);
+  }, [currentTimeTick, productsData, isLoadingPedidosAndProcessing, isToday, todayDocId, saladsData, resetSaladCountsForAfternoonShift, getTurnoActual]);
 
   useEffect(() => {
     const saladsRef = doc(db, SALADS_COLLECTION_NAME, todayDocId);
@@ -514,6 +594,67 @@ const Cocina = () => {
         unsubscribe();
     };
   }, [todayDocId]);
+
+  // --- Effect for correcting salad data based on calculated counts from 'pedidos' ---
+  useEffect(() => {
+    if (updateSaladsTimeoutRef.current) {
+      clearTimeout(updateSaladsTimeoutRef.current);
+    }
+
+    // Ensure we have both data sources to compare
+    if (!saladsData || saladsData.length === 0 || !calculatedSaladCounts) {
+      return;
+    }
+
+    const currentSaladDoc = saladsData[0];
+    const saladsDocRef = doc(db, SALADS_COLLECTION_NAME, todayDocId);
+    
+    const updates = {};
+    let needsUpdate = false;
+
+    // Compare 'ensaladas'
+    if (currentSaladDoc.ensaladas && calculatedSaladCounts.ensaladas) {
+      if (currentSaladDoc.ensaladas.grandes?.pedidas !== calculatedSaladCounts.ensaladas.grandes.pedidas) {
+        updates['ensaladas.grandes.pedidas'] = calculatedSaladCounts.ensaladas.grandes.pedidas;
+        needsUpdate = true;
+        console.warn(`[Cocina - Corrección] Discrepancia en ensaladas grandes. Documento: ${currentSaladDoc.ensaladas.grandes?.pedidas}, Pedidos: ${calculatedSaladCounts.ensaladas.grandes.pedidas}.`);
+      }
+      if (currentSaladDoc.ensaladas.pequenas?.pedidas !== calculatedSaladCounts.ensaladas.pequenas.pedidas) {
+        updates['ensaladas.pequenas.pedidas'] = calculatedSaladCounts.ensaladas.pequenas.pedidas;
+        needsUpdate = true;
+        console.warn(`[Cocina - Corrección] Discrepancia en ensaladas pequeñas. Documento: ${currentSaladDoc.ensaladas.pequenas?.pedidas}, Pedidos: ${calculatedSaladCounts.ensaladas.pequenas.pedidas}.`);
+      }
+    }
+
+    // Compare 'ensaladillas'
+    if (currentSaladDoc.ensaladillas && calculatedSaladCounts.ensaladillas) {
+      if (currentSaladDoc.ensaladillas.grandes?.pedidas !== calculatedSaladCounts.ensaladillas.grandes.pedidas) {
+        updates['ensaladillas.grandes.pedidas'] = calculatedSaladCounts.ensaladillas.grandes.pedidas;
+        needsUpdate = true;
+        console.warn(`[Cocina - Corrección] Discrepancia en ensaladillas grandes. Documento: ${currentSaladDoc.ensaladillas.grandes?.pedidas}, Pedidos: ${calculatedSaladCounts.ensaladillas.grandes.pedidas}.`);
+      }
+      if (currentSaladDoc.ensaladillas.pequenas?.pedidas !== calculatedSaladCounts.ensaladillas.pequenas.pedidas) {
+        updates['ensaladillas.pequenas.pedidas'] = calculatedSaladCounts.ensaladillas.pequenas.pedidas;
+        needsUpdate = true;
+        console.warn(`[Cocina - Corrección] Discrepancia en ensaladillas pequeñas. Documento: ${currentSaladDoc.ensaladillas.pequenas?.pedidas}, Pedidos: ${calculatedSaladCounts.ensaladillas.pequenas.pedidas}.`);
+      }
+    }
+
+    if (needsUpdate) {
+      console.log(`[Cocina - Corrección] Discrepancia(s) detectada(s). Programando actualización para ${SALADS_COLLECTION_NAME}/${todayDocId} en 3 segundos.`);
+      updateSaladsTimeoutRef.current = setTimeout(() => {
+        updateDoc(saladsDocRef, updates)
+          .then(() => console.log(`[Cocina - Corrección TIMEOUT EJECUTADO] Documento ${SALADS_COLLECTION_NAME}/${todayDocId} actualizado con éxito.`))
+          .catch(error => console.error(`[Cocina - Corrección TIMEOUT EJECUTADO] Error al actualizar ${SALADS_COLLECTION_NAME}/${todayDocId}:`, error));
+      }, 3000);
+    }
+
+    return () => {
+      if (updateSaladsTimeoutRef.current) {
+        clearTimeout(updateSaladsTimeoutRef.current);
+      }
+    };
+  }, [saladsData, calculatedSaladCounts, todayDocId]);
 
   const updateSaladCount = useCallback(async (type, size, amount) => {
     // todayDocId se deriva de dateToPass, así que dateToPass es una dependencia.
