@@ -1,8 +1,16 @@
-import React, { useContext, useState } from 'react';
+import React, { useContext, useState, useEffect } from 'react';
 import { dataContext } from '../Context/DataContext';
+import { db } from '../../components/firebase/firebase';
+import { doc, getDoc } from "firebase/firestore";
+import dayjs from 'dayjs';
+import CierreDia from './CierreDia';
+import TestGeneradorHistorial from './TestGeneradorHistorial';
 
 const Stock = () => {
   const { data, actualizarStock, loading } = useContext(dataContext);
+  
+  // Estado para guardar el objeto con TODOS los stocks de ayer
+  const [stockAnterior, setStockAnterior] = useState({});
 
   const [stockActual, setStockActual] = useState(
     data.reduce((acc, producto) => {
@@ -10,15 +18,31 @@ const Stock = () => {
       return acc;
     }, {})
   );
-
   const [nuevoStock, setNuevoStock] = useState(
     data.reduce((acc, producto) => {
       acc[producto.id_product] = 0;
       return acc;
     }, {})
   );
-
   const [search, setSearch] = useState("");
+
+  useEffect(() => {
+    const fetchStockAnterior = async () => {
+      const fechaAyer = dayjs().subtract(1, 'day').format('YYYY-MM-DD');
+      // Apuntamos al documento del día de ayer
+      const docRef = doc(db, 'historialStock', fechaAyer);
+      const docSnap = await getDoc(docRef);
+
+      if (docSnap.exists() && docSnap.data().stocks) {
+        // Guardamos el mapa completo de stocks en el estado
+        setStockAnterior(docSnap.data().stocks);
+      } else {
+        console.log("No se encontró el histórico de stock para el día de ayer.");
+      }
+    };
+    
+    fetchStockAnterior();
+  }, []);
 
   const clearSearch = () => {
     setSearch('');
@@ -31,21 +55,12 @@ const Stock = () => {
     });
   };
 
-  const handleStockActualChange = (id_product, e) => {
-    setStockActual({
-      ...stockActual,
-      [id_product]: parseInt(e.target.value) || 0,
-    });
-  };
-
   const handleActualizarStock = () => {
     Object.keys(stockActual).forEach((id_product) => {
-      const stock = stockActual[id_product] + nuevoStock[id_product];
-      if (stock !== "") {
-        actualizarStock(id_product, stock);
-        stockActual[id_product] = stock;
-        nuevoStock[id_product] = 0;
-      }
+      const stock = (parseFloat(stockActual[id_product]) || 0) + (parseFloat(nuevoStock[id_product]) || 0);
+      actualizarStock(id_product, stock);
+      setStockActual(prev => ({...prev, [id_product]: stock}));
+      setNuevoStock(prev => ({...prev, [id_product]: 0}));
     });
   };
 
@@ -53,8 +68,9 @@ const Stock = () => {
     return <p className="text-center">Cargando productos...</p>;
   }
 
+  // AHORA MOSTRAMOS TODOS LOS PRODUCTOS, sin el filtro del producto 20
   const productosFiltrados = data.filter((producto) =>
-    producto.name.toLowerCase().includes(search.toLowerCase()) && ![1, 2,39,40,48].includes(producto.id_product)
+    producto.name.toLowerCase().includes(search.toLowerCase()) && ![1, 2, 39, 40, 48].includes(producto.id_product)
   );
 
   const productosPorCategoria = productosFiltrados.reduce((acc, producto) => {
@@ -67,9 +83,8 @@ const Stock = () => {
   }, {});
 
   const ordenCategorias = ['comida', 'complementos', 'bebidas', 'postres', 'extras'];
-
   const categoriasOrdenadas = ordenCategorias.filter(categoria => productosPorCategoria[categoria]);
-
+  
   return (
     <div className="flex justify-center items-start mt-10 px-4 sm:px-6 lg:px-8">
       <div className="w-full max-w-7xl mb-24">
@@ -83,21 +98,8 @@ const Stock = () => {
               className="px-4 py-2 border border-gray-300 rounded-md w-full focus:ring-yellow-500 focus:border-yellow-500 pr-10"
             />
             {search && (
-              <svg
-                onClick={clearSearch}
-                xmlns="http://www.w3.org/2000/svg"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-                className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-900 cursor-pointer"
-                width="20" height="20"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth="2"
-                  d="M6 18L18 6M6 6l12 12"
-                />
+              <svg onClick={clearSearch} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-900 cursor-pointer" width="20" height="20">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
               </svg>
             )}
           </div>
@@ -111,48 +113,40 @@ const Stock = () => {
                 <tr className="text-xl font-nunito">
                   <th className="px-4 py-2">Producto</th>
                   <th className="px-4 py-2">Nombre</th>
+                  <th className="px-4 py-2">Stock Anterior</th>
                   <th className="px-4 py-2">Stock Actual</th>
                   <th className="px-4 py-2">Entran</th>
                   <th className="px-4 py-2">Stock Final</th>
                 </tr>
               </thead>
               <tbody>
-                {/* Ordenamos los productos por 'position' dentro de la categoría */}
                 {productosPorCategoria[categoria]
                   .sort((a, b) => a.position - b.position)
-                  .map((producto) => (
-                    <tr key={producto.id_product} className="border-b">
-                      <td className="px-4 py-2">
-                        <img
-                          src={producto.imagen_rpos}
-                          alt={producto.name}
-                          className="w-15 h-10 object-cover rounded-md mx-auto"
-                        />
-                      </td>
-                      <td className="px-4 py-2 font-nunito text-lg truncate max-w-[150px]">{producto.name}</td>
-                      <td className="px-4 py-2">
-                      <span
-                        className={`px-2 py-1 w-20 text-center inline-block font-nunito font-extrabold ${
-                          stockActual[producto.id_product] ? 'text-green-700  bg-white' : 'text-gray-900 font-nunito bg-red-500 rounded-md '
-                        }`}
-                      >
-                        {stockActual[producto.id_product] || "0"}
-                      </span>
-                      </td>
-                      <td className="px-4 py-2">
-                        <input
-                          type="number"
-                          value={nuevoStock[producto.id_product] || ""}
-                          onChange={(e) => handleStockChange(producto.id_product, e)}
-                          min="0"
-                          step="any"
-                          placeholder=""
-                          className="px-2 py-1 border border-gray-300 rounded-md w-20 text-center focus:ring-yellow-500 focus:border-yellow-500"
-                        />
-                      </td>
-                      <td className="px-4 py-2 font-nunito text-lg font-extrabold">{producto.stock + (nuevoStock[producto.id_product] || 0)}</td>
-                    </tr>
-                  ))}
+                  .map((producto) => {
+                    // LÓGICA SIMPLIFICADA: Busca el id del producto en el mapa de stocks de ayer
+                    const stockDeAyer = stockAnterior[producto.id_product] ?? 'N/D';
+
+                    return (
+                      <tr key={producto.id_product} className="border-b">
+                        <td className="px-4 py-2">
+                          <img src={producto.imagen_rpos} alt={producto.name} className="w-15 h-10 object-cover rounded-md mx-auto" />
+                        </td>
+                        <td className="px-4 py-2 font-nunito text-lg truncate max-w-[150px]">{producto.name}</td>
+                        <td className="px-4 py-2 font-nunito text-lg font-bold text-gray-500">
+                          {stockDeAyer}
+                        </td>
+                        <td className="px-4 py-2">
+                          <span className={`px-2 py-1 w-20 text-center inline-block font-nunito font-extrabold ${stockActual[producto.id_product] > 0 ? 'text-green-700 bg-white' : 'text-gray-900 font-nunito bg-red-500 rounded-md '}`}>
+                            {stockActual[producto.id_product] || "0"}
+                          </span>
+                        </td>
+                        <td className="px-4 py-2">
+                          <input type="number" value={nuevoStock[producto.id_product] || ""} onChange={(e) => handleStockChange(producto.id_product, e)} min="0" step="any" placeholder="" className="px-2 py-1 border border-gray-300 rounded-md w-20 text-center focus:ring-yellow-500 focus:border-yellow-500" />
+                        </td>
+                        <td className="px-4 py-2 font-nunito text-lg font-extrabold">{(parseFloat(stockActual[producto.id_product]) || 0) + (parseFloat(nuevoStock[producto.id_product]) || 0)}</td>
+                      </tr>
+                    )
+                  })}
               </tbody>
             </table>
           </div>
@@ -160,48 +154,9 @@ const Stock = () => {
       </div>
 
       <div className="flex justify-center items-center w-full fixed bottom-4 mx-4 rounded-md">
-        <button
-          onClick={handleActualizarStock}
-          className="w-[33%] py-3 bg-yellow-500 text-white font-nunito rounded-md focus:ring-yellow-500 hover:bg-yellow-600 flex items-center justify-center gap-2"
-        >
-          <svg
-            width="28px"
-            height="28px"
-            viewBox="0 0 24 24"
-            fill="none"
-            xmlns="http://www.w3.org/2000/svg"
-            className="text-white"
-          >
-            <g id="SVGRepo_iconCarrier">
-              <path
-                d="M4 18V6"
-                stroke="#ffffff"
-                strokeWidth="1.5"
-                strokeLinecap="round"
-              ></path>
-              <path
-                d="M20 12L20 18"
-                stroke="#ffffff"
-                strokeWidth="1.5"
-                strokeLinecap="round"
-              ></path>
-              <path
-                d="M12 10C16.4183 10 20 8.20914 20 6C20 3.79086 16.4183 2 12 2C7.58172 2 4 3.79086 4 6C4 8.20914 7.58172 10 12 10Z"
-                stroke="#ffffff"
-                strokeWidth="1.5"
-              ></path>
-              <path
-                d="M20 12C20 14.2091 16.4183 16 12 16C7.58172 16 4 14.2091 4 12"
-                stroke="#ffffff"
-                strokeWidth="1.5"
-                strokeLinecap="round"
-              ></path>
-              <path
-                d="M20 18C20 20.2091 16.4183 22 12 22C7.58172 22 4 20.2091 4 18"
-                stroke="#ffffff"
-                strokeWidth="1.5"
-              ></path>
-            </g>
+        <button onClick={handleActualizarStock} className="w-[33%] py-3 bg-yellow-500 text-white font-nunito rounded-md focus:ring-yellow-500 hover:bg-yellow-600 flex items-center justify-center gap-2">
+          <svg width="28px" height="28px" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className="text-white">
+            <g id="SVGRepo_iconCarrier"><path d="M4 18V6" stroke="#ffffff" strokeWidth="1.5" strokeLinecap="round"></path><path d="M20 12L20 18" stroke="#ffffff" strokeWidth="1.5" strokeLinecap="round"></path><path d="M12 10C16.4183 10 20 8.20914 20 6C20 3.79086 16.4183 2 12 2C7.58172 2 4 3.79086 4 6C4 8.20914 7.58172 10 12 10Z" stroke="#ffffff" strokeWidth="1.5"></path><path d="M20 12C20 14.2091 16.4183 16 12 16C7.58172 16 4 14.2091 4 12" stroke="#ffffff" strokeWidth="1.5" strokeLinecap="round"></path><path d="M20 18C20 20.2091 16.4183 22 12 22C7.58172 22 4 20.2091 4 18" stroke="#ffffff" strokeWidth="1.5"></path></g>
           </svg>
           <span className="font-nunito text-lg">Actualizar Stock</span>
         </button>
