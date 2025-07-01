@@ -36,23 +36,26 @@ const CierreDia = () => {
         stocks: stockFinalDelDia,
       });
 
-      setMensaje(`Cierre del día ${fechaHoy} guardado con éxito.`);
     } catch (error) {
       console.error("Error al cerrar el día: ", error);
-      setMensaje("Error al guardar el cierre. Inténtalo de nuevo.");
+      setMensaje("Error al guardar el cierre.");
     } finally {
       setLoading(false);
+      // Ocultar el mensaje después de unos segundos
+      setTimeout(() => setMensaje(''), 4000);
     }
   };
 
   return (
-    <div style={{ border: '2px dashed red', padding: '20px', margin: '20px', textAlign: 'center' }}>
-      <h3 style={{ marginTop: 0 }}>Panel de Cierre de Día</h3>
-      <p>Pulsa este botón AL FINAL de la jornada para guardar el stock de todos los productos.</p>
-      <button onClick={handleCerrarDia} disabled={loading} style={{ padding: '10px 20px', fontSize: '16px', cursor: 'pointer', background: 'red', color: 'white' }}>
-        {loading ? 'Guardando...' : 'Cerrar Día y Guardar Stock Final'}
+    <div className="flex items-center ml-4">
+      <button
+        onClick={handleCerrarDia}
+        disabled={loading}
+        className="px-4 py-1 bg-red-600 text-white font-nunito font-bold rounded-md shadow-md hover:bg-red-700 disabled:bg-gray-500 disabled:cursor-not-allowed transition-colors duration-300"
+      >
+        {loading ? 'Guardando...' : 'Cerrar Día'}
       </button>
-      {mensaje && <p style={{ marginTop: '10px' }}>{mensaje}</p>}
+
     </div>
   );
 };
