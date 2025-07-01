@@ -4,7 +4,6 @@ import { db } from '../../components/firebase/firebase';
 import { doc, getDoc } from "firebase/firestore";
 import dayjs from 'dayjs';
 import CierreDia from './CierreDia';
-import TestGeneradorHistorial from './TestGeneradorHistorial';
 
 const Stock = () => {
   const { data, actualizarStock, loading } = useContext(dataContext);

@@ -7,19 +7,19 @@ import tijera_new from '../../assets/tijera_new.png';
 import GenerarQRCodeInvisible from './GenerarQRCodeInvisible';
 import isEqual from 'lodash/isEqual'; // Import isEqual
 
-import { useState, useContext, useEffect, useRef, useMemo } from 'react';
+import { useState, useContext, useEffect, useMemo } from 'react';
 import { dataContext } from '../Context/DataContext';
 import { doc, updateDoc, getDoc, runTransaction, deleteDoc, increment } from 'firebase/firestore';
 import { db } from '../firebase/firebase';
 
 // Modal, Button, Form se mantienen si los modales del CUERPO de Órdenes los usan.
-import { Button, Modal, Form } from 'react-bootstrap'; 
+import { Button, Modal, Form } from 'react-bootstrap';
 
 // Link se mantiene si hay links en el CUERPO de Órdenes que no eran del offcanvas.
-// import { Link } from 'react-router-dom'; 
+// import { Link } from 'react-router-dom';
 
 // PedidoRapido lo maneja TestHeader.
-// import PedidoRapido from './PedidoRapido'; 
+// import PedidoRapido from './PedidoRapido';
 import ImprimirPedidoCompleto from './ImprimirPedidoCompleto';
 
 import dayjs from 'dayjs';
@@ -51,10 +51,10 @@ const Ordenes = () => {
     dateToPass, // Del DataContext, usado por la barra de búsqueda de Órdenes
     setDateToPass, // Del DataContext
     // numeroBarra, // TestHeader usa su propia base
-    // setNumeroBarra, 
+    // setNumeroBarra,
     totalProductosDespuesDeLas18, // Usado por la barra de búsqueda de Órdenes
     totalbloquesAntesdelas18, // Usado por la barra de búsqueda de Órdenes
-    setCart 
+    setCart
   } = useContext(dataContext);
 
   const [displayPedidos, setDisplayPedidos] = useState(pedidosFromContext || []);
@@ -88,25 +88,25 @@ const Ordenes = () => {
   const [showTurnoModal, setShowTurnoModal] = useState(false);
   const handleCloseTurnoModal = () => {
     setShowTurnoModal(false);
-    window.location.reload(); 
+    window.location.reload();
   };
 
   useEffect(() => {
     const interval = setInterval(() => {
       const currentTime = dayjs().locale('es').tz('Europe/Madrid');
-      const targetTime = currentTime.set('hour', 18).set('minute', 0).set('second', 0); 
+      const targetTime = currentTime.set('hour', 18).set('minute', 0).set('second', 0);
       if (currentTime.isSame(targetTime, 'minute')) {
         setShowTurnoModal(true);
         clearInterval(interval);
       }
-    }, 60000); 
+    }, 60000);
     return () => clearInterval(interval);
   }, []);
 
   const [showOptionsModal, setShowOptionsModal] = useState(false);
   const handleCloseOptionsModal = () => setShowOptionsModal(false);
   const [pedidoSeleccionado, setPedidoSeleccionado] = useState(null);
-  
+
   // Estados para el modal de confirmación de borrado
   const [showConfirmDeleteModal, setShowConfirmDeleteModal] = useState(false);
   const [pedidoParaBorrar, setPedidoParaBorrar] = useState(null);
@@ -122,13 +122,13 @@ const Ordenes = () => {
       telefono: pedido.telefono,
       img_perfil: pedido.img_perfil,
     };
-    setCart([]); 
-    setOrderBeingEdited(clientInfo); 
+    setCart([]);
+    setOrderBeingEdited(clientInfo);
     navigate('/layout/comida');
   };
 
   const handleEditOrder = (pedido) => {
-    setOrderBeingEdited(pedido); 
+    setOrderBeingEdited(pedido);
     navigate('/layout/comida');
   };
 
@@ -189,11 +189,11 @@ const Ordenes = () => {
                 const productoNombreOriginal = (productoEnPedido.nombre || productoEnPedido.alias || '');
                 const productNameLower = productoNombreOriginal.toLowerCase();
                 const productoCantidadEnPedido = Number(productoEnPedido.cantidad) || 0;
-                let idProductoParaStockGlobal = productoEnPedido.id?.toString(); 
+                let idProductoParaStockGlobal = productoEnPedido.id?.toString();
                 let cantidadParaStockGlobal = productoCantidadEnPedido;
                 // Modificar la lógica para incluir IDs 39 y 40 para restaurar stock al ID 1 (pollo entero)
                 if ([2, 39, 40].includes(productoEnPedido.id)) {
-                    idProductoParaStockGlobal = '1'; 
+                    idProductoParaStockGlobal = '1';
                     cantidadParaStockGlobal = 0.5 * productoCantidadEnPedido;
                 }
 
@@ -218,7 +218,7 @@ const Ordenes = () => {
 
                     if (productNameLower.includes('1/2') || productNameLower.includes('media')) tamanoEnsalada = 'pequenas';
                     else tamanoEnsalada = 'grandes';
-                    
+
                     if (tipoEnsaladaBase && tamanoEnsalada) {
                         const fieldPathParaDecremento = `${tipoEnsaladaBase}.${tamanoEnsalada}.pedidas`;
                         try {
@@ -228,7 +228,7 @@ const Ordenes = () => {
                         }
                     }
                 }
-                
+
                 let calendarCollectionName = null;
                 let cantidadARestarDelCalendario = 0;
                 const productoIdOriginal = productoEnPedido.id;
@@ -239,7 +239,7 @@ const Ordenes = () => {
                 } else if (productoIdOriginal === 41 || productoIdOriginal === 48) {
                     calendarCollectionName = 'costilla_calendar_daily';
                     cantidadARestarDelCalendario = (productoIdOriginal === 41) ? productoCantidadEnPedido : 0.5 * productoCantidadEnPedido;
-                } else if (productoIdOriginal === 20) { 
+                } else if (productoIdOriginal === 20) {
                     calendarCollectionName = 'codillo_calendar_daily';
                     cantidadARestarDelCalendario = productoCantidadEnPedido;
                 }
@@ -350,39 +350,39 @@ const Ordenes = () => {
 
         // 2. If not found by id_cart, and productoClickeado.uniqueId is present, try by uniqueId (with id and alias)
         if (targetIndexInFirestore === -1 && productoClickeado.uniqueId) {
-            targetIndexInFirestore = productosFirestore.findIndex(p => 
+            targetIndexInFirestore = productosFirestore.findIndex(p =>
                 p.id === productoClickeado.id &&
                 p.alias === productoClickeado.alias &&
                 p.uniqueId === productoClickeado.uniqueId
             );
         }
-        
+
         // 3. If still not found by a unique identifier, attempt the broader attribute match
         if (targetIndexInFirestore === -1) {
             targetIndexInFirestore = productosFirestore.findIndex(p =>
                 p.id === productoClickeado.id &&
-                p.alias === productoClickeado.alias && 
+                p.alias === productoClickeado.alias &&
                 isEqual(p.opciones || {}, productoClickeado.opciones || {}) && // Use isEqual for robust object comparison
-                p.tostado === productoClickeado.tostado && 
+                p.tostado === productoClickeado.tostado &&
                 p.troceado === productoClickeado.troceado &&
                 p.sinsalsa === productoClickeado.sinsalsa &&
                 p.extrasalsa === productoClickeado.extrasalsa &&
                 p.celiaco === productoClickeado.celiaco
             );
         }
-        
+
         // 4. The existing fallback to indiceProductoEnPedido (use with caution)
         if (targetIndexInFirestore === -1) {
           console.warn(`Producto específico no encontrado por atributos en pedido ${numeroPedidoStr}. Intentando por índice local ${indiceProductoEnPedido}. Clickeado:`, productoClickeado);
           if (productosFirestore[indiceProductoEnPedido] && productosFirestore[indiceProductoEnPedido].id === productoClickeado.id && productosFirestore[indiceProductoEnPedido].alias === productoClickeado.alias ) {
-            targetIndexInFirestore = indiceProductoEnPedido; 
+            targetIndexInFirestore = indiceProductoEnPedido;
             console.log("Producto encontrado por índice local como fallback.")
           } else {
               console.error('No se pudo encontrar el producto específico en Firestore por atributos ni por índice local confiable. Producto clickeado:', productoClickeado, 'Productos en Firestore:', productosFirestore);
               throw new Error('Producto no encontrado en Firestore para actualizar.');
           }
         }
-        
+
         const productoAActualizar = productosFirestore[targetIndexInFirestore];
         const entregadoActual = productoAActualizar.entregado || 0;
         let nuevoEntregado = entregadoActual + 1;
@@ -404,13 +404,58 @@ const Ordenes = () => {
     }
   };
 
+  const handleMarcarPedidoCompleto = async (numeroPedido) => {
+    // Optimistic UI Update
+    setDisplayPedidos(currentDisplayPedidos =>
+      currentDisplayPedidos.map(p => {
+        if (p.NumeroPedido !== numeroPedido) return p;
+
+        const productosTotalmenteEntregados = p.productos.map(prod => ({
+          ...prod,
+          entregado: prod.cantidad,
+        }));
+
+        return { ...p, productos: productosTotalmenteEntregados };
+      })
+    );
+
+    // Firestore Update
+    const numeroPedidoStr = numeroPedido.toString();
+    const pedidoRef = doc(db, 'pedidos', numeroPedidoStr);
+
+    try {
+      await runTransaction(db, async (transaction) => {
+        const pedidoDocSnap = await transaction.get(pedidoRef);
+        if (!pedidoDocSnap.exists()) {
+          throw new Error("El documento del pedido no existe en Firestore!");
+        }
+
+        const productosFirestore = pedidoDocSnap.data().productos;
+        if (!Array.isArray(productosFirestore)) {
+            throw new Error("El campo 'productos' en Firestore no es un array o no existe.");
+        }
+
+        const productosActualizados = productosFirestore.map(prod => ({
+            ...prod,
+            entregado: prod.cantidad,
+        }));
+
+        transaction.update(pedidoRef, { productos: productosActualizados });
+      });
+    } catch (error) {
+      console.error(`Error al marcar el pedido ${numeroPedidoStr} como completado en Firestore:`, error);
+      // Revert optimistic update on error
+      setDisplayPedidos(pedidosFromContext || []);
+    }
+  };
+
   const agruparPorBloques15Minutos = (pedidosParaAgrupar) => {
     const bloques = {};
     if (!pedidosParaAgrupar) return bloques;
 
     pedidosParaAgrupar.forEach((pedido) => {
       if (!pedido.fechahora || typeof pedido.fechahora !== 'string' || !pedido.fechahora.includes(' ')) return;
-      const fechaHora = dayjs(pedido.fechahora, 'DD/MM/YYYY HH:mm', 'es', true).tz('Europe/Madrid', true); 
+      const fechaHora = dayjs(pedido.fechahora, 'DD/MM/YYYY HH:mm', 'es', true).tz('Europe/Madrid', true);
       if(!fechaHora.isValid()) return;
 
       const hora = fechaHora.format('HH:mm');
@@ -418,7 +463,7 @@ const Ordenes = () => {
         bloques[hora] = {
           pedidos: [],
           cantidadProductos: 0,
-          productos: [], 
+          productos: [],
           cantidadProductosId1: 0, cantidadProductosId20: 0, cantidadProductosId2: 0,
           cantidadProductosId41: 0, cantidadProductosId48: 0,
           pollosAgrupados: {} // Para el desglose detallado de pollos
@@ -427,22 +472,22 @@ const Ordenes = () => {
       bloques[hora].pedidos.push(pedido);
       if(pedido.productos && Array.isArray(pedido.productos)){
         pedido.productos.forEach((producto) => {
-          const cantidadProducto = Number(producto.cantidad) || 0; 
+          const cantidadProducto = Number(producto.cantidad) || 0;
           bloques[hora].cantidadProductos += cantidadProducto;
-          const productoExistente = bloques[hora].productos.find(p => 
-            p.nombre === producto.alias && 
-            p.categoria === producto.categoria 
+          const productoExistente = bloques[hora].productos.find(p =>
+            p.nombre === producto.alias &&
+            p.categoria === producto.categoria
           );
           if (productoExistente) {
             productoExistente.cantidad += cantidadProducto;
-            productoExistente.entregado += (Number(producto.entregado) || 0); 
+            productoExistente.entregado += (Number(producto.entregado) || 0);
           } else {
             bloques[hora].productos.push({
-              nombre: producto.alias, 
-              cantidad: cantidadProducto, 
-              categoria: producto.categoria, 
-              entregado: (Number(producto.entregado) || 0), 
-              position: producto.position 
+              nombre: producto.alias,
+              cantidad: cantidadProducto,
+              categoria: producto.categoria,
+              entregado: (Number(producto.entregado) || 0),
+              position: producto.position
             });
           }
           if (producto.id === 1) bloques[hora].cantidadProductosId1 += cantidadProducto;
@@ -463,14 +508,14 @@ const Ordenes = () => {
             const extrasalsaKey = producto.extrasalsa ? "t" : "f";
 
             const clavePollo = `${tipoPollo}_${tostadoKey}_${troceadoKey}_${sinsalsaKey}_${extrasalsaKey}`;
-            
+
             let nombreDisplayPollo = tipoPollo === "entero" ? "Pollo" : "1/2 Pollo"; // Abreviado para más espacio
             let detallesDisplay = [];
             if (producto.tostado) detallesDisplay.push("Tostado");
             if (producto.troceado) detallesDisplay.push("Troceado");
             if (producto.sinsalsa) detallesDisplay.push("S.S");
             if (producto.extrasalsa) detallesDisplay.push("E.S");
-            
+
             if (detallesDisplay.length > 0) {
               nombreDisplayPollo += ` (${detallesDisplay.join(', ')})`;
             }
@@ -510,7 +555,7 @@ const Ordenes = () => {
     // console.log("Recalculando bloquesPedidos..."); // Para depuración, puedes quitarlo después
     return agruparPorBloques15Minutos(displayPedidos || []);
   }, [displayPedidos]);
-  
+
   const [searchTerm, setSearchTerm] = useState('');
   const handleSearchChange = (e) => setSearchTerm(e.target.value);
 
@@ -524,14 +569,14 @@ const Ordenes = () => {
     const horaFin = horaActual.add(45, 'minutes');
     const nuevosTotales = Object.keys(bloquesPedidos).reduce(
       (acc, bloqueHora) => {
-        const horaBloqueDate = dayjs(bloqueHora, 'HH:mm', 'es', true).tz('Europe/Madrid', true); 
+        const horaBloqueDate = dayjs(bloqueHora, 'HH:mm', 'es', true).tz('Europe/Madrid', true);
         if (horaBloqueDate.isValid() && horaBloqueDate.isBetween(horaActual, horaFin, null, '[)')) {
           const bloqueData = bloquesPedidos[bloqueHora];
           acc.totalProductosId1 += (bloqueData.cantidadProductosId1 || 0);
-          acc.totalProductosId2 += (bloqueData.cantidadProductosId2 || 0); 
+          acc.totalProductosId2 += (bloqueData.cantidadProductosId2 || 0);
           acc.totalProductosId20 += (bloqueData.cantidadProductosId20 || 0);
           acc.totalProductosId41 += (bloqueData.cantidadProductosId41 || 0);
-          acc.totalProductosId48 += (bloqueData.cantidadProductosId48 || 0); 
+          acc.totalProductosId48 += (bloqueData.cantidadProductosId48 || 0);
         }
         return acc;
       },
@@ -544,12 +589,12 @@ const Ordenes = () => {
   }, [bloquesPedidos]); // Removido totalesProximos45Min para evitar bucles si la estructura interna de bloquesPedidos no cambia pero la referencia sí
 
   /*let bloquesFiltrados = bloquesPedidos;
-  if (!dateToPass) { 
+  if (!dateToPass) {
     const currentTime = dayjs().locale('es').tz('Europe/Madrid');
     const isBefore6PM = currentTime.hour() < 18;
     bloquesFiltrados = Object.fromEntries(
       Object.entries(bloquesPedidos).filter(([hora]) => {
-        const horaBloqueDate = dayjs(hora, 'HH:mm', 'es', true).tz('Europe/Madrid', true); 
+        const horaBloqueDate = dayjs(hora, 'HH:mm', 'es', true).tz('Europe/Madrid', true);
         if(!horaBloqueDate.isValid()) return false;
         return isBefore6PM ? horaBloqueDate.hour() < 18 : horaBloqueDate.hour() >= 18;
       })
@@ -573,8 +618,8 @@ const Ordenes = () => {
     return bloquesPedidos;
   }, [bloquesPedidos, dateToPass]);
 
-  
-  
+
+
   return (
     <>
       <TestHeader /> {/* <--- NUEVO HEADER INTEGRADO AQUÍ ---> */}
@@ -585,8 +630,8 @@ const Ordenes = () => {
           <div className="ms-3 p-1">
             <svg width="28px" height="28px" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><g id="SVGRepo_bgCarrier" strokeWidth="0"/><g id="SVGRepo_tracerCarrier" strokeLinecap="round" strokeLinejoin="round"/><g id="SVGRepo_iconCarrier"><path fillRule="evenodd" clipRule="evenodd" d="M15 10.5C15 12.9853 12.9853 15 10.5 15C8.01472 15 6 12.9853 6 10.5C6 8.01472 8.01472 6 10.5 6C12.9853 6 15 8.01472 15 10.5ZM14.1793 15.2399C13.1632 16.0297 11.8865 16.5 10.5 16.5C7.18629 16.5 4.5 13.8137 4.5 10.5C4.5 7.18629 7.18629 4.5 10.5 4.5C13.8137 4.5 16.5 7.18629 16.5 10.5C16.5 11.8865 16.0297 13.1632 15.2399 14.1792L20.0304 18.9697L18.9697 20.0303L14.1793 15.2399Z" fill="#e5e7e9"/></g></svg>
           </div>
-          <div className="ms-1 w-30 h-6 bg-white rounded-md"> 
-            <div className="relative w-full h-full"> 
+          <div className="ms-1 w-30 h-6 bg-white rounded-md">
+            <div className="relative w-full h-full">
               <input type="text" className="w-full h-full bg-transparent border-none outline-none px-2 text-center pl-8" placeholder="buscar..." value={searchTerm} onChange={handleSearchChange}/>
               {searchTerm && (
                 <button className="absolute right-2 top-1/2 transform -translate-y-1/2" onClick={() => setSearchTerm('')}>
@@ -596,15 +641,15 @@ const Ordenes = () => {
             </div>
           </div>
         </div>
-        <div className="flex justify-center w-full items-center"> 
+        <div className="flex justify-center w-full items-center">
           <div className="text-white text-[1.5vh]">
             <div>
               {dateToPass && ( // Este dateToPass es del DataContext
-                <span className="text-[#75adab] font-nunito font-bold -ms-[20vw] flex items-center justify-between"> 
+                <span className="text-[#75adab] font-nunito font-bold -ms-[20vw] flex items-center justify-between">
                   MODO SUPERVISIÓN DE PEDIDOS ({dayjs(dateToPass).format("DD/MM/YYYY")}) {/* Mostrar fecha */}
-                  <button 
-                    onClick={() => { setDateToPass(null); }} 
-                    className=" text-[#75adab] hover:text-yellow-700 font-bold text-lg leading-none -me-[40vw]" 
+                  <button
+                    onClick={() => { setDateToPass(null); }}
+                    className=" text-[#75adab] hover:text-yellow-700 font-bold text-lg leading-none -me-[40vw]"
                     aria-label="Volver al día actual">&times;
                   </button>
                 </span>
@@ -685,10 +730,12 @@ const Ordenes = () => {
               return (
                 <div key={pedido.id || pedido.NumeroPedido} className={`w-full flex ${containerColor} p-[0.30vh] mb-1 rounded-md shadow`}>
                   <div className="flex items-center">
-                    <h3 className={`text-[0.75vw] font-semibold mr-1 sm:mr-4 text-center ${pedido.origen === 1 ? 'text-green-700' : pedido.origen === 0 ? 'text-gray-600' : 'text-gray-700'}`}>
-                      {pedido.NumeroPedido}
-                      <p className="pt-1 w-20 sm:w-24 text-[0.8vw] sm:text-[1vw] font-extrabold truncate">{pedido.cliente ? pedido.cliente : 'Generico'}</p>
-                    </h3>
+                    <div onDoubleClick={() => handleMarcarPedidoCompleto(pedido.NumeroPedido)} className="cursor-pointer">
+                        <h3 className={`text-[0.75vw] font-semibold mr-1 sm:mr-4 text-center ${pedido.origen === 1 ? 'text-green-700' : pedido.origen === 0 ? 'text-gray-600' : 'text-gray-700'}`}>
+                        {pedido.NumeroPedido}
+                        <p className="pt-1 w-20 sm:w-24 text-[0.8vw] sm:text-[1vw] font-extrabold truncate">{pedido.cliente ? pedido.cliente : 'Generico'}</p>
+                        </h3>
+                    </div>
                     <div className="ms-[-0.5vw] me-1 sm:me-0">
                       <button className="p-1 rounded-md hover:bg-[#f2ac02] transition-all border border-gray-300" onClick={() => handleShowOptionsModal(pedido)}>
                         <svg fill="#808b96" width="25px" height="25px" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M12,7a2,2,0,1,0-2-2A2,2,0,0,0,12,7Zm0,10a2,2,0,1,0,2,2A2,2,0,0,0,12,17Zm0-7a2,2,0,1,0,2,2A2,2,0,0,0,12,10Z"/></svg>
@@ -715,10 +762,10 @@ const Ordenes = () => {
                         else if (producto.categoria === 'bebidas') borderColor = 'border-red-700';
                         else if (producto.categoria === 'postres') borderColor = 'border-purple-700';
                         if (entregadoActual === cantidadTotal && cantidadTotal > 0) backgroundColor = 'bg-[#52be80]';
-                        
+
                         return (
                           <div
-                            key={producto.id_cart || `${producto.id}-${index}-${producto.alias}`} 
+                            key={producto.id_cart || `${producto.id}-${index}-${producto.alias}`}
                             className={`border-2 ${borderColor} ${backgroundColor} p-1 sm:p-2 rounded-md w-auto flex items-center text-xs sm:text-sm cursor-pointer my-1`}
                             onClick={() => handleClickProductoEntregado(pedido.NumeroPedido, producto, producto.cantidad, index)}>
                             {producto.alias}
@@ -766,14 +813,14 @@ const Ordenes = () => {
             })}
           </div>
         ))}
-      </div> 
-      
+      </div>
+
       {/* Modals del cuerpo de Órdenes (Options, Turno) se mantienen */}
       <Modal show={showOptionsModal} onHide={handleCloseOptionsModal} size="md" backdrop="static" keyboard={false} centered>
         <Modal.Body className="flex flex-col items-center ">
          {pedidoSeleccionado && pedidoSeleccionado.origen === 1 && (
            <div className="p-3 text-center -mt-2">
-            
+
              <h1 className='text-red-600 font-extrabold font-nunito text-lg'>-PEDIDO APP NO EDITABLE-</h1>
              <p className='text-gray-400 font-nunito text-xs mt-1 -mb-2'>Puedes crear un nuevo pedido con los datos del cliente desde aquí.</p>
            </div>
@@ -789,7 +836,7 @@ const Ordenes = () => {
     className="p-2 sm:p-3 cursor-pointer hover:bg-yellow-500 rounded-md text-center"
     onClick={() => {
       if (pedidoSeleccionado.origen === 1) {
-        handleCreateOrder(pedidoSeleccionado); 
+        handleCreateOrder(pedidoSeleccionado);
         handleCloseOptionsModal();
       } else {
         handleEditOrder(pedidoSeleccionado);
@@ -833,7 +880,7 @@ const Ordenes = () => {
 
       {/* Modal de Confirmación de Borrado */}
       <Modal show={showConfirmDeleteModal} onHide={handleCloseConfirmDeleteModal} size="md" backdrop="static" keyboard={false} centered>
-        
+
         <Modal.Body className='bg-gray-100 font-nunito rounded-md'>
 
           <div className=' text-gray-700 font-nunito text-xl text-center p-2'>
@@ -861,7 +908,7 @@ const Ordenes = () => {
           </Button>
         </Modal.Footer>
       </Modal>
-      
+
       <Modal show={showTurnoModal} onHide={handleCloseTurnoModal} size="md" backdrop="static" keyboard={false} centered>
         <Modal.Body className="flex flex-col items-center ">
           <div><h1 className='font-nunito text-2xl font-[2vw] text-[#808b96]'>El Turno actual ha finalizado!</h1></div>
@@ -876,7 +923,7 @@ const Ordenes = () => {
 
          {/* Modal para mostrar el detalle de pollos */}
       <Modal show={showDetallePollosModal} onHide={handleCloseDetallePollosModal} size="md" keyboard={false} centered>
-       
+
         <Modal.Body className='bg-gray-100 font-nunito rounded-md'>
 
             <div className='flex justify-center items-center text-gray-700 font-extrabold font-nunito p-2 mb-2'>
@@ -917,8 +964,8 @@ const Ordenes = () => {
 
         </Modal.Body>
         <Modal.Footer className='bg-gray-100 border-t-0'>
-          <Button 
-            variant="primary" 
+          <Button
+            variant="primary"
             onClick={handleCloseDetallePollosModal}
             className="bg-white border-gray-500 text-gray-500 hover:border-yellow-900 hover:text-gray-900 font-nunito"
           >
@@ -926,10 +973,10 @@ const Ordenes = () => {
           </Button>
         </Modal.Footer>
       </Modal>
-      
+
       {/* El Modal de Sumar en Barra y el Offcanvas de menú ya no son necesarios aquí, TestHeader los manejaría si tuviera esa funcionalidad */}
       {/* Si PedidoRapido se usa fuera del TestHeader, se mantiene. Si no, se elimina. TestHeader tiene su propio PedidoRapido. */}
-      {/* <PedidoRapido ref={pedidoRapidoRef} datosCliente={datosCliente} /> */} 
+      {/* <PedidoRapido ref={pedidoRapidoRef} datosCliente={datosCliente} /> */}
     </>
   );
 };
