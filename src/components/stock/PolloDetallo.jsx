@@ -1,68 +1,46 @@
-import React, { useEffect, useState } from 'react';
-import { db } from '../firebase/firebase'; // Importa la instancia de Firebase
-import { collection, getDocs, doc, setDoc, updateDoc, onSnapshot } from 'firebase/firestore'; // Importa las funciones necesarias 
+import React, { useEffect, useState, useRef, useCallback } from 'react';
+import { db } from '../firebase/firebase';
+import { collection, doc, updateDoc, onSnapshot } from 'firebase/firestore';
 import Table from 'react-bootstrap/Table';
 import dayjs from 'dayjs';
 
 const PolloDetallo = () => {
-  const [estadisticas, setEstadisticas] = useState([]); // Estado para almacenar los datos
-  const [loading, setLoading] = useState(true); // Estado para manejar el estado de carga
+  const [estadisticas, setEstadisticas] = useState([]);
+  const [loading, setLoading] = useState(true);
+  // Ref para controlar que la actualización automática se ejecute solo una vez por carga
+  const isUpdateTriggered = useRef(false);
 
+  // EFECTO 1: Se suscribe a los cambios en Firestore en tiempo real para obtener los datos.
   useEffect(() => {
-    // Función para obtener los datos de la colección 'estadisticas_diarias'
-    const obtenerEstadisticas = async () => {
-      try {
-        const querySnapshot = await getDocs(collection(db, "estadisticas_diarias"));
-        
-        // Mapeamos los documentos y extraemos los datos
-        const datos = querySnapshot.docs.map(doc => {
-          // Aquí usamos el nombre del documento como "dia" y los datos del documento
-          const data = doc.data();
-          return {
-            dia: doc.id, // Utilizamos el ID del documento como el "dia"
-            ...data // Agregamos los datos del documento al objeto
-          };
-        });
+    setLoading(true);
+    const estadisticasRef = collection(db, "estadisticas_diarias");
+    const unsubscribe = onSnapshot(estadisticasRef, (querySnapshot) => {
+      const datos = querySnapshot.docs.map(doc => ({
+        dia: doc.id,
+        ...doc.data()
+      }));
 
-        // Ordenamos los datos por la fecha del día (aseguramos que 'dia' esté en formato YYYY-MM-DD)
-        const datosOrdenados = datos.sort((a, b) => {
-          const fechaA = dayjs(a.dia, 'DD-MM-YYYY'); // Usamos dayjs para convertir a objeto Date
-          const fechaB = dayjs(b.dia, 'DD-MM-YYYY'); // Usamos dayjs para convertir a objeto Date
-          return fechaA - fechaB; // Ordenar de los más antiguos a los más recientes
-        });
+      const datosOrdenados = datos.sort((a, b) => {
+        const fechaA = dayjs(a.dia, 'DD-MM-YYYY');
+        const fechaB = dayjs(b.dia, 'DD-MM-YYYY');
+        return fechaA.isAfter(fechaB) ? 1 : -1;
+      });
 
-        // Limitamos a los últimos 30 días
-        const datosLimitados = datosOrdenados.slice(-15);
-        //console.log("datosLimitados");
-       // console.log(datosLimitados);
+      const datosLimitados = datosOrdenados.slice(-15);
+      setEstadisticas(datosLimitados);
+      setLoading(false);
+    }, (error) => {
+      console.error("Error al obtener los datos de Firestore en tiempo real: ", error);
+      setLoading(false);
+    });
 
-        setEstadisticas(datosLimitados); // Guarda los datos ordenados y limitados en el estado
-      } catch (error) {
-        console.error("Error al obtener los datos de Firestore: ", error);
-      }
-    };
-
-    obtenerEstadisticas(); // Llama a la función al cargar el componente
-    setLoading(false); // Cambia el estado de carga
+    return () => unsubscribe();
   }, []);
 
-  // Función para manejar el cambio de valores en los inputs
-  const handleInputChange = (e, dia, campo) => {
-    const value = parseFloat(e.target.value) || 0; // Validamos que el valor sea numérico
-    setEstadisticas(prevEstadisticas =>
-      prevEstadisticas.map(item =>
-        item.dia === dia
-          ? { ...item, [campo]: value } // Actualizamos el campo correspondiente solo para este día
-          : item
-      )
-    );
-  };
-
-  // Función para actualizar todos los campos en Firebase
-  const handleActualizar = async () => {
-
+  // FUNCIÓN PARA ACTUALIZAR: Lógica para recalcular y guardar en Firebase.
+  // Se envuelve en useCallback para optimización y evitar re-creaciones innecesarias.
+  const handleActualizar = useCallback(async () => {
     try {
-
       const hoy = dayjs();
       const fechasPermitidas = [
         hoy.format('DD-MM-YYYY'),
@@ -70,69 +48,77 @@ const PolloDetallo = () => {
         hoy.subtract(2, 'day').format('DD-MM-YYYY')
       ];
 
+      let stockFinal = 0;
+      let stock_anterior = -1000000000000;
 
-      let stockFinal=0;
-      let stock_anterior=-1000000000000;
       for (const item of estadisticas) {
         if (!fechasPermitidas.includes(item.dia)) {
           continue;
         }
 
-        console.log("****DIA: "+item.dia);
-        const docRef = doc(db, 'estadisticas_diarias', item.dia); // Referencia al documento en Firestore
+        console.log("**** Procesando Día para corrección: " + item.dia);
+        const docRef = doc(db, 'estadisticas_diarias', item.dia);
 
-         // Realizamos los cálculos antes de actualizar el documento
-         if (stock_anterior==-1000000000000)
-           stock_anterior=  (item.stock_anterior || 0);
-        
+        if (stock_anterior === -1000000000000) {
+          stock_anterior = item.stock_anterior || 0;
+        }
+
         const stockActualizado = (item.entran || 0) + stock_anterior;
         stockFinal = stockActualizado - (item.vd || 0) - (item.baja || 0) - (item.devueltos || 0);
 
-         console.log("Stock_final:"+stockFinal);
-         console.log("Stock_anterior:"+stock_anterior);
-
-
-        // Aquí actualizamos todos los campos para ese día
         await updateDoc(docRef, {
           entran: item.entran,
           baja: item.baja,
           devueltos: item.devueltos,
           stock_anterior: stock_anterior,
           stock: stockFinal,
-          //stockactualizado: stockActualizado,
-          //stockfinal: stockFinal,
-           // Calculo de total
         });
 
-        stock_anterior=stockFinal;
-
-       //console.log(`Datos del día ${item.dia} actualizados correctamente.`);
-       //alert(`Datos del día ${item.dia} actualizados correctamente.`);
+        stock_anterior = stockFinal;
       }
 
-      const docRef = doc(db, 'productos', '1'); // Referencia al documento en Firestore
+      const docRef = doc(db, 'productos', '1');
       await updateDoc(docRef, {
         stock: stockFinal
-      }
-    );
+      });
 
+      console.log("Actualización de datos completada.");
+      // Se elimina window.location.reload() para evitar un bucle infinito.
+      // La vista se actualiza sola gracias a onSnapshot.
 
-      window.location.reload();
-
-      
     } catch (error) {
       console.error("Error al actualizar los datos en Firebase:", error);
     }
+  }, [estadisticas]); // Se ejecuta si 'estadisticas' cambia
+
+  // EFECTO 2: Lanza la función de actualización automática UNA SOLA VEZ al cargar los datos.
+  useEffect(() => {
+    if (estadisticas.length > 0 && !isUpdateTriggered.current) {
+      console.log("Lanzando corrección automática al cargar el componente...");
+      handleActualizar();
+      // Se marca como 'true' para que no se vuelva a ejecutar
+      isUpdateTriggered.current = true;
+    }
+  }, [estadisticas, handleActualizar]);
+
+  // FUNCIÓN PARA MANEJAR CAMBIOS EN LOS INPUTS
+  const handleInputChange = (e, dia, campo) => {
+    const value = parseFloat(e.target.value) || 0;
+    setEstadisticas(prevEstadisticas =>
+      prevEstadisticas.map(item =>
+        item.dia === dia
+          ? { ...item, [campo]: value }
+          : item
+      )
+    );
   };
 
-  // Si estamos cargando, mostramos un mensaje de carga
+  // RENDERIZADO: Muestra "Cargando..." mientras se obtienen los datos.
   if (loading) {
     return <p className="text-center">Cargando estadísticas...</p>;
   }
 
-
-
-
+  // RENDERIZADO: Muestra la tabla y el botón.
   return (
     <div className="container my-4">
       <h2 className="text-center mb-4 font-nunito text-gray-500 text-2xl -mt-8">Gestion Stock Pollos</h2>
@@ -150,76 +136,68 @@ const PolloDetallo = () => {
           </tr>
         </thead>
         <tbody className='text-center'>
-          {/* Mapeamos los datos de las estadisticas y los mostramos en la tabla */}
           {estadisticas.map((item, index) => {
-            // Calculamos stockActualizado y stockFinal dentro del JSX para cada fila
-              const stockActualizado = (item.entran || 0) + (item.stock_anterior || 0);
-              const stockFinal = stockActualizado - (item.vd || 0) - (item.baja || 0) - (item.devueltos || 0);
-
-            const isEditable = index >= estadisticas.length - 3; // Solo los últimos 3 días son editables
-
-            // Verificamos si es lunes para insertar la fila vacía
-            const isMonday = item.diasemana.toLowerCase() === 'lunes';
+            const stockActualizado = (item.entran || 0) + (item.stock_anterior || 0);
+            const stockFinal = stockActualizado - (item.vd || 0) - (item.baja || 0) - (item.devueltos || 0);
+            const isEditable = index >= estadisticas.length - 3;
+            const isMonday = item.diasemana && item.diasemana.toLowerCase() === 'lunes';
 
             return (
-              [
-                // Fila separadora cuando es lunes
-                isMonday && (
+              // Se usa React.Fragment para poder devolver un array de elementos
+              <React.Fragment key={`fragment-${item.dia}`}>
+                {isMonday && (
                   <tr key={`separator-${item.dia}`} className="separator-row">
                     <td colSpan="8" className="text-center py-2">
                       <span className="text-yellow-500 "></span>
                     </td>
                   </tr>
-                ),
-
-                // Fila con datos
-                <tr key={index} className="table-row">
+                )}
+                <tr key={item.dia} className="table-row">
                   <td className="table-cell-width capitalize"> {item.diasemana} , {item.dia}</td>
                   <td className="table-cell-width w-36 font-extrabold">{item.stock_anterior}</td>
                   <td className="table-cell-width text-center w-32">
-                    <input 
-                      type="number" 
-                      value={item.entran === 0 ? '' : item.entran || ''} 
-                      onChange={(e) => handleInputChange(e, item.dia, 'entran')} 
+                    <input
+                      type="number"
+                      value={item.entran === 0 ? '' : item.entran || ''}
+                      onChange={(e) => handleInputChange(e, item.dia, 'entran')}
                       className="form-control w-24 mx-auto text-center"
-                      min="0" // Aseguramos que no pueda ser negativo
-                      disabled={!isEditable} // Deshabilitamos la edición si no es uno de los últimos 3 días
+                      min="0"
+                      disabled={!isEditable}
                     />
                   </td>
-
                   <td className="table-cell-width w-40 font-extrabold">{stockActualizado}</td>
                   <td className="table-cell-width w-40">{item.vd || 0}</td>
                   <td className="table-cell-width w-32">
-                    <input 
-                      type="number" 
-                      value={item.baja === 0 ? '' : item.baja || ''} 
-                      onChange={(e) => handleInputChange(e, item.dia, 'baja')} 
+                    <input
+                      type="number"
+                      value={item.baja === 0 ? '' : item.baja || ''}
+                      onChange={(e) => handleInputChange(e, item.dia, 'baja')}
                       className="form-control w-24 mx-auto text-center"
-                      min="0" // Aseguramos que no pueda ser negativo
-                      disabled={!isEditable} // Deshabilitamos la edición si no es uno de los últimos 3 días
+                      min="0"
+                      disabled={!isEditable}
                     />
                   </td>
                   <td className="table-cell-width w-40 ">
-                    <input 
-                      type="number" 
-                      value={item.devueltos === 0 ? '' : item.devueltos || ''} 
-                      onChange={(e) => handleInputChange(e, item.dia, 'devueltos')} 
+                    <input
+                      type="number"
+                      value={item.devueltos === 0 ? '' : item.devueltos || ''}
+                      onChange={(e) => handleInputChange(e, item.dia, 'devueltos')}
                       className="form-control w-24 mx-auto text-center"
-                      min="0" // Aseguramos que no pueda ser negativo
-                      disabled={!isEditable} // Deshabilitamos la edición si no es uno de los últimos 3 días
+                      min="0"
+                      disabled={!isEditable}
                     />
                   </td>
                   <td className="table-cell-width w-40 font-extrabold">
                     {stockFinal}
                   </td>
                 </tr>
-              ]
+              </React.Fragment>
             );
           })}
         </tbody>
       </Table>
       <div className='flex text-center justify-center items-center'>
-        <button 
+        <button
           className="mt-[2vw] w-[10vw] tracking-wide bg-[#f2ac02] text-white py-[0.95vw] rounded-lg hover:bg-yellow-600 transition-all duration-300 ease-in-out flex items-center justify-center focus:shadow-outline focus:outline-none"
           onClick={handleActualizar}
         >

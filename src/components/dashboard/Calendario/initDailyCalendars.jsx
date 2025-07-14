@@ -377,7 +377,7 @@ const processTodaysFutureOrders = async (dateString) => {
                             calendarCollection = productTypesConfig.chicken.dailyCollection;
                             quantityToAddCalendar = quantityToDeductFromStock; // Add same amount to calendar
                             productNameForCalendar = 'Pollo';
-                        } else if (itemId === 41 || itemId === 48) { // Costilla Entera (41) or Media Costilla (48)
+                          } else if (itemId === 41 || itemId === 48) { // Costilla Entera (41) or Media Costilla (48)
                             stockProductId = productTypesConfig.costilla.stockProductId; // Use base stock ID (41)
                             quantityToDeductFromStock = (itemId === 48) ? itemQuantity / 2 : itemQuantity; // Deduct 0.5 for Media Costilla
                             calendarCollection = productTypesConfig.costilla.dailyCollection;

@@ -55,7 +55,7 @@ const Ordenes = () => {
       const today = now.format('YYYY-MM-DD');
 
       // Definir los rangos horarios
-      const afternoonStart = dayjs(`${today} 14:30:00`).tz('Europe/Madrid');
+      const afternoonStart = dayjs(`${today} 08:20:00`).tz('Europe/Madrid');
       const afternoonEnd = dayjs(`${today} 17:00:00`).tz('Europe/Madrid');
       const nightStart = dayjs(`${today} 21:00:00`).tz('Europe/Madrid');
       const nightEnd = dayjs(`${today} 23:59:59`).tz('Europe/Madrid');
@@ -437,6 +437,44 @@ const Ordenes = () => {
     }
   };
 
+
+// ... dentro del componente Ordenes
+
+  const marcarTodosLosPedidosPendientesComoCompletos = async () => {
+    const currentTime = dayjs().locale('es').tz('Europe/Madrid');
+    const hoyEsDomingo = currentTime.day() === 0; // 0 = Domingo
+    
+    // Un turno es de "mañana" solo si NO es domingo Y es antes de las 18:00
+    const isMorningShift = !hoyEsDomingo && currentTime.hour() < 18;
+
+    // Filtramos los pedidos del turno actual que tengan al menos un producto no entregado completamente.
+    const pedidosPendientesDelTurno = displayPedidos.filter(p => {
+      if (!p.fechahora || typeof p.fechahora !== 'string' || !p.fechahora.includes(' ')) return false;
+      const horaPedido = dayjs(p.fechahora, 'DD/MM/YYYY HH:mm', 'es', true).tz('Europe/Madrid', true);
+      if (!horaPedido.isValid()) return false;
+
+      // Comprobar si el pedido pertenece al turno actual
+      const esDelTurnoActual = isMorningShift ? horaPedido.hour() < 18 : horaPedido.hour() >= 18;
+      if (!esDelTurnoActual) return false;
+
+      // Comprobar si el pedido no está completo
+      const noEstaCompleto = p.productos && p.productos.some(prod => (prod.entregado || 0) < prod.cantidad);
+      
+      return noEstaCompleto;
+    });
+
+    if (pedidosPendientesDelTurno.length > 0) {
+      console.log(`[CIERRE TURNO] Marcando ${pedidosPendientesDelTurno.length} pedidos pendientes del turno de ${isMorningShift ? 'mañana' : 'tarde'} como completados.`);
+      // Creamos un array de promesas, una por cada pedido a actualizar.
+      const promises = pedidosPendientesDelTurno.map(p => handleMarcarPedidoCompleto(p.NumeroPedido));
+      await Promise.all(promises); // Esperamos a que todas las actualizaciones terminen.
+      console.log(`[CIERRE TURNO] Finalizada la marcación de pedidos pendientes del turno.`);
+    } else {
+      console.log(`[CIERRE TURNO] No hay pedidos pendientes en el turno de ${isMorningShift ? 'mañana' : 'tarde'} para marcar como completados.`);
+    }
+  };
+
+
   const agruparPorBloques15Minutos = (pedidosParaAgrupar) => {
     const bloques = {};
     if (!pedidosParaAgrupar) return bloques;
@@ -572,11 +610,16 @@ const Ordenes = () => {
   const bloquesFiltrados = useMemo(() => {
     if (!dateToPass) {
       const currentTime = dayjs().locale('es').tz('Europe/Madrid');
-      const isBefore6PM = currentTime.hour() < 18;
+      const hoyEsDomingo = currentTime.day() === 0; // 0 = Domingo
+      
+      // La vista es de "mañana" (antes de las 18h) solo si NO es domingo.
+      const isBefore6PM = !hoyEsDomingo && currentTime.hour() < 18;
+      
       return Object.fromEntries(
         Object.entries(bloquesPedidos).filter(([hora]) => {
           const horaBloqueDate = dayjs(hora, 'HH:mm', 'es', true).tz('Europe/Madrid', true);
           if (!horaBloqueDate.isValid()) return false;
+          // La lógica de filtrado se basa en la variable isBefore6PM, que ya contempla la excepción del domingo.
           return isBefore6PM ? horaBloqueDate.hour() < 18 : horaBloqueDate.hour() >= 18;
         })
       );
@@ -639,7 +682,7 @@ const Ordenes = () => {
 
         {/* CONTENEDOR DERECHO: Se muestra si no es modo supervisión Y si es la hora correcta */}
         <div className="flex-shrink-0">
-            {!dateToPass && showCierreDia && <CierreDia />}
+            {!dateToPass && showCierreDia && <CierreDia onCierre={marcarTodosLosPedidosPendientesComoCompletos} />}
         </div>
       </div>
 

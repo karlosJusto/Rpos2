@@ -14,7 +14,7 @@ function CalendarioDropdown({ onDateChange,initialDate }) {
   const [horaSeleccionada, setHoraSeleccionada] = useState(false);
   const [minutoSeleccionado, setMinutoSeleccionado] = useState(false);
 
-  const horasDisponibles = ["11", "12", "13", "14", "15", "16","17", "18", "19", "20", "21", "22"];
+  const horasDisponibles = ["08","09","11", "12", "13", "14", "15", "16","17", "18", "19", "20", "21", "22"];
   const minutosDisponibles = ["00", "15", "30", "45"];
 
   const fechaActual = format(new Date(), "dd/MM/yyyy");

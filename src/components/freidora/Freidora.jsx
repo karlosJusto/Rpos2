@@ -1,18 +1,69 @@
 import { useEffect, useState, useMemo, useRef, useCallback } from 'react';
 import { db } from '../firebase/firebase';
-import { collection, query, where, onSnapshot, getDocs, orderBy, doc, updateDoc } from 'firebase/firestore'; // Importa onSnapshot, getDocs, orderBy, doc, updateDoc
-import singluten from '../../assets/singluten.png'; // Imagen sin gluten
+import { collection, query, where, onSnapshot, getDocs, orderBy, doc, updateDoc } from 'firebase/firestore';
+import singluten from '../../assets/singluten.png';
 import dayjs from 'dayjs';
-import timezone from 'dayjs/plugin/timezone'; // Plugin para zona horaria
-import utc from 'dayjs/plugin/utc'; // Plugin para trabajar con fechas en UTC
-
-// import LGFreidora from './LGFreidora'; // Eliminado para evitar dependencia circular o uso incorrecto
+import timezone from 'dayjs/plugin/timezone';
+import utc from 'dayjs/plugin/utc';
 
 dayjs.extend(utc);
 dayjs.extend(timezone);
 
-// Images will be loaded directly from Firebase Storage URLs provided in Firestore documents
+// --- Componente del Modal (Integrado y Corregido) ---
+const OrderDetailsModal = ({ isOpen, onClose, data, timeBlock }) => {
+  if (!isOpen || !data || data.length === 0) {
+    return null;
+  }
+  const modalTitle = `Desglose de Pedidos (${timeBlock})`;
 
+  return (
+    <div 
+      className="fixed inset-0 bg-black bg-opacity-60 flex justify-center items-center z-50 font-nunito"
+      onClick={onClose}
+    >
+      <div 
+        className="bg-white rounded-lg shadow-2xl p-6 w-full max-w-lg mx-4"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex justify-between items-center border-b pb-3 mb-4">
+          <h2 className="text-xl font-bold text-gray-800">{modalTitle}</h2>
+          <button 
+            onClick={onClose} 
+            className="text-gray-500 hover:text-gray-800 text-3xl font-bold leading-none"
+            aria-label="Cerrar"
+          >
+            &times;
+          </button>
+        </div>
+        <div className="max-h-[60vh] overflow-y-auto">
+          {data.map((aggregatedItem, itemIndex) => (
+            <div key={itemIndex} className="mb-4 last:mb-0">
+              <h3 className="font-bold text-lg text-blue-600 border-b-2 border-blue-200 pb-1 mb-2">
+                {aggregatedItem.alias}
+              </h3>
+              <ul className="space-y-1 pl-2">
+                {/* CORRECCIÓN: Se añade `|| []` para evitar el error si `breakdown` es undefined. */}
+                {(aggregatedItem.breakdown || []).map((order, orderIndex) => (
+                  <li key={orderIndex} className="bg-gray-100 p-2 rounded-md flex justify-between items-center text-sm">
+                    <span className="font-semibold text-gray-700">
+                      Pedido: {order.numeropedido}
+                    </span>
+                    <span className="text-gray-600">
+                      x{order.contributed_portions} {aggregatedItem.doble ? 'doble(s)' : ''} (Total pedido: {order.original_total})
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+
+// --- Componente Principal Freidora ---
 const Freidora = () => {
   const [pedidos, setPedidos] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -21,562 +72,315 @@ const Freidora = () => {
   const [bloqueHorario, setBloqueHorario] = useState('');
   const [anteriores, setAnteriores] = useState('');
   const [posteriores, setPosteriores] = useState('');
-  const [pedidosTotales, setPedidosTotales] = useState({}); // Inicializado como objeto para consistencia
-  const [productosFreidoraConfig, setProductosFreidoraConfig] = useState([]); // State for freidora products
-
+  const [pedidosTotales, setPedidosTotales] = useState({});
+  const [productosFreidoraConfig, setProductosFreidoraConfig] = useState([]);
+  const [isModalOpen, setModalOpen] = useState(false);
+  const [modalData, setModalData] = useState([]);
+  const [modalTimeBlock, setModalTimeBlock] = useState("");
   const audioRef = useRef(null);
-  const previousRelevantOrderProductIdsRef = useRef(new Set()); // Stores "orderId-productId-uniqueId"
+  const previousRelevantOrderProductIdsRef = useRef(new Set());
   const initialLoadFreidoraDoneRef = useRef(false);
 
   useEffect(() => {
-    // Función para actualizar la hora y los bloques
     const actualizarHora = () => {
-      const currentTime = dayjs().locale('es').tz('Europe/Madrid'); // Obtener la hora actual en España
-      setHora(currentTime.format('HH:mm:ss')); // Establecer la hora actual en formato 'HH:mm:ss'
-
-      // Obtener los minutos de la hora actual
+      const currentTime = dayjs().locale('es').tz('Europe/Madrid');
+      setHora(currentTime.format('HH:mm:ss'));
       const minutos = currentTime.minute();
-
       let nuevoBloque = '';
-
-      // Determinamos el bloque horario según los minutos de la hora actual
-      if (minutos >= 0 && minutos <= 15) {
-        nuevoBloque = currentTime.startOf('hour').add(15, 'minute').format('HH:mm'); // Bloque a las xx:15
-      } else if (minutos >= 16 && minutos <= 30) {
-        nuevoBloque = currentTime.startOf('hour').add(30, 'minute').format('HH:mm'); // Bloque a las xx:30
-      } else if (minutos >= 31 && minutos <= 45) {
-        nuevoBloque = currentTime.startOf('hour').add(45, 'minute').format('HH:mm'); // Bloque a las xx:45
-      } else if (minutos >= 46 && minutos <= 59) {
-        nuevoBloque = currentTime.add(1, 'hour').startOf('hour').format('HH:mm'); // Bloque a la siguiente hora (xx+1:00)
-      }
-
-      setBloqueHorario(nuevoBloque); // Actualizamos el estado con el nuevo bloque horario
-
-      // Calcular anteriores y posteriores basados en el bloqueHorario
-      const bloqueTime = dayjs(nuevoBloque, 'HH:mm'); // Convertimos bloqueHorario a dayjs
-
-      // Anteriores: Restamos 15 minutos al bloqueHorario
-      const tiempoAnteriores = bloqueTime.subtract(15, 'minute').format('HH:mm');
-      setAnteriores(tiempoAnteriores);
-
-      // Posteriores: Sumamos 15 minutos al bloqueHorario (originalmente eran 30, ajustado a 15 para simetría)
-      const tiempoPosteriores = bloqueTime.add(15, 'minute').format('HH:mm');
-      setPosteriores(tiempoPosteriores);
+      if (minutos >= 0 && minutos <= 15) nuevoBloque = currentTime.startOf('hour').add(15, 'minute').format('HH:mm');
+      else if (minutos >= 16 && minutos <= 30) nuevoBloque = currentTime.startOf('hour').add(30, 'minute').format('HH:mm');
+      else if (minutos >= 31 && minutos <= 45) nuevoBloque = currentTime.startOf('hour').add(45, 'minute').format('HH:mm');
+      else if (minutos >= 46 && minutos <= 59) nuevoBloque = currentTime.add(1, 'hour').startOf('hour').format('HH:mm');
+      setBloqueHorario(nuevoBloque);
+      const bloqueTime = dayjs(nuevoBloque, 'HH:mm');
+      setAnteriores(bloqueTime.subtract(15, 'minute').format('HH:mm'));
+      setPosteriores(bloqueTime.add(15, 'minute').format('HH:mm'));
     };
-
     actualizarHora();
     const interval = setInterval(actualizarHora, 60000); 
     return () => clearInterval(interval);
   }, []);
 
   const playNotificationSoundFreidora = useCallback(() => {
-    if (audioRef.current) {
-      audioRef.current.play().catch(error => console.warn("Error playing freidora notification sound:", error));
-    }
+    if (audioRef.current) audioRef.current.play().catch(error => console.warn("Error playing sound:", error));
   }, []);
 
-
-  // useEffect to load freidora products configuration from Firebase
   useEffect(() => {
     const fetchFreidoraProducts = async () => {
       try {
-        const freidoraCollectionRef = collection(db, 'freidora');
-        // You can order by a specific field, e.g., 'orden' or 'nombreDisplay'
-        // If you add an 'orden' field to your Firebase documents, use orderBy('orden')
-        const q = query(freidoraCollectionRef, orderBy('nombreDisplay')); 
+        const q = query(collection(db, 'freidora'), orderBy('nombreDisplay')); 
         const querySnapshot = await getDocs(q);
-        const loadedProducts = [];
-        querySnapshot.forEach((doc) => {
-          const data = doc.data();
-          loadedProducts.push({
-            id: doc.id, // Use Firestore document ID as the product id
-            nombreDisplay: data.nombreDisplay,
-            imagenSrc: data.imagenUrl || null, // Use the image URL from Firebase
-            filtroKey: data.filtroKey,
-          });
-        });
+        const loadedProducts = querySnapshot.docs.map(doc => ({ id: doc.id, imagenSrc: doc.data().imagenUrl || null, ...doc.data() }));
         setProductosFreidoraConfig(loadedProducts);
-      } catch (err) {
-        console.error("Error fetching freidora products:", err);
-        // Optionally, set an error state here to display to the user
-      }
+      } catch (err) { console.error("Error fetching freidora products:", err); }
     };
     fetchFreidoraProducts();
-  }, []); // Runs once on mount
+  }, []);
 
-  // Use useMemo to create a list of freidora products with unique filtroKey
   const uniqueProductosFreidoraMostrados = useMemo(() => {
     const uniqueKeys = new Set();
-    const result = [];
-    productosFreidoraConfig.forEach(producto => {
-      if (!uniqueKeys.has(producto.filtroKey)) {
-        uniqueKeys.add(producto.filtroKey);
-        result.push(producto);
-      }
-    });
-    return result;
+    return productosFreidoraConfig.filter(p => !uniqueKeys.has(p.filtroKey) && uniqueKeys.add(p.filtroKey));
   }, [productosFreidoraConfig]);
 
-
-useEffect(() => {
-  const hoy = new Date();
-  const dia = String(hoy.getDate()).padStart(2, '0');
-  const mes = String(hoy.getMonth() + 1).padStart(2, '0');
-  const anio = hoy.getFullYear();
-  const horaActualDate = hoy.getHours(); // Renamed to avoid conflict with 'hora' state
-
-  let fechaInicio, fechaFin;
-
-  if (horaActualDate < 18) {
-    fechaInicio = `${dia}/${mes}/${anio} 00:00`;
-    fechaFin = `${dia}/${mes}/${anio} 17:59`;
-  } else {
-    fechaInicio = `${dia}/${mes}/${anio} 18:00`;
-    fechaFin = `${dia}/${mes}/${anio} 23:59`;
-  }
-
-  setLoading(true);
-  setError(null);
-
-  const pedidosRef = collection(db, 'pedidos');
-  const q = query(pedidosRef, where('fechahora', '>=', fechaInicio), where('fechahora', '<=', fechaFin));
-
-  const unsubscribe = onSnapshot(q, (snapshot) => {
-    const pedidosDelDiaAcumulados = {}; // Para acumular cantidades por clave única
-    const productosTotalesAcumulados = {}; // Para la sección "Totales"
-    let anyNewFreidoraItemFoundGlobal = false;
-    const currentSnapshotRelevantProductIds = new Set();
-    const updatePromises = [];
-
-    snapshot.forEach((pedidoDoc) => {
-      const pedidoData = { id: pedidoDoc.id, ...pedidoDoc.data() };
-      let ordenNecesitaActualizacionFirestore = false;
-      let itemsQueDispararonSonidoEnEstaOrden = new Set();
-
-      const productosModificados = pedidoData.productos ? pedidoData.productos.map((prod, idx) => {
-        let p = { ...prod };
-        if (p.freidora === true) {
-          const itemUniqueId = `${pedidoData.id}-${p.id}-${p.uniqueId || idx}`;
-          currentSnapshotRelevantProductIds.add(itemUniqueId);
-
-          if (p.vistoFreidora === undefined) {
-            p.vistoFreidora = false;
-            ordenNecesitaActualizacionFirestore = true;
-          }
-
-          if (p.vistoFreidora === false && initialLoadFreidoraDoneRef.current && !previousRelevantOrderProductIdsRef.current.has(itemUniqueId)) {
-            anyNewFreidoraItemFoundGlobal = true;
-            itemsQueDispararonSonidoEnEstaOrden.add(itemUniqueId);
-            // No se marca p.vistoFreidora = true aquí directamente, se hará antes del updateDoc
-            ordenNecesitaActualizacionFirestore = true; // Ensure update is flagged
-          }
-        }
-        return p;
-      }) : [];
-
-      if (ordenNecesitaActualizacionFirestore) {
-        const productosParaFirestore = productosModificados.map((prod, idx) => {
+  useEffect(() => {
+    const hoy = new Date();
+    const dia = String(hoy.getDate()).padStart(2, '0');
+    const mes = String(hoy.getMonth() + 1).padStart(2, '0');
+    const anio = hoy.getFullYear();
+    const horaActualDate = hoy.getHours();
+    const fechaInicio = horaActualDate < 18 ? `${dia}/${mes}/${anio} 00:00` : `${dia}/${mes}/${anio} 18:00`;
+    const fechaFin = horaActualDate < 18 ? `${dia}/${mes}/${anio} 17:59` : `${dia}/${mes}/${anio} 23:59`;
+    
+    setLoading(true);
+    setError(null);
+    const q = query(collection(db, 'pedidos'), where('fechahora', '>=', fechaInicio), where('fechahora', '<=', fechaFin));
+    
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const todasLasPorciones = [];
+      const productosTotalesFinal = {};
+      
+      snapshot.forEach((pedidoDoc) => {
+        const pedidoData = { id: pedidoDoc.id, ...pedidoDoc.data() };
+        
+        // Lógica de notificaciones
+        let ordenNecesitaActualizacionFirestore = false;
+        let itemsQueDispararonSonidoEnEstaOrden = new Set();
+        const productosModificados = pedidoData.productos ? pedidoData.productos.map((prod, idx) => {
           let p = { ...prod };
           if (p.freidora === true) {
             const itemUniqueId = `${pedidoData.id}-${p.id}-${p.uniqueId || idx}`;
-            if (itemsQueDispararonSonidoEnEstaOrden.has(itemUniqueId)) {
-              p.vistoFreidora = true; // Mark as seen if it triggered sound
+            if (p.vistoFreidora === undefined) {
+              p.vistoFreidora = false;
+              ordenNecesitaActualizacionFirestore = true;
+            }
+            if (p.vistoFreidora === false && initialLoadFreidoraDoneRef.current && !previousRelevantOrderProductIdsRef.current.has(itemUniqueId)) {
+              itemsQueDispararonSonidoEnEstaOrden.add(itemUniqueId);
+              ordenNecesitaActualizacionFirestore = true;
             }
           }
           return p;
+        }) : [];
+        if (ordenNecesitaActualizacionFirestore) {
+          const productosParaFirestore = productosModificados.map((prod, idx) => {
+            let p = { ...prod };
+            if (p.freidora === true) {
+              const itemUniqueId = `${pedidoData.id}-${p.id}-${p.uniqueId || idx}`;
+              if (itemsQueDispararonSonidoEnEstaOrden.has(itemUniqueId)) {
+                p.vistoFreidora = true;
+              }
+            }
+            return p;
+          });
+          const pedidoRef = doc(db, 'pedidos', pedidoData.id);
+          updateDoc(pedidoRef, { productos: productosParaFirestore }).catch(err => console.error(`Error updating ${pedidoData.id}`, err));
+        }
+        if (itemsQueDispararonSonidoEnEstaOrden.size > 0) {
+            playNotificationSoundFreidora();
+        }
+        
+        const productosDelPedido = pedidoData.productos || [];
+        const fechaRecogidaPedido = dayjs(pedidoData.fechahora, 'DD/MM/YYYY HH:mm').tz('Europe/Madrid');
+
+        productosDelPedido.forEach((productoItem) => {
+          if (productoItem.freidora === true) {
+            // Acumular para la tarjeta de "Totales"
+            const claveTotal = `${productoItem.id}`;
+            if (productosTotalesFinal[claveTotal]) {
+                productosTotalesFinal[claveTotal].cantidad += productoItem.cantidad;
+                productosTotalesFinal[claveTotal].entregado += productoItem.entregado || 0;
+                if (productoItem.celiaco) productosTotalesFinal[claveTotal].cantidad_celiaco += productoItem.cantidad;
+            } else {
+                productosTotalesFinal[claveTotal] = {
+                    id: productoItem.id, nombre: productoItem.nombre, alias: productoItem.alias,
+                    cantidad: productoItem.cantidad, entregado: productoItem.entregado || 0,
+                    cantidad_celiaco: productoItem.celiaco ? productoItem.cantidad : 0, position: productoItem.position,
+                };
+            }
+
+            // Generar porciones individuales para la visualización
+            const esEspecial = (productoItem.id === 10 || productoItem.id === 3);
+            const baseItem = {
+                id: productoItem.id, nombre: productoItem.nombre, displayAlias: productoItem.alias || productoItem.nombre,
+                entregado: productoItem.entregado || 0, fechahora: fechaRecogidaPedido.format('HH:mm'),
+                position: productoItem.position, celiaco: productoItem.celiaco,
+            };
+
+            const breakdownInfo = {
+                numeropedido: pedidoData.NumeroPedido,
+                original_total: productoItem.cantidad,
+            };
+
+            if (esEspecial) {
+                const cantidadDobles = Math.floor(productoItem.cantidad / 2);
+                const cantidadSimples = productoItem.cantidad % 2;
+
+                if (cantidadDobles > 0) {
+                    todasLasPorciones.push({
+                        ...baseItem, tipo: 'doble', cantidad_racion: cantidadDobles,
+                        breakdown: { ...breakdownInfo, contributed_portions: cantidadDobles },
+                        cantidad_celiaco_racion: baseItem.celiaco ? cantidadDobles * 2 : 0,
+                    });
+                }
+                if (cantidadSimples > 0) {
+                    todasLasPorciones.push({
+                        ...baseItem, tipo: 'simple', cantidad_racion: cantidadSimples,
+                        breakdown: { ...breakdownInfo, contributed_portions: cantidadSimples },
+                        cantidad_celiaco_racion: baseItem.celiaco ? cantidadSimples : 0,
+                    });
+                }
+            } else {
+                todasLasPorciones.push({
+                    ...baseItem, tipo: 'simple', cantidad_racion: productoItem.cantidad,
+                    breakdown: { ...breakdownInfo, contributed_portions: productoItem.cantidad },
+                    cantidad_celiaco_racion: baseItem.celiaco ? productoItem.cantidad : 0,
+                });
+            }
+          }
         });
-        const pedidoRef = doc(db, 'pedidos', pedidoData.id);
-        updatePromises.push(
-          updateDoc(pedidoRef, { productos: productosParaFirestore })
-            .then(() => console.log(`[Freidora] Firestore updated for ${pedidoData.id} (vistoFreidora)`))
-            .catch(err => console.error(`[Freidora] Error updating ${pedidoData.id} (vistoFreidora)`, err))
-        );
+      });
+      
+      const porcionesAgrupadas = {};
+      todasLasPorciones.forEach(porcion => {
+          const claveAgrupacion = `${porcion.id}-${porcion.fechahora}-${porcion.tipo}`;
+          if (porcionesAgrupadas[claveAgrupacion]) {
+              porcionesAgrupadas[claveAgrupacion].cantidad_original_pedido += porcion.cantidad_racion;
+              porcionesAgrupadas[claveAgrupacion].entregado += porcion.entregado;
+              porcionesAgrupadas[claveAgrupacion].cantidad_celiaco += porcion.cantidad_celiaco_racion;
+              porcionesAgrupadas[claveAgrupacion].breakdown.push(porcion.breakdown);
+          } else {
+              porcionesAgrupadas[claveAgrupacion] = {
+                  id: porcion.id, nombre: porcion.nombre,
+                  alias: porcion.tipo === 'doble' ? `${porcion.displayAlias} Dobles` : porcion.displayAlias,
+                  displayAlias: porcion.displayAlias, cantidad_original_pedido: porcion.cantidad_racion,
+                  entregado: porcion.entregado, fechahora: porcion.fechahora,
+                  position: porcion.position, breakdown: [porcion.breakdown],
+                  celiaco: porcion.celiaco, doble: porcion.tipo === 'doble',
+                  cantidad_celiaco: porcion.cantidad_celiaco_racion,
+              };
+          }
+      });
+
+      const arrayPedidosFinal = Object.values(porcionesAgrupadas).map(p => ({
+          ...p,
+          cantidad: Math.max(0, p.cantidad_original_pedido - p.entregado),
+      }));
+      
+      setPedidos(arrayPedidosFinal);
+      setPedidosTotales(productosTotalesFinal);
+      setLoading(false);
+      
+      if (!initialLoadFreidoraDoneRef.current) {
+        initialLoadFreidoraDoneRef.current = true;
       }
       
-      // Accumulation logic using the potentially updated products
-      const productosParaAcumular = ordenNecesitaActualizacionFirestore ? productosModificados.map((prod, idx) => {
-        let p = { ...prod }; // Start with a copy of the modified product
-        if (p.freidora === true) {
-            const itemUniqueId = `${pedidoData.id}-${p.id}-${p.uniqueId || idx}`;
-            if (itemsQueDispararonSonidoEnEstaOrden.has(itemUniqueId)) {
-                p.vistoFreidora = true; // Ensure `vistoFreidora` is true if it triggered sound
-            }
-        }
-        return p;
-      }) : (pedidoData.productos || []);
-
-
-      if (productosParaAcumular) {
-          const fechaRecogidaPedido = dayjs(pedidoData.fechahora, 'DD/MM/YYYY HH:mm').tz('Europe/Madrid');
-          productosParaAcumular.forEach((productoItem) => {
-            if (productoItem.freidora === true) {
-              let productoBase = {
-                id: productoItem.id,
-                nombre: productoItem.nombre,
-                alias: productoItem.alias,
-                cantidad: productoItem.cantidad,
-                celiaco: productoItem.celiaco,
-                cantidad_celiaco: 0,
-                numeropedido: pedidoData.NumeroPedido,
-                entregado: productoItem.entregado || 0,
-                fechahora: fechaRecogidaPedido.format('HH:mm'),
-                doble: false,
-                vistoFreidora: productoItem.vistoFreidora, // Carry over the status
-                position: productoItem.position,
-
-                
-              };
-
-
-          
-  
-              let claveUnicaPedido = `${productoBase.id}-${productoBase.fechahora}`;
-              let esDobleOriginal = false;
-  
-              if ((productoBase.id === 10 || productoBase.id === 3) && productoBase.cantidad > 1) {
-                claveUnicaPedido += "_doble";
-                esDobleOriginal = true;
-              }
-  
-              if (pedidosDelDiaAcumulados[claveUnicaPedido]) {
-                if (esDobleOriginal) {
-                  pedidosDelDiaAcumulados[claveUnicaPedido].cantidad += Math.floor(productoBase.cantidad / 2);
-                  pedidosDelDiaAcumulados[claveUnicaPedido].entregado += Math.floor(productoBase.entregado / 2);
-                  if (productoBase.celiaco) {
-                    pedidosDelDiaAcumulados[claveUnicaPedido].cantidad_celiaco += Math.floor(productoBase.cantidad / 2);
-                  }
-                  if ((productoBase.cantidad % 2) > 0) {
-                    const claveSimpleRestante = claveUnicaPedido.replace('_doble', '');
-                    if (pedidosDelDiaAcumulados[claveSimpleRestante]) {
-                        pedidosDelDiaAcumulados[claveSimpleRestante].cantidad += 1;
-                        pedidosDelDiaAcumulados[claveSimpleRestante].entregado += (productoBase.entregado % 2);
-                        if (productoBase.celiaco) pedidosDelDiaAcumulados[claveSimpleRestante].cantidad_celiaco += 1;
-                    } else {
-                        let itemSimpleRestante = { ...productoBase, cantidad: 1, entregado: (productoBase.entregado % 2), cantidad_celiaco: productoBase.celiaco ? 1 : 0, doble: false };
-                        pedidosDelDiaAcumulados[claveSimpleRestante] = itemSimpleRestante;
-                    }
-                  }
-                } else {
-                  pedidosDelDiaAcumulados[claveUnicaPedido].cantidad += productoBase.cantidad;
-                  pedidosDelDiaAcumulados[claveUnicaPedido].entregado += productoBase.entregado;
-                  if (productoBase.celiaco) {
-                    pedidosDelDiaAcumulados[claveUnicaPedido].cantidad_celiaco += productoBase.cantidad;
-                  }
-                }
-              } else {
-                if (esDobleOriginal) {
-                  let itemDobleNuevo = { ...productoBase, alias: (productoBase.alias || productoBase.nombre) + " Dobles", cantidad: Math.floor(productoBase.cantidad / 2), entregado: Math.floor(productoBase.entregado / 2), cantidad_celiaco: productoBase.celiaco ? Math.floor(productoBase.cantidad / 2) : 0, doble: true };
-                  pedidosDelDiaAcumulados[claveUnicaPedido] = itemDobleNuevo;
-                  if ((productoBase.cantidad % 2) > 0) {
-                    const claveSimpleRestante = claveUnicaPedido.replace('_doble', '');
-                    let itemSimpleRestante = { ...productoBase, cantidad: 1, entregado: (productoBase.entregado % 2), cantidad_celiaco: productoBase.celiaco ? 1 : 0, doble: false };
-                    pedidosDelDiaAcumulados[claveSimpleRestante] = itemSimpleRestante;
-                  }
-                } else {
-                  let itemSimpleNuevo = { ...productoBase, cantidad_celiaco: productoBase.celiaco ? productoBase.cantidad : 0 };
-                  pedidosDelDiaAcumulados[claveUnicaPedido] = itemSimpleNuevo;
-                }
-              }
-            }
-          });
-        }
+    }, (error) => {
+      console.error("Error en Snapshot:", error);
+      setError("Error al obtener pedidos.");
+      setLoading(false);
     });
+    return () => unsubscribe();
+  }, []);
 
-    Promise.all(updatePromises).then(() => {
-      // console.log("[Freidora] All Firestore updates for vistoFreidora completed for this snapshot.");
-    });
-
-    if (anyNewFreidoraItemFoundGlobal) {
-      playNotificationSoundFreidora();
+  const handleOpenModal = (timeBlock) => {
+    const itemsInBlock = pedidos.filter(p => p.fechahora === timeBlock);
+    if (itemsInBlock.length > 0) {
+      setModalData(itemsInBlock);
+      setModalTimeBlock(timeBlock);
+      setModalOpen(true);
     }
-    previousRelevantOrderProductIdsRef.current = currentSnapshotRelevantProductIds;
+  };
 
-    // Mark initial load as done after the first snapshot has been processed,
-    // regardless of whether it contained orders or not.
-    if (!initialLoadFreidoraDoneRef.current) {
-      initialLoadFreidoraDoneRef.current = true;
-      console.log("[Freidora] Initial processing pass complete. Ready for new order sounds. Snapshot size: " + snapshot.size);
-    }
-
-    const arrayPedidosProcesados = Object.values(pedidosDelDiaAcumulados);
-    arrayPedidosProcesados.forEach((pedido) => {
-      pedido.cantidad_original_pedido = pedido.cantidad;
-      pedido.cantidad = Math.max(0, pedido.cantidad - pedido.entregado);
-
-      let claveTotal = `${pedido.id}`;
-      if (pedido.doble) claveTotal += "_doble";
-
-      if (productosTotalesAcumulados[claveTotal]) {
-        productosTotalesAcumulados[claveTotal].cantidad += pedido.cantidad;
-        productosTotalesAcumulados[claveTotal].entregado += pedido.entregado;
-        productosTotalesAcumulados[claveTotal].cantidad_celiaco += pedido.cantidad_celiaco || 0;
-      } else {
-        productosTotalesAcumulados[claveTotal] = {
-          id: pedido.id,
-          nombre: pedido.nombre,
-          alias: pedido.alias,
-          cantidad: pedido.cantidad,
-          entregado: pedido.entregado,
-          cantidad_celiaco: pedido.cantidad_celiaco || 0,
-          doble: pedido.doble,
-          position: pedido.position, // Asegurarse de propagar la posición
-        };
-      }
-    });
-
-
-
-    setPedidos(arrayPedidosProcesados);
-    setPedidosTotales(productosTotalesAcumulados);
-    setLoading(false);
-
-  }, (error) => {
-    console.error("Error al escuchar los pedidos del día: ", error);
-    setError("Ocurrió un error al obtener los pedidos.");
-    setLoading(false);
-  });
-
-  return () => unsubscribe();
-}, []);
+  const showAnterioresInfoButton = useMemo(() => 
+    pedidos.some(p => p.fechahora === anteriores),
+    [pedidos, anteriores]
+  );
+  
+  const showPosterioresInfoButton = useMemo(() => 
+    pedidos.some(p => p.fechahora === posteriores),
+    [pedidos, posteriores]
+  );
 
   const numProductosFreidora = uniqueProductosFreidoraMostrados.length;
+  const contenedorProductosClases = numProductosFreidora > 6 ? "flex flex-nowrap overflow-x-auto gap-4 py-2 px-4 font-nunito mt-2 w-full" : "flex flex-wrap justify-between gap-4 py-2 px-4 font-nunito mt-2 w-full";
+  const tarjetaProductoClases = numProductosFreidora > 6 ? "bg-[#F3F3F3] rounded-lg h-[40vh] flex flex-col flex-shrink-0 w-[15.66%] min-w-[200px]" : "bg-[#F3F3F3] rounded-lg h-[40vh] flex flex-col flex-grow basis-0 min-w-[200px]";
 
-
-const contenedorProductosClases =
-  numProductosFreidora > 6
-    ? "flex flex-nowrap overflow-x-auto gap-4 py-2 px-4 font-nunito mt-2 w-full"
-    : "flex flex-wrap justify-between gap-4 py-2 px-4 font-nunito mt-2 w-full";
-
-const tarjetaProductoClases =
-  numProductosFreidora > 6
-    ? "bg-[#F3F3F3] rounded-lg h-[40vh] flex flex-col flex-shrink-0 w-[15.66%] min-w-[200px]"
-    : "bg-[#F3F3F3] rounded-lg h-[40vh] flex flex-col flex-grow basis-0 min-w-[200px]";
-
+  const sortFunction = (a, b) => {
+      const isDobleA = a.alias?.toLowerCase().includes('dobles');
+      const isDobleB = b.alias?.toLowerCase().includes('dobles');
+      const baseAliasA = (a.displayAlias || a.alias)?.toLowerCase().replace('dobles', '').trim();
+      const baseAliasB = (b.displayAlias || b.alias)?.toLowerCase().replace('dobles', '').trim();
+      const esPatataOPimiento = (alias) => alias.includes('patata') || alias.includes('pimiento');
+      if (baseAliasA === baseAliasB && esPatataOPimiento(baseAliasA)) {
+        if (isDobleA && !isDobleB) return -1;
+        if (!isDobleA && isDobleB) return 1;
+      }
+      return (Number(a.position) || 0) - (Number(b.position) || 0);
+  };
 
   return (
     <>
       <div className={contenedorProductosClases}>
         {uniqueProductosFreidoraMostrados.map((productoInfo) => (
           <div key={productoInfo.id} className={tarjetaProductoClases}>
-            <div className="flex justify-center p-2 -mt-4">
-              <img
-                src={productoInfo.imagenSrc}
-                alt={productoInfo.nombreDisplay}
-                className="w-20 h-20  bg-white border-2 border-gray-700 rounded-full object-contain"
-              />
-            </div>
-            {/* Opcional: Título dentro de la tarjeta si lo deseas */}
-            {/* <p className="text-center font-semibold text-gray-700 text-sm px-2 truncate">{productoInfo.nombreDisplay}</p> */}
-           <div className="text-center p-2 overflow-y-auto flex-grow">
-  {pedidos
-    .filter(
-      (pedido) =>
-        pedido.fechahora === bloqueHorario &&
-        pedido.nombre.toLowerCase().includes(productoInfo.filtroKey)
-    )
-    .sort((a, b) => {
-      const isDobleA = a.alias?.toLowerCase().includes('dobles');
-      const isDobleB = b.alias?.toLowerCase().includes('dobles');
-
-      const baseAliasA = a.alias?.toLowerCase().replace('dobles', '').trim();
-      const baseAliasB = b.alias?.toLowerCase().replace('dobles', '').trim();
-
-            const esPatataOPimiento = (alias) =>
-              alias.includes('patata') || alias.includes('pimiento');
-
-            // Si son del mismo grupo base y son patatas o pimientos
-            if (baseAliasA === baseAliasB && esPatataOPimiento(baseAliasA)) {
-              if (isDobleA && !isDobleB) return -1;
-              if (!isDobleA && isDobleB) return 1;
-            }
-
-            // Orden normal por posición si existe
-            return (Number(a.position) || 0) - (Number(b.position) || 0);
-          })
-          .map((pedido, index) => {
-            const borderColor = pedido.cantidad > 0 ? 'border-red-500' : 'border-green-500';
-              const itemKey = `${pedido.numeropedido || 'N/A'}-${pedido.id}-${productoInfo.id}-${index}`;
-
-              return (
-                <div
-                  key={itemKey}
-                  className={`mb-2 p-2 bg-white rounded-md shadow-md border-2 ${borderColor}`}
-                >
+            <div className="flex justify-center p-2 -mt-4"><img src={productoInfo.imagenSrc} alt={productoInfo.nombreDisplay} className="w-20 h-20 bg-white border-2 border-gray-700 rounded-full object-contain" /></div>
+            <div className="text-center p-2 overflow-y-auto flex-grow">
+              {pedidos.filter((p) => p.fechahora === bloqueHorario && p.nombre.toLowerCase().includes(productoInfo.filtroKey)).sort(sortFunction).map((pedido, index) => (
+                <div key={index} className={`mb-2 p-2 bg-white rounded-md shadow-md border-2 ${pedido.cantidad > 0 ? 'border-red-500' : 'border-green-500'}`}>
                   <div className="flex items-center justify-center">
-                    <h2 className="mr-2 text-md flex items-center">
-                      {`${pedido.cantidad_original_pedido}`}
-                      <span className="font-bold px-1">[ {pedido.entregado} ]</span> x {pedido.alias}
-                      {pedido.cantidad_celiaco > 0 && (
-                        <span className="flex items-center ms-2">
-                          [ {pedido.cantidad_celiaco} x
-                          <img
-                            src={singluten}
-                            alt="Sin gluten"
-                            className="w-6 h-6 ms-1 me-1"
-                          /> ]
-                        </span>
-                      )}
-                    </h2>
+                    <h2 className="mr-2 text-md flex items-center">{`${pedido.cantidad_original_pedido}`}<span className="font-bold px-1">[ {pedido.entregado} ]</span> x {pedido.alias}{pedido.cantidad_celiaco > 0 && (<span className="flex items-center ms-2">[ {pedido.cantidad_celiaco} x<img src={singluten} alt="Sin gluten" className="w-6 h-6 ms-1 me-1" />]</span>)}</h2>
                   </div>
                 </div>
-              );
-            })}
-        </div>
-
+              ))}
+            </div>
           </div>
         ))}
       </div>
-
-      {/* Parte totales, anteriores y posteriores */}
       <div className="flex justify-between items-center mx-auto w-full px-4 font-nunito mt-2">
-        {/* Totales */}
         <div className="bg-[#F3F3F3] w-[30%] rounded-lg h-[42vh] flex flex-col">
           <h1 className="bg-gray-700 p-2 text-white text-lg text-center rounded-t-md">Totales</h1>
-          <div className="text-center p-2 overflow-y-auto h-[calc(42vh-theme(spacing.10))]"> {/* Ajuste para scroll interno */}
-            {Object.values(pedidosTotales)
-                  .sort((a, b) => {
-                  const isDobleA = a.alias?.toLowerCase().includes('dobles');
-                  const isDobleB = b.alias?.toLowerCase().includes('dobles');
-
-                  const baseAliasA = a.alias?.toLowerCase().replace('dobles', '').trim();
-                  const baseAliasB = b.alias?.toLowerCase().replace('dobles', '').trim();
-
-                  const esPatataOPimiento = (alias) =>
-                    alias.includes('patata') || alias.includes('pimiento');
-
-                  // Si ambos productos están relacionados y son Patatas/Pimientos
-                  if (baseAliasA === baseAliasB && esPatataOPimiento(baseAliasA)) {
-                    if (isDobleA && !isDobleB) return -1;
-                    if (!isDobleA && isDobleB) return 1;
-                  }
-
-                  // Orden normal por posición
-                  return (Number(a.position) || 0) - (Number(b.position) || 0);
-                })
-              .map((pedido, index) => {
-              const borderColor = pedido.cantidad > 0 ? 'border-red-500' : 'border-green-500';
-              const itemKey = `total-${pedido.id}-${pedido.alias || index}-${pedido.doble ? 'd' : 's'}`;
-              return (
-                <div
-                  key={itemKey}
-                  className={`mb-2 p-2 bg-white rounded-md shadow-md border-2 ${borderColor}`}
-                >
-
+          <div className="text-center p-2 overflow-y-auto h-[calc(42vh-theme(spacing.10))]">
+            {Object.values(pedidosTotales).sort(sortFunction).map((pedido, index) => (
+                <div key={index} className={`mb-2 p-2 bg-white rounded-md shadow-md border-2 ${pedido.cantidad > pedido.entregado ? 'border-red-500' : 'border-green-500'}`}>
                   <div className="flex items-center justify-center">
-                    <h2 className="mr-2 text-md flex items-center">
-                      {`${pedido.cantidad + pedido.entregado}`}
-                      <span className="font-bold px-1">[ {pedido.entregado} ]</span> x {pedido.alias}
-                      {pedido.cantidad_celiaco > 0 && (
-                        <span className="flex items-center ms-2 gap-[0.1vw]">
-                          [ {pedido.cantidad_celiaco} x
-                          <img src={singluten} alt="Sin gluten" className="w-6 h-6 ms-1 me-1" />]
-                        </span>
-                      )}
-                    </h2>
+                    <h2 className="mr-2 text-md flex items-center">{`${pedido.cantidad}`}<span className="font-bold px-1">[ {pedido.entregado} ]</span> x {pedido.alias}{pedido.cantidad_celiaco > 0 && (<span className="flex items-center ms-2 gap-[0.1vw]">[ {pedido.cantidad_celiaco} x<img src={singluten} alt="Sin gluten" className="w-6 h-6 ms-1 me-1" />]</span>)}</h2>
                   </div>
                 </div>
-              );
-            })}
+            ))}
           </div>
         </div>
-
-        {/* Anteriores */}
         <div className="bg-[#F3F3F3] w-[30%] rounded-lg h-[42vh] flex flex-col">
-          <h1 className="bg-gray-700 p-2 text-white text-lg text-center rounded-t-md">Anteriores: {anteriores}</h1>
+          <div className="bg-gray-700 p-2 text-white text-lg text-center rounded-t-md flex items-center justify-center">
+            <h1>Anteriores: {anteriores}</h1>
+            {showAnterioresInfoButton && (<button onClick={() => handleOpenModal(anteriores)} className="ml-2 bg-blue-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-sm font-bold hover:bg-blue-600 transition-transform duration-200 hover:scale-110" aria-label="Ver desglose">i</button>)}
+          </div>
           <div className="text-center p-2 overflow-y-auto h-[calc(42vh-theme(spacing.10))]">
-            {pedidos
-              .filter((pedido) => pedido.fechahora === anteriores)
-                .sort((a, b) => {
-                  const isDobleA = a.alias?.toLowerCase().includes('dobles');
-                  const isDobleB = b.alias?.toLowerCase().includes('dobles');
-
-                  const baseAliasA = a.alias?.toLowerCase().replace('dobles', '').trim();
-                  const baseAliasB = b.alias?.toLowerCase().replace('dobles', '').trim();
-
-                  const esPatataOPimiento = (alias) =>
-                    alias.includes('patata') || alias.includes('pimiento');
-
-                  // Si ambos productos están relacionados y son Patatas/Pimientos
-                  if (baseAliasA === baseAliasB && esPatataOPimiento(baseAliasA)) {
-                    if (isDobleA && !isDobleB) return -1;
-                    if (!isDobleA && isDobleB) return 1;
-                  }
-
-                  // Orden normal por posición
-                  return (Number(a.position) || 0) - (Number(b.position) || 0);
-                })
-              .map((pedido, index) => {
-                const borderColor = pedido.cantidad > 0 ? 'border-red-500' : 'border-green-500';
-                const itemKey = `anterior-${pedido.numeropedido || 'N/A'}-${pedido.id}-${index}`;
-                return (
-                  <div key={itemKey} className={`mb-2 p-2 bg-white rounded-md shadow-md border-2 ${borderColor}`}>
-                    <div className="flex items-center justify-center">
-                      <h2 className="mr-2 text-md flex items-center">
-                        {`${pedido.cantidad_original_pedido}`}
-                        <span className="font-bold px-1">[ {pedido.entregado} ]</span> x {pedido.alias}
-                        {pedido.cantidad_celiaco > 0 && (
-                          <span className="flex items-center ms-2">
-                            [ {pedido.cantidad_celiaco} x
-                            <img src={singluten} alt="Sin gluten" className="w-6 h-6 ms-1 me-1" /> ]
-                          </span>
-                        )}
-                      </h2>
-                    </div>
-                  </div>
-                );
-              })}
+            {pedidos.filter((p) => p.fechahora === anteriores).sort(sortFunction).map((pedido, index) => (
+              <div key={index} className={`mb-2 p-2 bg-white rounded-md shadow-md border-2 ${pedido.cantidad > 0 ? 'border-red-500' : 'border-green-500'}`}>
+                <div className="flex items-center justify-center">
+                  <h2 className="mr-2 text-md flex items-center">{`${pedido.cantidad_original_pedido}`}<span className="font-bold px-1">[ {pedido.entregado} ]</span> x {pedido.alias}{pedido.cantidad_celiaco > 0 && (<span className="flex items-center ms-2">[ {pedido.cantidad_celiaco} x<img src={singluten} alt="Sin gluten" className="w-6 h-6 ms-1 me-1" />]</span>)}</h2>
+                </div>
+              </div>
+            ))}
           </div>
         </div>
-
-        {/* Posteriores */}
         <div className="bg-[#F3F3F3] w-[30%] rounded-lg h-[42vh] flex flex-col">
-          <h1 className="bg-gray-700 p-2 text-white text-lg text-center rounded-t-md">Posteriores: {posteriores}</h1>
+          <div className="bg-gray-700 p-2 text-white text-lg text-center rounded-t-md flex items-center justify-center">
+            <h1>Posteriores: {posteriores}</h1>
+            {showPosterioresInfoButton && (<button onClick={() => handleOpenModal(posteriores)} className="ml-2 bg-blue-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-sm font-bold hover:bg-blue-600 transition-transform duration-200 hover:scale-110" aria-label="Ver desglose">i</button>)}
+          </div>
           <div className="text-center p-2 overflow-y-auto h-[calc(42vh-theme(spacing.10))]">
-            {pedidos
-              .filter((pedido) => pedido.fechahora === posteriores)
-               .sort((a, b) => {
-                  const isDobleA = a.alias?.toLowerCase().includes('dobles');
-                  const isDobleB = b.alias?.toLowerCase().includes('dobles');
-
-                  const baseAliasA = a.alias?.toLowerCase().replace('dobles', '').trim();
-                  const baseAliasB = b.alias?.toLowerCase().replace('dobles', '').trim();
-
-                  const esPatataOPimiento = (alias) =>
-                    alias.includes('patata') || alias.includes('pimiento');
-
-                  // Si ambos productos están relacionados y son Patatas/Pimientos
-                  if (baseAliasA === baseAliasB && esPatataOPimiento(baseAliasA)) {
-                    if (isDobleA && !isDobleB) return -1;
-                    if (!isDobleA && isDobleB) return 1;
-                  }
-
-                  // Orden normal por posición
-                  return (Number(a.position) || 0) - (Number(b.position) || 0);
-                })
-              .map((pedido, index) => {
-                const borderColor = pedido.cantidad > 0 ? 'border-red-500' : 'border-green-500';
-                const itemKey = `posterior-${pedido.numeropedido || 'N/A'}-${pedido.id}-${index}`;
-                return (
-                  <div key={itemKey} className={`mb-2 p-2 bg-white rounded-md shadow-md border-2 ${borderColor}`}>
-                    <div className="flex items-center justify-center">
-                      <h2 className="mr-2 text-md flex items-center">
-                        {`${pedido.cantidad_original_pedido}`}
-                        <span className="font-bold px-1">[ {pedido.entregado} ]</span> x {pedido.alias}
-                        {pedido.cantidad_celiaco > 0 && (
-                          <span className="flex items-center ms-2">
-                            [ {pedido.cantidad_celiaco} x
-                            <img src={singluten} alt="Sin gluten" className="w-6 h-6 ms-1 me-1" /> ]
-                          </span>
-                        )}
-                      </h2>
-                    </div>
-                  </div>
-                );
-              })}
+            {pedidos.filter((p) => p.fechahora === posteriores).sort(sortFunction).map((pedido, index) => (
+              <div key={index} className={`mb-2 p-2 bg-white rounded-md shadow-md border-2 ${pedido.cantidad > 0 ? 'border-red-500' : 'border-green-500'}`}>
+                 <div className="flex items-center justify-center">
+                  <h2 className="mr-2 text-md flex items-center">{`${pedido.cantidad_original_pedido}`}<span className="font-bold px-1">[ {pedido.entregado} ]</span> x {pedido.alias}{pedido.cantidad_celiaco > 0 && (<span className="flex items-center ms-2">[ {pedido.cantidad_celiaco} x<img src={singluten} alt="Sin gluten" className="w-6 h-6 ms-1 me-1" />]</span>)}</h2>
+                </div>
+              </div>
+            ))}
           </div>
         </div>
       </div>
       <audio ref={audioRef} src="/musica/level-up.mp3" preload="auto" />
+      <OrderDetailsModal isOpen={isModalOpen} onClose={() => setModalOpen(false)} data={modalData} timeBlock={modalTimeBlock} />
     </>
   );
 };
