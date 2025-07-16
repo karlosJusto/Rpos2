@@ -9,7 +9,7 @@ import utc from 'dayjs/plugin/utc';
 dayjs.extend(utc);
 dayjs.extend(timezone);
 
-// --- Componente del Modal (Integrado y Corregido) ---
+// --- Componente del Modal para ANTERIORES/POSTERIORES (Sin cambios) ---
 const OrderDetailsModal = ({ isOpen, onClose, data, timeBlock }) => {
   if (!isOpen || !data || data.length === 0) {
     return null;
@@ -42,7 +42,6 @@ const OrderDetailsModal = ({ isOpen, onClose, data, timeBlock }) => {
                 {aggregatedItem.alias}
               </h3>
               <ul className="space-y-1 pl-2">
-                {/* CORRECCIÓN: Se añade `|| []` para evitar el error si `breakdown` es undefined. */}
                 {(aggregatedItem.breakdown || []).map((order, orderIndex) => (
                   <li key={orderIndex} className="bg-gray-100 p-2 rounded-md flex justify-between items-center text-sm">
                     <span className="font-semibold text-gray-700">
@@ -63,6 +62,58 @@ const OrderDetailsModal = ({ isOpen, onClose, data, timeBlock }) => {
 };
 
 
+// --- Componente de Modal para TOTALES (Sin cambios en su estructura) ---
+const TotalsBreakdownModal = ({ isOpen, onClose, data, title }) => {
+  if (!isOpen) {
+    return null;
+  }
+
+  // Ordenamos las horas para que aparezcan cronológicamente en el modal
+  const sortedTimeKeys = Object.keys(data).sort();
+
+  return (
+    <div 
+      className="fixed inset-0 bg-black bg-opacity-60 flex justify-center items-center z-50 font-nunito"
+      onClick={onClose}
+    >
+      <div 
+        className="bg-white rounded-lg shadow-2xl p-6 w-full max-w-md mx-4"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex justify-between items-center border-b pb-3 mb-4">
+          <h2 className="text-xl font-bold text-gray-800">{title}</h2>
+          <button 
+            onClick={onClose} 
+            className="text-gray-500 hover:text-gray-800 text-3xl font-bold leading-none"
+            aria-label="Cerrar"
+          >
+            &times;
+          </button>
+        </div>
+        <div className="max-h-[60vh] overflow-y-auto">
+          {sortedTimeKeys.length > 0 ? (
+            sortedTimeKeys.map(time => (
+              <div key={time} className="mb-4 last:mb-0">
+                <strong className="text-lg text-gray-700 block mb-2 border-b pb-1">{time}</strong>
+                <div className="pl-4">
+                  {data[time].map((item, index) => (
+                    <div key={index} className="text-gray-600 text-md py-1">
+                      {item.alias} x{item.quantity}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))
+          ) : (
+            <p className="text-gray-500 text-center py-4">No hay desglose disponible.</p>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+
 // --- Componente Principal Freidora ---
 const Freidora = () => {
   const [pedidos, setPedidos] = useState([]);
@@ -74,9 +125,17 @@ const Freidora = () => {
   const [posteriores, setPosteriores] = useState('');
   const [pedidosTotales, setPedidosTotales] = useState({});
   const [productosFreidoraConfig, setProductosFreidoraConfig] = useState([]);
+  
+  // Estado para el modal de Anteriores/Posteriores
   const [isModalOpen, setModalOpen] = useState(false);
   const [modalData, setModalData] = useState([]);
   const [modalTimeBlock, setModalTimeBlock] = useState("");
+  
+  // Estado para el modal de Totales
+  const [isTotalsModalOpen, setTotalsModalOpen] = useState(false);
+  const [totalsModalData, setTotalsModalData] = useState({});
+  const [totalsModalTitle, setTotalsModalTitle] = useState("");
+
   const audioRef = useRef(null);
   const previousRelevantOrderProductIdsRef = useRef(new Set());
   const initialLoadFreidoraDoneRef = useRef(false);
@@ -122,6 +181,19 @@ const Freidora = () => {
     return productosFreidoraConfig.filter(p => !uniqueKeys.has(p.filtroKey) && uniqueKeys.add(p.filtroKey));
   }, [productosFreidoraConfig]);
 
+  const sortFunction = (a, b) => {
+      const isDobleA = a.alias?.toLowerCase().includes('dobles');
+      const isDobleB = b.alias?.toLowerCase().includes('dobles');
+      const baseAliasA = (a.displayAlias || a.alias)?.toLowerCase().replace('dobles', '').trim();
+      const baseAliasB = (b.displayAlias || b.alias)?.toLowerCase().replace('dobles', '').trim();
+      const esPatataOPimiento = (alias) => alias.includes('patata') || alias.includes('pimiento');
+      if (baseAliasA === baseAliasB && esPatataOPimiento(baseAliasA)) {
+        if (isDobleA && !isDobleB) return -1;
+        if (!isDobleA && isDobleB) return 1;
+      }
+      return (Number(a.position) || 0) - (Number(b.position) || 0);
+  };
+
   useEffect(() => {
     const hoy = new Date();
     const dia = String(hoy.getDate()).padStart(2, '0');
@@ -137,12 +209,11 @@ const Freidora = () => {
     
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const todasLasPorciones = [];
-      const productosTotalesFinal = {};
       
       snapshot.forEach((pedidoDoc) => {
         const pedidoData = { id: pedidoDoc.id, ...pedidoDoc.data() };
         
-        // Lógica de notificaciones
+        // Lógica de notificaciones (sin cambios)
         let ordenNecesitaActualizacionFirestore = false;
         let itemsQueDispararonSonidoEnEstaOrden = new Set();
         const productosModificados = pedidoData.productos ? pedidoData.productos.map((prod, idx) => {
@@ -183,21 +254,10 @@ const Freidora = () => {
 
         productosDelPedido.forEach((productoItem) => {
           if (productoItem.freidora === true) {
-            // Acumular para la tarjeta de "Totales"
-            const claveTotal = `${productoItem.id}`;
-            if (productosTotalesFinal[claveTotal]) {
-                productosTotalesFinal[claveTotal].cantidad += productoItem.cantidad;
-                productosTotalesFinal[claveTotal].entregado += productoItem.entregado || 0;
-                if (productoItem.celiaco) productosTotalesFinal[claveTotal].cantidad_celiaco += productoItem.cantidad;
-            } else {
-                productosTotalesFinal[claveTotal] = {
-                    id: productoItem.id, nombre: productoItem.nombre, alias: productoItem.alias,
-                    cantidad: productoItem.cantidad, entregado: productoItem.entregado || 0,
-                    cantidad_celiaco: productoItem.celiaco ? productoItem.cantidad : 0, position: productoItem.position,
-                };
-            }
 
-            // Generar porciones individuales para la visualización
+            // ** YA NO SE CALCULA EL TOTAL AQUÍ, SE ELIMINA EL BLOQUE ANTERIOR **
+            
+            // Generar porciones individuales para la visualización (lógica sin cambios)
             const esEspecial = (productoItem.id === 10 || productoItem.id === 3);
             const baseItem = {
                 id: productoItem.id, nombre: productoItem.nombre, displayAlias: productoItem.alias || productoItem.nombre,
@@ -216,8 +276,8 @@ const Freidora = () => {
 
                 if (cantidadDobles > 0) {
                     todasLasPorciones.push({
-                        ...baseItem, tipo: 'doble', cantidad_racion: cantidadDobles,
-                        breakdown: { ...breakdownInfo, contributed_portions: cantidadDobles },
+                        ...baseItem, tipo: 'doble', cantidad_racion: cantidadDobles * 2,
+                        breakdown: { ...breakdownInfo, contributed_portions: cantidadDobles * 2 },
                         cantidad_celiaco_racion: baseItem.celiaco ? cantidadDobles * 2 : 0,
                     });
                 }
@@ -265,8 +325,30 @@ const Freidora = () => {
           cantidad: Math.max(0, p.cantidad_original_pedido - p.entregado),
       }));
       
+      // *** NUEVA LÓGICA PARA CALCULAR LOS TOTALES ***
+      // Se calcula a partir de 'arrayPedidosFinal', que es la fuente de datos correcta y detallada.
+      const nuevosPedidosTotales = {};
+      arrayPedidosFinal.forEach(pedido => {
+          const claveTotal = pedido.alias; // La clave es el alias correcto: "Patatas Dobles", "Patatas", etc.
+          if (nuevosPedidosTotales[claveTotal]) {
+              nuevosPedidosTotales[claveTotal].cantidad += pedido.cantidad_original_pedido;
+              nuevosPedidosTotales[claveTotal].entregado += pedido.entregado;
+              nuevosPedidosTotales[claveTotal].cantidad_celiaco += pedido.cantidad_celiaco;
+          } else {
+              nuevosPedidosTotales[claveTotal] = {
+                  id: pedido.id,
+                  nombre: pedido.nombre,
+                  alias: pedido.alias, // El alias correcto para mostrar
+                  cantidad: pedido.cantidad_original_pedido,
+                  entregado: pedido.entregado,
+                  cantidad_celiaco: pedido.cantidad_celiaco,
+                  position: pedido.position,
+              };
+          }
+      });
+
       setPedidos(arrayPedidosFinal);
-      setPedidosTotales(productosTotalesFinal);
+      setPedidosTotales(nuevosPedidosTotales); // Se actualiza el estado con los totales correctos
       setLoading(false);
       
       if (!initialLoadFreidoraDoneRef.current) {
@@ -279,15 +361,39 @@ const Freidora = () => {
       setLoading(false);
     });
     return () => unsubscribe();
-  }, []);
+  }, []); 
+
+  // --- Lógica para los Modales (Sin cambios) ---
 
   const handleOpenModal = (timeBlock) => {
     const itemsInBlock = pedidos.filter(p => p.fechahora === timeBlock);
     if (itemsInBlock.length > 0) {
-      setModalData(itemsInBlock);
+      setModalData(itemsInBlock.sort(sortFunction));
       setModalTimeBlock(timeBlock);
       setModalOpen(true);
     }
+  };
+  
+  const handleOpenTotalsModal = () => {
+    const groupedByTime = pedidos.reduce((acc, portion) => {
+      const time = portion.fechahora;
+      if (!acc[time]) {
+        acc[time] = [];
+      }
+      acc[time].push({ 
+        alias: portion.alias, 
+        quantity: portion.cantidad_original_pedido
+      });
+      return acc;
+    }, {});
+    
+    for (const time in groupedByTime) {
+      groupedByTime[time].sort(sortFunction);
+    }
+    
+    setTotalsModalData(groupedByTime);
+    setTotalsModalTitle("Desglose General de Pedidos");
+    setTotalsModalOpen(true);
   };
 
   const showAnterioresInfoButton = useMemo(() => 
@@ -303,19 +409,6 @@ const Freidora = () => {
   const numProductosFreidora = uniqueProductosFreidoraMostrados.length;
   const contenedorProductosClases = numProductosFreidora > 6 ? "flex flex-nowrap overflow-x-auto gap-4 py-2 px-4 font-nunito mt-2 w-full" : "flex flex-wrap justify-between gap-4 py-2 px-4 font-nunito mt-2 w-full";
   const tarjetaProductoClases = numProductosFreidora > 6 ? "bg-[#F3F3F3] rounded-lg h-[40vh] flex flex-col flex-shrink-0 w-[15.66%] min-w-[200px]" : "bg-[#F3F3F3] rounded-lg h-[40vh] flex flex-col flex-grow basis-0 min-w-[200px]";
-
-  const sortFunction = (a, b) => {
-      const isDobleA = a.alias?.toLowerCase().includes('dobles');
-      const isDobleB = b.alias?.toLowerCase().includes('dobles');
-      const baseAliasA = (a.displayAlias || a.alias)?.toLowerCase().replace('dobles', '').trim();
-      const baseAliasB = (b.displayAlias || b.alias)?.toLowerCase().replace('dobles', '').trim();
-      const esPatataOPimiento = (alias) => alias.includes('patata') || alias.includes('pimiento');
-      if (baseAliasA === baseAliasB && esPatataOPimiento(baseAliasA)) {
-        if (isDobleA && !isDobleB) return -1;
-        if (!isDobleA && isDobleB) return 1;
-      }
-      return (Number(a.position) || 0) - (Number(b.position) || 0);
-  };
 
   return (
     <>
@@ -337,10 +430,22 @@ const Freidora = () => {
       </div>
       <div className="flex justify-between items-center mx-auto w-full px-4 font-nunito mt-2">
         <div className="bg-[#F3F3F3] w-[30%] rounded-lg h-[42vh] flex flex-col">
-          <h1 className="bg-gray-700 p-2 text-white text-lg text-center rounded-t-md">Totales</h1>
+          <div className="bg-gray-700 p-2 text-white text-lg text-center rounded-t-md flex items-center justify-center relative">
+            <h1 className="flex-grow">Totales</h1>
+            <button 
+              onClick={handleOpenTotalsModal} 
+              className="absolute right-2 bg-blue-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-sm font-bold hover:bg-blue-600 transition-transform duration-200 hover:scale-110" 
+              aria-label="Ver desglose general"
+            >
+              i
+            </button>
+          </div>
           <div className="text-center p-2 overflow-y-auto h-[calc(42vh-theme(spacing.10))]">
             {Object.values(pedidosTotales).sort(sortFunction).map((pedido, index) => (
-                <div key={index} className={`mb-2 p-2 bg-white rounded-md shadow-md border-2 ${pedido.cantidad > pedido.entregado ? 'border-red-500' : 'border-green-500'}`}>
+                <div 
+                  key={index} 
+                  className={`mb-2 p-2 bg-white rounded-md shadow-md border-2 ${pedido.cantidad > pedido.entregado ? 'border-red-500' : 'border-green-500'}`}
+                >
                   <div className="flex items-center justify-center">
                     <h2 className="mr-2 text-md flex items-center">{`${pedido.cantidad}`}<span className="font-bold px-1">[ {pedido.entregado} ]</span> x {pedido.alias}{pedido.cantidad_celiaco > 0 && (<span className="flex items-center ms-2 gap-[0.1vw]">[ {pedido.cantidad_celiaco} x<img src={singluten} alt="Sin gluten" className="w-6 h-6 ms-1 me-1" />]</span>)}</h2>
                   </div>
@@ -380,7 +485,10 @@ const Freidora = () => {
         </div>
       </div>
       <audio ref={audioRef} src="/musica/level-up.mp3" preload="auto" />
+      
+      {/* --- RENDERIZADO DE AMBOS MODALES --- */}
       <OrderDetailsModal isOpen={isModalOpen} onClose={() => setModalOpen(false)} data={modalData} timeBlock={modalTimeBlock} />
+      <TotalsBreakdownModal isOpen={isTotalsModalOpen} onClose={() => setTotalsModalOpen(false)} data={totalsModalData} title={totalsModalTitle} />
     </>
   );
 };
