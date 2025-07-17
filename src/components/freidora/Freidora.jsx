@@ -213,7 +213,6 @@ const Freidora = () => {
       snapshot.forEach((pedidoDoc) => {
         const pedidoData = { id: pedidoDoc.id, ...pedidoDoc.data() };
         
-        // Lógica de notificaciones (sin cambios)
         let ordenNecesitaActualizacionFirestore = false;
         let itemsQueDispararonSonidoEnEstaOrden = new Set();
         const productosModificados = pedidoData.productos ? pedidoData.productos.map((prod, idx) => {
@@ -254,10 +253,7 @@ const Freidora = () => {
 
         productosDelPedido.forEach((productoItem) => {
           if (productoItem.freidora === true) {
-
-            // ** YA NO SE CALCULA EL TOTAL AQUÍ, SE ELIMINA EL BLOQUE ANTERIOR **
             
-            // Generar porciones individuales para la visualización (lógica sin cambios)
             const esEspecial = (productoItem.id === 10 || productoItem.id === 3);
             const baseItem = {
                 id: productoItem.id, nombre: productoItem.nombre, displayAlias: productoItem.alias || productoItem.nombre,
@@ -276,21 +272,29 @@ const Freidora = () => {
 
                 if (cantidadDobles > 0) {
                     todasLasPorciones.push({
-                        ...baseItem, tipo: 'doble', cantidad_racion: cantidadDobles * 2,
-                        breakdown: { ...breakdownInfo, contributed_portions: cantidadDobles * 2 },
+                        ...baseItem,
+                        tipo: 'doble',
+                        // *** CORRECCIÓN APLICADA AQUÍ ***
+                        // La cantidad de ración es el número de "packs dobles", no el total de unidades.
+                        cantidad_racion: cantidadDobles, 
+                        breakdown: { ...breakdownInfo, contributed_portions: cantidadDobles },
                         cantidad_celiaco_racion: baseItem.celiaco ? cantidadDobles * 2 : 0,
                     });
                 }
                 if (cantidadSimples > 0) {
                     todasLasPorciones.push({
-                        ...baseItem, tipo: 'simple', cantidad_racion: cantidadSimples,
+                        ...baseItem,
+                        tipo: 'simple',
+                        cantidad_racion: cantidadSimples,
                         breakdown: { ...breakdownInfo, contributed_portions: cantidadSimples },
                         cantidad_celiaco_racion: baseItem.celiaco ? cantidadSimples : 0,
                     });
                 }
             } else {
                 todasLasPorciones.push({
-                    ...baseItem, tipo: 'simple', cantidad_racion: productoItem.cantidad,
+                    ...baseItem,
+                    tipo: 'simple',
+                    cantidad_racion: productoItem.cantidad,
                     breakdown: { ...breakdownInfo, contributed_portions: productoItem.cantidad },
                     cantidad_celiaco_racion: baseItem.celiaco ? productoItem.cantidad : 0,
                 });
@@ -325,11 +329,9 @@ const Freidora = () => {
           cantidad: Math.max(0, p.cantidad_original_pedido - p.entregado),
       }));
       
-      // *** NUEVA LÓGICA PARA CALCULAR LOS TOTALES ***
-      // Se calcula a partir de 'arrayPedidosFinal', que es la fuente de datos correcta y detallada.
       const nuevosPedidosTotales = {};
       arrayPedidosFinal.forEach(pedido => {
-          const claveTotal = pedido.alias; // La clave es el alias correcto: "Patatas Dobles", "Patatas", etc.
+          const claveTotal = pedido.alias;
           if (nuevosPedidosTotales[claveTotal]) {
               nuevosPedidosTotales[claveTotal].cantidad += pedido.cantidad_original_pedido;
               nuevosPedidosTotales[claveTotal].entregado += pedido.entregado;
@@ -338,7 +340,7 @@ const Freidora = () => {
               nuevosPedidosTotales[claveTotal] = {
                   id: pedido.id,
                   nombre: pedido.nombre,
-                  alias: pedido.alias, // El alias correcto para mostrar
+                  alias: pedido.alias,
                   cantidad: pedido.cantidad_original_pedido,
                   entregado: pedido.entregado,
                   cantidad_celiaco: pedido.cantidad_celiaco,
@@ -348,7 +350,7 @@ const Freidora = () => {
       });
 
       setPedidos(arrayPedidosFinal);
-      setPedidosTotales(nuevosPedidosTotales); // Se actualiza el estado con los totales correctos
+      setPedidosTotales(nuevosPedidosTotales);
       setLoading(false);
       
       if (!initialLoadFreidoraDoneRef.current) {
@@ -362,8 +364,6 @@ const Freidora = () => {
     });
     return () => unsubscribe();
   }, []); 
-
-  // --- Lógica para los Modales (Sin cambios) ---
 
   const handleOpenModal = (timeBlock) => {
     const itemsInBlock = pedidos.filter(p => p.fechahora === timeBlock);
@@ -486,7 +486,6 @@ const Freidora = () => {
       </div>
       <audio ref={audioRef} src="/musica/level-up.mp3" preload="auto" />
       
-      {/* --- RENDERIZADO DE AMBOS MODALES --- */}
       <OrderDetailsModal isOpen={isModalOpen} onClose={() => setModalOpen(false)} data={modalData} timeBlock={modalTimeBlock} />
       <TotalsBreakdownModal isOpen={isTotalsModalOpen} onClose={() => setTotalsModalOpen(false)} data={totalsModalData} title={totalsModalTitle} />
     </>

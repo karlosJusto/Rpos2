@@ -604,19 +604,12 @@ const TestHeader = ({ mostrarElementosDeOrdenes }) => {
            </Form.Label>
            <div className="flex justify-center ">
                       <input
-            type="number"
-            value={numeroASumar}
-            onChange={(e) => {
-              const value = e.target.value;
-
-              // Solo permitir números y máximo 3 dígitos
-              if (value === '' || (/^\d{1,3}$/.test(value))) {
-                handleNumeroASumarChange(e); // Solo llama si es válido
-              }
-            }}
-  autoFocus
-  className="text-center w-[40%] text-3xl font-nunito text-gray-700 bg-transparent border-b-2 border-yellow-400 focus:outline-none focus:border-yellow-500 transition duration-300"
-  placeholder="0"
+             type="number"
+             value={numeroASumar}
+             onChange={handleNumeroASumarChange}
+             autoFocus
+             className="text-center w-[40%] text-3xl font-nunito text-gray-700 bg-transparent border-b-2 border-yellow-400 focus:outline-none focus:border-yellow-500 transition duration-300"
+             placeholder="0"
              />
            </div>
          </Form.Group>

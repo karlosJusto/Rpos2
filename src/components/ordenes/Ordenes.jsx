@@ -1,5 +1,5 @@
 // Ordenes.jsx
-import dinero from '../../assets/dinero.png';
+import dinero from '../../assets/dinero-morado.png';
 import singluten from '../../assets/singluten.png';
 import fire_new from '../../assets/fire_new.png';
 import tijera_new from '../../assets/tijera_new.png';
@@ -739,7 +739,7 @@ const Ordenes = () => {
                 <div key={pedido.id || pedido.NumeroPedido} className={`w-full flex ${containerColor} p-[0.30vh] mb-1 rounded-md shadow`}>
                   <div className="flex items-center">
                     <div onDoubleClick={() => handleMarcarPedidoCompleto(pedido.NumeroPedido)} className="cursor-pointer">
-                        <h3 className={`text-[0.75vw] font-semibold mr-1 sm:mr-4 text-center ${pedido.origen === 1 ? 'text-green-700' : pedido.origen === 0 ? 'text-gray-600' : 'text-gray-700'}`}>
+                        <h3 className={`text-[0.75vw] font-semibold mr-1 sm:mr-4 text-center ${pedido.origen === 1 ? 'text-purple-700' : pedido.origen === 0 ? 'text-gray-600' : 'text-gray-700'}`}>
                         {pedido.NumeroPedido}
                         <p className="pt-1 w-20 sm:w-24 text-[0.8vw] sm:text-[1vw] font-extrabold truncate">{pedido.cliente ? pedido.cliente : 'Generico'}</p>
                         </h3>

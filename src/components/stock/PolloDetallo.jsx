@@ -26,7 +26,7 @@ const PolloDetallo = () => {
         return fechaA.isAfter(fechaB) ? 1 : -1;
       });
 
-      const datosLimitados = datosOrdenados.slice(-15);
+      const datosLimitados = datosOrdenados.slice(-8);
       setEstadisticas(datosLimitados);
       setLoading(false);
     }, (error) => {
