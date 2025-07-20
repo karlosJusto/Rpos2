@@ -608,23 +608,32 @@ const Ordenes = () => {
   }, [bloquesPedidos]);
 
   const bloquesFiltrados = useMemo(() => {
-    if (!dateToPass) {
-      const currentTime = dayjs().locale('es').tz('Europe/Madrid');
-      const hoyEsDomingo = currentTime.day() === 0; // 0 = Domingo
-      
-      // La vista es de "mañana" (antes de las 18h) solo si NO es domingo.
-      const isBefore6PM = !hoyEsDomingo && currentTime.hour() < 18;
-      
-      return Object.fromEntries(
-        Object.entries(bloquesPedidos).filter(([hora]) => {
-          const horaBloqueDate = dayjs(hora, 'HH:mm', 'es', true).tz('Europe/Madrid', true);
-          if (!horaBloqueDate.isValid()) return false;
-          // La lógica de filtrado se basa en la variable isBefore6PM, que ya contempla la excepción del domingo.
-          return isBefore6PM ? horaBloqueDate.hour() < 18 : horaBloqueDate.hour() >= 18;
-        })
-      );
+    // Si estamos en modo supervisión, no se filtra por turno.
+    if (dateToPass) {
+      return bloquesPedidos;
     }
-    return bloquesPedidos;
+
+    const currentTime = dayjs().locale('es').tz('Europe/Madrid');
+    const hoyEsDomingo = currentTime.day() === 0; // 0 = Domingo
+
+    // FIX: Si es domingo, mostramos todos los pedidos del día sin filtrar por turno.
+    if (hoyEsDomingo) {
+      return bloquesPedidos;
+    }
+
+    // Para el resto de días (no-domingos), aplicamos la lógica de turnos.
+    const isMorningShiftView = currentTime.hour() < 18;
+
+    return Object.fromEntries(
+      Object.entries(bloquesPedidos).filter(([hora]) => {
+        const horaBloqueDate = dayjs(hora, 'HH:mm', 'es', true).tz('Europe/Madrid', true);
+        if (!horaBloqueDate.isValid()) return false;
+
+        // Si es vista de mañana, mostrar pedidos < 18h.
+        // Si es vista de tarde, mostrar pedidos >= 18h.
+        return isMorningShiftView ? horaBloqueDate.hour() < 18 : horaBloqueDate.hour() >= 18;
+      })
+    );
   }, [bloquesPedidos, dateToPass]);
 
   return (
