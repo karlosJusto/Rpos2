@@ -22,8 +22,15 @@ const HolidayCalendar = () => {
   }, []);
 
   // Formatear fecha a "YYYY-MM-DD"
-  const formatDate = (date) => date.toISOString().split('T')[0];
+  const formatDate = (date) => {
+    const year = date.getFullYear();
+    // getMonth() es 0-indexed (Enero=0), por eso se suma 1
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    // getDate() devuelve el día del mes
+    const day = String(date.getDate()).padStart(2, '0');
 
+    return `${year}-${month}-${day}`;
+  };
   // Lógica para marcar o limpiar un día
   const handleDayClick = async (date) => {
     const dateString = formatDate(date);

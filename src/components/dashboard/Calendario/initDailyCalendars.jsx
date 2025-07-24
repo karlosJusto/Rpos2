@@ -582,6 +582,7 @@ export const initDailyCalendars = async () => {
       if (holidayDocSnap.exists()) {
         const holidayData = holidayDocSnap.data();
         if (holidayData.type === 'holiday') { dayId = "8"; dayType = 'Festivo'; }
+        // CORREGIDO: Ahora asigna el ID correcto para vísperas.
         else if (holidayData.type === 'preHoliday') { dayId = "9"; dayType = 'Víspera de Festivo'; }
       }
 
