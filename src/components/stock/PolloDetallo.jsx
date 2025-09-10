@@ -1,14 +1,90 @@
-import React, { useEffect, useState, useRef, useCallback } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { db } from '../firebase/firebase';
-import { collection, doc, updateDoc, onSnapshot } from 'firebase/firestore';
+import { collection, doc, updateDoc, onSnapshot, getDoc, writeBatch } from 'firebase/firestore';
 import Table from 'react-bootstrap/Table';
 import dayjs from 'dayjs';
+import 'dayjs/locale/es';
+dayjs.locale('es');
 
 const PolloDetallo = () => {
   const [estadisticas, setEstadisticas] = useState([]);
   const [loading, setLoading] = useState(true);
-  const isUpdateTriggered = useRef(false);
 
+  // FUNCIÓN PARA CORREGIR Y ACTUALIZAR DATOS (MODIFICADA)
+  // Ahora acepta un stock inicial como punto de partida fiable
+  const corregirYActualizarDatos = useCallback(async (datosSinCorregir, stockInicial) => {
+    if (datosSinCorregir.length === 0) {
+      setLoading(false);
+      return;
+    }
+
+    // 1. OBTENER LAS VENTAS DE LA COLECCIÓN SECUNDARIA
+    const ventasPromises = datosSinCorregir.map(item =>
+      getDoc(doc(db, 'estadisticas_diarias2', item.dia))
+    );
+    const ventasDocs = await Promise.all(ventasPromises);
+    const ventasDiarias = {};
+    ventasDocs.forEach((docSnap, index) => {
+      const dia = datosSinCorregir[index].dia;
+      ventasDiarias[dia] = docSnap.exists() ? docSnap.data().vd || 0 : 0;
+    });
+
+    // 2. CORREGIR LA CADENA DE STOCK EN MEMORIA (LÓGICA MEJORADA)
+    const datosCorregidos = [];
+    // Usamos el stockInicial recibido como el primer "stockAnteriorCalculado"
+    let stockAnteriorCalculado = stockInicial;
+
+    datosSinCorregir.forEach((item) => {
+      // Ya no necesitamos la condición para el índice 0. Siempre empezamos con el valor calculado anterior.
+      const quedan = stockAnteriorCalculado;
+      const ventas = ventasDiarias[item.dia] || 0;
+      const total = quedan + (item.entran || 0);
+      const stockFinal = total - ventas - (item.baja || 0) - (item.devueltos || 0);
+
+      datosCorregidos.push({
+        ...item,
+        vd: ventas,
+        stock_anterior: quedan,
+        stock: stockFinal,
+      });
+
+      // El siguiente stock anterior será el stock final de este día
+      stockAnteriorCalculado = stockFinal;
+    });
+
+    // 3. ACTUALIZAR EL ESTADO DE REACT
+    setEstadisticas(datosCorregidos);
+    setLoading(false);
+
+    // 4. ACTUALIZAR FIRESTORE EN SEGUNDO PLANO
+    try {
+      const batch = writeBatch(db);
+      let stockFinalDelPeriodo = 0;
+
+      datosCorregidos.forEach(item => {
+        const docRef = doc(db, 'estadisticas_diarias', item.dia);
+        batch.update(docRef, {
+          stock_anterior: item.stock_anterior,
+          stock: item.stock,
+          vd: item.vd,
+          entran: item.entran || 0,
+          baja: item.baja || 0,
+          devueltos: item.devueltos || 0,
+        });
+        stockFinalDelPeriodo = item.stock;
+      });
+
+      const docRefProd = doc(db, 'productos', '1');
+      batch.update(docRefProd, { stock: stockFinalDelPeriodo });
+
+      await batch.commit();
+      console.log("Corrección y actualización automática completada en Firestore.");
+    } catch (error) {
+      console.error("Error al actualizar los datos en Firebase:", error);
+    }
+  }, []);
+
+  // EFECTO PRINCIPAL (MODIFICADO)
   useEffect(() => {
     setLoading(true);
     const estadisticasRef = collection(db, "estadisticas_diarias");
@@ -19,116 +95,78 @@ const PolloDetallo = () => {
       }));
 
       const datosOrdenados = datos.sort((a, b) => {
-        const fechaA = dayjs(a.dia, 'DD-MM-YYYY');
-        const fechaB = dayjs(b.dia, 'DD-MM-YYYY');
-        return fechaA.isAfter(fechaB) ? 1 : -1;
+        return dayjs(a.dia, 'DD-MM-YYYY').diff(dayjs(b.dia, 'DD-MM-YYYY'));
       });
+      
+      if (datosOrdenados.length === 0) {
+        setLoading(false);
+        return;
+      }
 
-      const datosLimitados = datosOrdenados.slice(-8);
-      setEstadisticas(datosLimitados);
-      setLoading(false);
+      // 1. OBTENEMOS 9 DÍAS EN LUGAR DE 8
+      const datosConArranque = datosOrdenados.slice(-9);
+
+      // 2. DETERMINAMOS EL STOCK INICIAL
+      // Si tenemos menos de 9 días (por ejemplo al principio), el stock inicial es 0.
+      // Si tenemos 9, el stock inicial es el stock final del primer día de la lista.
+      const stockDeArranque = datosConArranque.length < 9 ? 0 : datosConArranque[0].stock || 0;
+      
+      // 3. SEPARAMOS LOS DATOS QUE REALMENTE VAMOS A MOSTRAR (LOS ÚLTIMOS 8)
+      const datosParaMostrar = datosConArranque.slice(-8);
+
+      // 4. Iniciar el proceso de corrección con el stock inicial correcto
+      corregirYActualizarDatos(datosParaMostrar, stockDeArranque);
+
     }, (error) => {
-      console.error("Error al obtener los datos de Firestore en tiempo real: ", error);
+      console.error("Error al obtener datos:", error);
       setLoading(false);
     });
 
     return () => unsubscribe();
-  }, []);
-
-  const handleActualizar = useCallback(async () => {
-    try {
-      const hoy = dayjs();
-      const fechasPermitidas = [
-        hoy.format('DD-MM-YYYY'),
-        hoy.subtract(1, 'day').format('DD-MM-YYYY'),
-        hoy.subtract(2, 'day').format('DD-MM-YYYY')
-      ];
-
-      let stockFinal = 0;
-      let stock_anterior = -1000000000000;
-
-      for (const item of estadisticas) {
-        if (!fechasPermitidas.includes(item.dia)) {
-          continue;
-        }
-
-        console.log("**** Procesando Día para corrección: " + item.dia);
-        const docRef = doc(db, 'estadisticas_diarias', item.dia);
-
-        if (stock_anterior === -1000000000000) {
-          stock_anterior = item.stock_anterior || 0;
-        }
-
-        const stockActualizado = (item.entran || 0) + stock_anterior;
-        stockFinal = stockActualizado - (item.vd || 0) - (item.baja || 0) - (item.devueltos || 0);
-
-        await updateDoc(docRef, {
-          entran: item.entran,
-          baja: item.baja,
-          devueltos: item.devueltos,
-          stock_anterior: stock_anterior,
-          stock: stockFinal,
-        });
-
-        stock_anterior = stockFinal;
-      }
-
-      const docRef = doc(db, 'productos', '1');
-      await updateDoc(docRef, {
-        stock: stockFinal
-      });
-
-      console.log("Actualización de datos completada.");
-    } catch (error) {
-      console.error("Error al actualizar los datos en Firebase:", error);
-    }
-  }, [estadisticas]);
-
-  useEffect(() => {
-    if (estadisticas.length > 0 && !isUpdateTriggered.current) {
-      console.log("Lanzando corrección automática al cargar el componente...");
-      handleActualizar();
-      isUpdateTriggered.current = true;
-    }
-  }, [estadisticas, handleActualizar]);
+  }, [corregirYActualizarDatos]);
 
   const handleInputChange = (e, dia, campo) => {
     const value = parseFloat(e.target.value) || 0;
-    setEstadisticas(prevEstadisticas =>
-      prevEstadisticas.map(item =>
-        item.dia === dia
-          ? { ...item, [campo]: value }
-          : item
-      )
+    const nuevasEstadisticas = estadisticas.map(item =>
+      item.dia === dia ? { ...item, [campo]: value } : item
     );
+    
+    // Al recalcular, usamos el stock_anterior del primer elemento que ya está en el estado,
+    // que fue corregido durante la carga inicial.
+    const stockInicialRecalculo = estadisticas.length > 0 ? estadisticas[0].stock_anterior : 0;
+    
+    corregirYActualizarDatos(nuevasEstadisticas, stockInicialRecalculo);
   };
+  
+  const handleActualizarManual = () => {
+      setLoading(true);
+      const stockInicialRecalculo = estadisticas.length > 0 ? estadisticas[0].stock_anterior : 0;
+      corregirYActualizarDatos(estadisticas, stockInicialRecalculo);
+  }
 
   if (loading) {
-    return <p className="text-center">Cargando estadísticas...</p>;
+    return <p className="text-center">Cargando y corrigiendo datos...</p>;
   }
 
   return (
     <div className="container my-4">
-
-      {/* Contenedor con scroll y altura máxima */}
       <div className="overflow-auto max-h-[70vh] pt-[10vh]">
-  <Table striped bordered hover size="sm" className="font-nunito min-w-full">
-    <thead className="sticky top-0 bg-white z-10 shadow-sm">
-      <tr className='text-center'>
-        <th>Día</th>
-        <th>Quedan</th>
-        <th>Entran</th>
-        <th>Total</th>
-        <th>Salen</th>
-        <th>Baja</th>
-        <th>Devueltos</th>
-        <th>Stock</th>
-      </tr>
-    </thead>
+        <Table striped bordered hover size="sm" className="font-nunito min-w-full">
+          <thead className="sticky top-0 bg-white z-10 shadow-sm">
+            <tr className='text-center'>
+              <th>Día</th>
+              <th>Quedan</th>
+              <th>Entran</th>
+              <th>Total</th>
+              <th>Salen</th>
+              <th>Baja</th>
+              <th>Devueltos</th>
+              <th>Stock</th>
+            </tr>
+          </thead>
           <tbody className='text-center'>
             {estadisticas.map((item, index) => {
-              const stockActualizado = (item.entran || 0) + (item.stock_anterior || 0);
-              const stockFinal = stockActualizado - (item.vd || 0) - (item.baja || 0) - (item.devueltos || 0);
+              const stockActualizado = item.stock_anterior + (item.entran || 0);
               const isEditable = index >= estadisticas.length - 3;
               const isMonday = item.diasemana && item.diasemana.toLowerCase() === 'lunes';
 
@@ -136,47 +174,24 @@ const PolloDetallo = () => {
                 <React.Fragment key={`fragment-${item.dia}`}>
                   {isMonday && (
                     <tr key={`separator-${item.dia}`} className="separator-row">
-                      <td colSpan="8" className="text-center py-2">
-                        <span className="text-yellow-500 "></span>
-                      </td>
+                      <td colSpan="8" className="text-center py-2"><span className="text-yellow-500 "></span></td>
                     </tr>
                   )}
                   <tr key={item.dia} className="table-row">
                     <td className="table-cell-width capitalize">{item.diasemana}, {item.dia}</td>
-                    <td className="table-cell-width w-36 font-extrabold">{item.stock_anterior}</td>
+                    <td className="table-cell-width w-36 font-extrabold">{item.stock_anterior.toFixed(2)}</td>
                     <td className="table-cell-width text-center w-32">
-                      <input
-                        type="number"
-                        value={item.entran === 0 ? '' : item.entran || ''}
-                        onChange={(e) => handleInputChange(e, item.dia, 'entran')}
-                        className="form-control w-24 mx-auto text-center"
-                        min="0"
-                        disabled={!isEditable}
-                      />
+                      <input type="number" value={item.entran === 0 ? '' : item.entran || ''} onChange={(e) => handleInputChange(e, item.dia, 'entran')} className="form-control w-24 mx-auto text-center" min="0" disabled={!isEditable}/>
                     </td>
-                    <td className="table-cell-width w-40 font-extrabold">{stockActualizado}</td>
-                    <td className="table-cell-width w-40">{item.vd || 0}</td>
+                    <td className="table-cell-width w-40 font-extrabold">{stockActualizado.toFixed(2)}</td>
+                    <td className="table-cell-width w-40 font-bold text-red-600">{item.vd}</td>
                     <td className="table-cell-width w-32">
-                      <input
-                        type="number"
-                        value={item.baja === 0 ? '' : item.baja || ''}
-                        onChange={(e) => handleInputChange(e, item.dia, 'baja')}
-                        className="form-control w-24 mx-auto text-center"
-                        min="0"
-                        disabled={!isEditable}
-                      />
+                      <input type="number" value={item.baja === 0 ? '' : item.baja || ''} onChange={(e) => handleInputChange(e, item.dia, 'baja')} className="form-control w-24 mx-auto text-center" min="0" disabled={!isEditable}/>
                     </td>
                     <td className="table-cell-width w-40">
-                      <input
-                        type="number"
-                        value={item.devueltos === 0 ? '' : item.devueltos || ''}
-                        onChange={(e) => handleInputChange(e, item.dia, 'devueltos')}
-                        className="form-control w-24 mx-auto text-center"
-                        min="0"
-                        disabled={!isEditable}
-                      />
+                      <input type="number" value={item.devueltos === 0 ? '' : item.devueltos || ''} onChange={(e) => handleInputChange(e, item.dia, 'devueltos')} className="form-control w-24 mx-auto text-center" min="0" disabled={!isEditable}/>
                     </td>
-                    <td className="table-cell-width w-40 font-extrabold">{stockFinal}</td>
+                    <td className="table-cell-width w-40 font-extrabold">{item.stock.toFixed(2)}</td>
                   </tr>
                 </React.Fragment>
               );
@@ -184,24 +199,9 @@ const PolloDetallo = () => {
           </tbody>
         </Table>
       </div>
-
-      {/* Botón Actualizar */}
       <div className='flex text-center justify-center items-center'>
-        <button
-          className="mt-[2vw] w-[10vw] tracking-wide bg-[#f2ac02] text-white py-[0.95vw] rounded-lg hover:bg-yellow-600 transition-all duration-300 ease-in-out flex items-center justify-center focus:shadow-outline focus:outline-none"
-          onClick={handleActualizar}
-        >
-          <svg width="28px" height="28px" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <g id="SVGRepo_iconCarrier">
-              <path d="M4 18V6" stroke="#ffffff" strokeWidth="1.5" strokeLinecap="round"></path>
-              <path d="M20 12L20 18" stroke="#ffffff" strokeWidth="1.5" strokeLinecap="round"></path>
-              <path d="M12 10C16.4183 10 20 8.20914 20 6C20 3.79086 16.4183 2 12 2C7.58172 2 4 3.79086 4 6C4 8.20914 7.58172 10 12 10Z"
-                stroke="#ffffff" strokeWidth="1.5"></path>
-              <path d="M20 12C20 14.2091 16.4183 16 12 16C7.58172 16 4 14.2091 4 12" stroke="#ffffff" strokeWidth="1.5" strokeLinecap="round"></path>
-              <path d="M20 18C20 20.2091 16.4183 22 12 22C7.58172 22 4 20.2091 4 18" stroke="#ffffff" strokeWidth="1.5"></path>
-            </g>
-          </svg>
-          <span className="ml-[0.5vw] font-nunito text-md">Actualizar</span>
+        <button className="mt-[2vw] w-[10vw] tracking-wide bg-[#f2ac02] text-white py-[0.95vw] rounded-lg hover:bg-yellow-600 transition-all duration-300 ease-in-out flex items-center justify-center focus:shadow-outline focus:outline-none" onClick={handleActualizarManual}>
+            <span className="ml-[0.5vw] font-nunito text-md">Actualizar</span>
         </button>
       </div>
     </div>

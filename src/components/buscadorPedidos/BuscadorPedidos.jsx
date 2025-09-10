@@ -48,8 +48,8 @@ const BuscadorPedidos = () => {
       switch (criterio) {
         case 'telefono':
           if (telefono) {
-            q = query(pedidosRef, where('idCliente', '==', telefono));
-          }
+            const endStr = telefono + '\uf8ff';
+            q = query(pedidosRef, where('idCliente', '>=', telefono), where('idCliente', '<=', endStr));          }
           break;
 
         case 'nombre':

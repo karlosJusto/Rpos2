@@ -80,8 +80,8 @@ const ModalClientes = ({ show, handleClose, onSave, initialData,clearClientData 
       const clientesFiltrados = clientes.filter((cliente) => {
         // Use 'cliente' field for name search based on your data structure
         const nombre = cliente.cliente ? cliente.cliente.toLowerCase() : '';
-        const telefono = cliente.telefono ? cliente.telefono.toString() : ''; // Ensure telefono is string for includes
-        return nombre.includes(termLower) || telefono.includes(termLower);
+        const telefono = cliente.telefono ? cliente.telefono.toString() : ''; 
+        return nombre.includes(termLower) || telefono.startsWith(term);
       });
       setFilteredClientes(clientesFiltrados);
     }
