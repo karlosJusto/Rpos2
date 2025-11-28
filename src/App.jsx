@@ -3,6 +3,9 @@ import { BrowserRouter, Routes, Route, useLocation } from "react-router-dom"; //
 import Home from "./components/home/Home";
 import Login from "./components/login/Login";
 import LoginJefe from "./components/login/LoginJefe";
+import Terminos from "./components/Terminos";
+import DeleteAccount from "./components/DeleteAccount";
+
 // LGOrdenes no se usa en las rutas, quizá sea un componente interno o un error?
 // import LGOrdenes from "./components/ordenes/LGOrdenes";
 import LGFreidora from "./components/freidora/LGFreidora";
@@ -73,6 +76,8 @@ function App() {
           <Route path="/" element={<Home />} />
           <Route path="/login" element={<Login />} />
           <Route path="/loginJefe" element={<LoginJefe />} />
+          <Route path="/terminos" element={<Terminos />} />
+          <Route path="/deleteAccount" element={<DeleteAccount />} />
 
           {/* Rutas Protegidas */}
           <Route element={<ProtectedRoute />}>

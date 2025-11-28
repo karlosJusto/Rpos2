@@ -195,6 +195,10 @@ const Ordenes = () => {
                     idProductoParaStockGlobal = '1';
                     cantidadParaStockGlobal = 0.5 * productoCantidadEnPedido;
                 }
+                else if (productoEnPedido.id === 48) { 
+                  idProductoParaStockGlobal = '41';
+                  cantidadParaStockGlobal = 0.5 * productoCantidadEnPedido;
+                }
 
                 if (cantidadParaStockGlobal > 0 && idProductoParaStockGlobal) {
                     const productRef = doc(db, 'productos', idProductoParaStockGlobal);
@@ -237,7 +241,9 @@ const Ordenes = () => {
                     cantidadARestarDelCalendario = (productoIdOriginal === 1 || productNameLower.includes('menú pollo entero')) ? productoCantidadEnPedido : 0.5 * productoCantidadEnPedido;
                 } else if (productoIdOriginal === 41 || productoIdOriginal === 48) {
                     calendarCollectionName = 'costilla_calendar_daily';
-                    cantidadARestarDelCalendario = (productoIdOriginal === 41) ? productoCantidadEnPedido : 0.5 * productoCantidadEnPedido;
+                    cantidadARestarDelCalendario = (productoIdOriginal === 41) 
+                    ? productoCantidadEnPedido 
+                    : 0.5 * productoCantidadEnPedido;
                 } else if (productoIdOriginal === 20) {
                     calendarCollectionName = 'codillo_calendar_daily';
                     cantidadARestarDelCalendario = productoCantidadEnPedido;
@@ -310,10 +316,18 @@ const Ordenes = () => {
           if (isMatch) {
             productFoundAndUpdated = true;
             const entregadoActual = prodInState.entregado || 0;
-            let nuevoEntregado = entregadoActual + 1;
-            if (nuevoEntregado > maxCantidad) {
-              nuevoEntregado = 0;
+            const esProductoDobleFreidora = [10, 3].includes(productoClickeado.id);
+            let nuevoEntregado;
+
+            if (entregadoActual >= maxCantidad) {
+                nuevoEntregado = 0; // Resetea a 0 si ya está completo
+            } else if (esProductoDobleFreidora) {
+                // Incrementa en 2 para productos dobles, sin pasar del máximo
+                nuevoEntregado = Math.min(entregadoActual + 2, maxCantidad);
+            } else {
+                nuevoEntregado = entregadoActual + 1; // Lógica original para otros productos
             }
+
             return { ...prodInState, entregado: nuevoEntregado };
           }
           return prodInState;
@@ -377,9 +391,16 @@ const Ordenes = () => {
 
         const productoAActualizar = productosFirestore[targetIndexInFirestore];
         const entregadoActual = productoAActualizar.entregado || 0;
-        let nuevoEntregado = entregadoActual + 1;
-        if (nuevoEntregado > maxCantidad) {
-          nuevoEntregado = 0;
+        const esProductoDobleFreidora = [10, 3].includes(productoClickeado.id);
+        let nuevoEntregado;
+
+        if (entregadoActual >= maxCantidad) {
+            nuevoEntregado = 0; // Resetea a 0 si ya está completo
+        } else if (esProductoDobleFreidora) {
+            // Incrementa en 2 para productos dobles, sin pasar del máximo
+            nuevoEntregado = Math.min(entregadoActual + 2, maxCantidad);
+        } else {
+            nuevoEntregado = entregadoActual + 1; // Lógica original para otros productos
         }
 
         const productosActualizados = productosFirestore.map((p, idx) =>
@@ -737,11 +758,16 @@ const Ordenes = () => {
               )}
             </div>
             {bloquesFiltrados[bloqueHora].pedidos.filter((pedido) => {
-              const searchLower = searchTerm.toLowerCase();
-              const numeroPedidoStr = String(pedido.NumeroPedido || "").toLowerCase();
-              const clienteStr = String(pedido.cliente || "").toLowerCase();
-              return clienteStr.includes(searchLower) || numeroPedidoStr.includes(searchLower);
-            }).map((pedido) => {
+                const searchLower = searchTerm.toLowerCase();
+                const numeroPedidoStr = String(pedido.NumeroPedido || "").toLowerCase();
+                const clienteStr = String(pedido.cliente || "").toLowerCase();
+                const telefonoStr = String(pedido.telefono || ""); // Añadimos el teléfono
+
+                // Ahora incluimos el teléfono en la búsqueda
+                return clienteStr.includes(searchLower) || 
+                      numeroPedidoStr.includes(searchLower) || 
+                      telefonoStr.includes(searchLower);
+              }).map((pedido) => {
               const todosCompletados = pedido.productos.every(producto => producto.entregado === producto.cantidad && producto.cantidad > 0);
               const containerColor = todosCompletados ? 'bg-[#52be80]' : 'bg-gray-200';
               return (

@@ -1,16 +1,29 @@
 {
-  "hosting": {
-    "public": "dist",
-    "ignore": [
-      "firebase.json",
-      "**/.*",
-      "**/node_modules/**"
-    ],
-    "rewrites": [
-      {
-        "source": "**",
-        "destination": "/index.html"
-      }
-    ]
-  }
+  "hosting": [
+    {
+      "target": "superpolloweb-tienda",
+      "public": "dist",
+      "ignore": [
+        "firebase.json",
+        "**/.*",
+        "**/node_modules/**"
+      ],
+      "rewrites": [
+        {
+          "source": "**",
+          "destination": "/index.html"
+        }
+      ]
+    },
+    {
+      "target": "superpollorpos",
+      "redirects": [
+        {
+          "source": "/:path*",
+          "destination": "https://superpollomungia-tienda.web.app/:path*",
+          "type": 301
+        }
+      ]
+    }
+  ]
 }

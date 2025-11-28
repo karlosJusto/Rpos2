@@ -1,11 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { db } from "../firebase/firebase"; // Asegúrate de tener correctamente la configuración de Firebase
+import { db } from "../firebase/firebase"; 
 import { collection, getDocs } from "firebase/firestore";
 import dayjs from 'dayjs';
-import timezone from 'dayjs/plugin/timezone'; // Plugin para zona horaria
-import utc from 'dayjs/plugin/utc'; // Plugin para trabajar con fechas en UTC
+import timezone from 'dayjs/plugin/timezone'; 
+import utc from 'dayjs/plugin/utc'; 
 
-// Extender dayjs para usar los plugins de zona horaria y UTC
 dayjs.extend(utc);
 dayjs.extend(timezone);
 
@@ -15,7 +14,6 @@ const StockDia = () => {
   const [error, setError] = useState(null);
 
   useEffect(() => {
-    // Función para obtener los pedidos del día
     const obtenerPedidosDelDia = async () => {
       setLoading(true);
       setError(null);
@@ -27,70 +25,68 @@ const StockDia = () => {
         const pedidosDelDia = [];
         querySnapshot.forEach((doc) => {
           const pedido = doc.data();
-          // Verificamos si la fecha de recogida está hoy
           if (pedido.productos) {
-            // Utilizamos la fecha desde el objeto pedido
-            const fechaRecogida = dayjs(pedido.fechahora, 'DD/MM/YYYY HH:mm'); // O ajusta el formato según sea necesario
-            const fechaHoy = dayjs().tz('Europe/Madrid').startOf('day'); // Hora inicio del día
-            const fechaFinal = dayjs().tz('Europe/Madrid').endOf('day'); // Hora final del día
+            const fechaRecogida = dayjs(pedido.fechahora, 'DD/MM/YYYY HH:mm'); 
+            const fechaHoy = dayjs().tz('Europe/Madrid').startOf('day'); 
+            const fechaFinal = dayjs().tz('Europe/Madrid').endOf('day'); 
 
-            // Validamos si la fecha de recogida es válida
             if (!fechaRecogida.isValid()) {
               return;
             }
 
-            // Comprobamos si la fecha de recogida está dentro del rango de hoy
             if (fechaRecogida.isBetween(fechaHoy, fechaFinal, null, '[]')) {
-              // Agrupar los productos dentro del mismo pedido
               pedido.productos.forEach((producto) => {
-                const index = pedidosDelDia.findIndex((p) => p.id === producto.id && p.numeropedido === pedido.NumeroPedido);
-
-                if (index > -1) {
-                  // Si el producto ya existe en el mismo pedido, solo actualizamos la cantidad
-                  pedidosDelDia[index].cantidad += producto.cantidad;
-                } else {
-                  // Si el producto no existe, lo agregamos como nuevo
-                  pedidosDelDia.push({
-                    id: producto.id,
-                    nombre: producto.nombre,
-                    categoria: producto.categoria, // Añadimos la categoría
-                    cantidad: producto.cantidad,
-                    numeropedido: pedido.NumeroPedido,
-                    cliente: pedido.cliente,
-                    fechahora: fechaRecogida.format('DD/MM/YYYY HH:mm'),
-                    position: producto.position, // Añadimos la posición
-                  });
-                }
+                // CAMBIO: No agrupamos aquí, solo aplanamos la lista de productos
+                // y añadimos el 'origen' del pedido a cada producto.
+                pedidosDelDia.push({
+                  id: producto.id,
+                  nombre: producto.nombre,
+                  categoria: producto.categoria,
+                  cantidad: producto.cantidad,
+                  position: producto.position,
+                  origen: pedido.origen, // CAMBIO: Añadimos el origen del pedido.
+                });
               });
             }
           }
         });
 
-        setPedidos(pedidosDelDia); // Actualiza el estado con los pedidos del día
+        setPedidos(pedidosDelDia);
       } catch (err) {
         console.error("Error al obtener los pedidos del día: ", err);
         setError("Ocurrió un error al obtener los pedidos.");
       }
-      setLoading(false); // Finaliza el estado de carga
+      setLoading(false);
     };
 
     obtenerPedidosDelDia();
   }, []);
 
-  // Agrupar los productos por categoría
-  const productosAgrupadosPorCategoria = pedidos.reduce((acc, pedido) => {
-    if (!acc[pedido.categoria]) {
-      acc[pedido.categoria] = [];
+  // CAMBIO: Lógica de agrupación modificada para separar por origen.
+  const productosAgrupadosPorCategoria = pedidos.reduce((acc, producto) => {
+    // Si la categoría no existe en el acumulador, la creamos.
+    if (!acc[producto.categoria]) {
+      acc[producto.categoria] = [];
     }
-    const index = acc[pedido.categoria].findIndex(p => p.id === pedido.id);
+
+    // Buscamos si el producto ya fue agregado a la lista de esa categoría.
+    const index = acc[producto.categoria].findIndex(p => p.id === producto.id);
+    
     if (index > -1) {
-      acc[pedido.categoria][index].cantidadTotal += pedido.cantidad;
+      // Si ya existe, actualizamos las cantidades según el origen.
+      if (producto.origen === 1) { // Online
+        acc[producto.categoria][index].cantidadOnline += producto.cantidad;
+      } else { // Tienda
+        acc[producto.categoria][index].cantidadTienda += producto.cantidad;
+      }
     } else {
-      acc[pedido.categoria].push({
-        id: pedido.id,
-        nombre: pedido.nombre,
-        cantidadTotal: pedido.cantidad,
-        position: pedido.position, // Incluimos la posición en el objeto agrupado
+      // Si no existe, lo agregamos inicializando las cantidades.
+      acc[producto.categoria].push({
+        id: producto.id,
+        nombre: producto.nombre,
+        position: producto.position,
+        cantidadTienda: producto.origen !== 1 ? producto.cantidad : 0,
+        cantidadOnline: producto.origen === 1 ? producto.cantidad : 0,
       });
     }
     return acc;
@@ -98,75 +94,105 @@ const StockDia = () => {
 
   // Definir el orden deseado de las categorías
   const ordenCategorias = ["comida", "complementos", "bebidas", "postres", "extras"];
-
-  // Crear un nuevo array de categorías ordenado
   const categoriasOrdenadas = ordenCategorias.map(categoria => [categoria, productosAgrupadosPorCategoria[categoria]]).filter(item => item[1]);
-
-  // Obtener la fecha actual y formatearla
   const fechaHoy = dayjs().tz('Europe/Madrid').format('DD/MM/YYYY');
 
-  // Sumar la cantidad de Pollo Asado (id 1) y 1/2 Pollo (id 2) tambien sumamos 0.5 de menu fat y 0.5 e menu fit
-const calcularTotalPollo = (productos) => {
-  const polloAsado = productos.find(p => p.id === 1);
-  const medioPollo = productos.find(p => p.id === 2);
-  const menufit = productos.find(p => p.id === 39);
-  const menufat = productos.find(p => p.id === 40);
+  // CAMBIO: La función ahora calcula totales para tienda, online y general.
+  const calcularTotalesPollo = (productos) => {
+    const getQty = (id, tipo) => {
+        const p = productos.find(prod => prod.id === id);
+        if (!p) return 0;
+        return tipo === 'tienda' ? p.cantidadTienda : p.cantidadOnline;
+    };
 
-  const total =
-    (polloAsado ? polloAsado.cantidadTotal : 0) +
-    (medioPollo ? medioPollo.cantidadTotal * 0.5 : 0) +
-    (menufit ? menufit.cantidadTotal * 0.5 : 0) +
-    (menufat ? menufat.cantidadTotal * 0.5 : 0);
+    const totalTienda = 
+        getQty(1, 'tienda') + (getQty(2, 'tienda') * 0.5) + (getQty(39, 'tienda') * 0.5) + (getQty(40, 'tienda') * 0.5);
 
-  return total.toFixed(1); // Retorna el total con un decimal
-};
+    const totalOnline = 
+        getQty(1, 'online') + (getQty(2, 'online') * 0.5) + (getQty(39, 'online') * 0.5) + (getQty(40, 'online') * 0.5);
+
+    return {
+        tienda: totalTienda.toFixed(1),
+        online: totalOnline.toFixed(1),
+        general: (totalTienda + totalOnline).toFixed(1)
+    };
+  };
 
   return (
     <div className="max-w-full mx-auto">
       <h1 className="text-center mb-4 font-nunito text-gray-500 text-2xl -mt-5">Productos ya vendidos - {fechaHoy}</h1>
-    {error && <p className="mt-4 text-red-600 text-center">{error}</p>}
-    {loading ? (
-      <div className="flex justify-center items-cente">
-        <div className="spinner-border animate-spin border-t-2 border-b-2 border-yellow-500 w-6 h-6 rounded-full"></div>
-      </div>
-    ) : (
-      <div className="flex justify-center gap-3 font-nunito ">
-        {categoriasOrdenadas.length === 0 ? (
-          <p className="text-center text-gray-500">No hay pedidos. (:</p>
-        ) : (
-          categoriasOrdenadas.map(([categoria, productos]) => (
-            <div key={categoria} className="bg-white rounded-md shadow-lg p-4 w-full sm:w-1/2 md:w-1/3 lg:w-1/4 xl:w-1/5 min-w-[200px]">
-              <h2 className="text-lg font-extrabold text-yellow-500 mb-2 text-center">{categoria.toUpperCase()}</h2>
-              <table className="table table-sm w-full border-separate">
-                <thead>
-                  <tr>
-                    <th className="text-left">Producto</th>
-                    <th className="text-right">Cant.</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {productos.sort((a, b) => a.position - b.position).map((producto) => (
-                    <tr key={producto.id}>
-                      <td className="text-left">{producto.nombre}</td>
-                      <td className="text-right font-extrabold">{producto.cantidadTotal}</td>
-                    </tr>
-                  ))}
-                </tbody>
-                {categoria.toLowerCase() === 'comida' && (
-                  <tfoot className="border-t-2 mt-2">
-                    <tr>
-                      <td className="font-extrabold text-left">Total Pollo</td>
-                      <td className="font-extrabold text-right">{calcularTotalPollo(productos)}</td>
-                    </tr>
-                  </tfoot>
-                )}
-              </table>
-            </div>
-          ))
-        )}
-      </div>
-    )}
-  </div>
+      {error && <p className="mt-4 text-red-600 text-center">{error}</p>}
+      {loading ? (
+        <div className="flex justify-center items-cente">
+          <div className="spinner-border animate-spin border-t-2 border-b-2 border-yellow-500 w-6 h-6 rounded-full"></div>
+        </div>
+      ) : (
+        <div className="flex justify-center gap-3 font-nunito flex-wrap">
+          {categoriasOrdenadas.length === 0 ? (
+            <p className="text-center text-gray-500">No hay pedidos. (:</p>
+          ) : (
+            categoriasOrdenadas.map(([categoria, productos]) => {
+              // CAMBIO: Se llama a la función aquí para tener los totales listos.
+              const totalesPollo = categoria.toLowerCase() === 'comida' ? calcularTotalesPollo(productos) : null;
+              
+              return (
+                <div key={categoria} className="bg-white rounded-md shadow-lg p-4 w-full sm:w-1/2 md:w-1/3 lg:w-1/4 xl:w-1/5 min-w-[250px]">
+                  <h2 className="text-lg font-extrabold text-yellow-500 mb-2 text-center">{categoria.toUpperCase()}</h2>
+                  <table className="table table-sm w-full border-separate text-sm">
+                    {/* CAMBIO: Cabecera de la tabla actualizada */}
+                    <thead>
+                      <tr className="text-gray-600">
+                        <th className="text-left font-semibold">Producto</th>
+                        <th className="text-center font-semibold">Tienda</th>
+                        <th className="text-center font-semibold">Online</th>
+                        <th className="text-right font-bold">Total</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {productos.sort((a, b) => a.position - b.position).map((producto) => (
+                        // CAMBIO: Fila de la tabla actualizada con las nuevas cantidades
+                        <tr key={producto.id}>
+                          <td className="text-left">{producto.nombre}</td>
+                          <td className="text-center">{producto.cantidadTienda > 0 ? producto.cantidadTienda : '-'}</td>
+                          <td className="text-center">{producto.cantidadOnline > 0 ? producto.cantidadOnline : '-'}</td>
+                          <td className="text-right font-extrabold">{producto.cantidadTienda + producto.cantidadOnline}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                    {/* CAMBIO: Pie de tabla para 'comida' actualizado */}
+                    {categoria.toLowerCase() === 'comida' && (
+                      <tfoot className="border-t-2 mt-2">
+                        <tr>
+                            <td className="font-bold text-left pt-2" colSpan="4">TOTAL POLLOS</td>
+                        </tr>
+                        <tr>
+                            <td className="text-left pl-2">Tienda</td>
+                            <td className="font-extrabold text-center">{totalesPollo.tienda}</td>
+                            <td></td>
+                            <td></td>
+                        </tr>
+                         <tr>
+                            <td className="text-left pl-2">Online</td>
+                            <td className="font-extrabold text-center">{totalesPollo.online}</td>
+                            <td></td>
+                            <td></td>
+                        </tr>
+                         <tr className='border-t'>
+                            <td className="text-left font-bold pt-1">General</td>
+                            <td></td>
+                            <td></td>
+                            <td className="font-extrabold text-right pt-1">{totalesPollo.general}</td>
+                        </tr>
+                      </tfoot>
+                    )}
+                  </table>
+                </div>
+              )
+            })
+          )}
+        </div>
+      )}
+    </div>
   );
 };
 

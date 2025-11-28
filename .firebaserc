@@ -1,5 +1,23 @@
 {
   "projects": {
-    "default": "superpollorpos"
-  }
+    "default": "superpollorpos",
+    "firebase target:apply hosting superpolloweb-tienda tienda": "superpollorpos",
+    "tienda": "superpollorpos"
+  },
+  "targets": {
+    "superpollorpos": {
+      "hosting": {
+        "superpolloweb-testing": [
+          "superpolloweb-testing"
+        ],
+        "superpolloweb-tienda": [
+          "superpollomungia-tienda"
+        ],
+        "superpollorpos": [
+          "superpollorpos"
+        ]
+      }
+    }
+  },
+  "etags": {}
 }

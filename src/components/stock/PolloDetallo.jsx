@@ -1,6 +1,6 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { db } from '../firebase/firebase';
-import { collection, doc, updateDoc, onSnapshot, getDoc, writeBatch } from 'firebase/firestore';
+import { collection, doc, onSnapshot, getDoc, writeBatch } from 'firebase/firestore';
 import Table from 'react-bootstrap/Table';
 import dayjs from 'dayjs';
 import 'dayjs/locale/es';
@@ -9,113 +9,65 @@ dayjs.locale('es');
 const PolloDetallo = () => {
   const [estadisticas, setEstadisticas] = useState([]);
   const [loading, setLoading] = useState(true);
+  const isUpdatingFromListener = useRef(true);
 
-  // FUNCIÓN PARA CORREGIR Y ACTUALIZAR DATOS (MODIFICADA)
-  // Ahora acepta un stock inicial como punto de partida fiable
-  const corregirYActualizarDatos = useCallback(async (datosSinCorregir, stockInicial) => {
-    if (datosSinCorregir.length === 0) {
-      setLoading(false);
-      return;
+  // Función pura que solo recalcula la cadena de stock en memoria
+  const recalcularCadenaDeStock = useCallback((datosEntrada, stockInicial) => {
+    if (!datosEntrada || datosEntrada.length === 0) {
+      return [];
     }
-
-    // 1. OBTENER LAS VENTAS DE LA COLECCIÓN SECUNDARIA
-    const ventasPromises = datosSinCorregir.map(item =>
-      getDoc(doc(db, 'estadisticas_diarias2', item.dia))
-    );
-    const ventasDocs = await Promise.all(ventasPromises);
-    const ventasDiarias = {};
-    ventasDocs.forEach((docSnap, index) => {
-      const dia = datosSinCorregir[index].dia;
-      ventasDiarias[dia] = docSnap.exists() ? docSnap.data().vd || 0 : 0;
-    });
-
-    // 2. CORREGIR LA CADENA DE STOCK EN MEMORIA (LÓGICA MEJORADA)
     const datosCorregidos = [];
-    // Usamos el stockInicial recibido como el primer "stockAnteriorCalculado"
     let stockAnteriorCalculado = stockInicial;
 
-    datosSinCorregir.forEach((item) => {
-      // Ya no necesitamos la condición para el índice 0. Siempre empezamos con el valor calculado anterior.
+    datosEntrada.forEach((item) => {
       const quedan = stockAnteriorCalculado;
-      const ventas = ventasDiarias[item.dia] || 0;
+      const ventas = item.vd || 0;
       const total = quedan + (item.entran || 0);
       const stockFinal = total - ventas - (item.baja || 0) - (item.devueltos || 0);
 
       datosCorregidos.push({
         ...item,
-        vd: ventas,
         stock_anterior: quedan,
         stock: stockFinal,
       });
-
-      // El siguiente stock anterior será el stock final de este día
       stockAnteriorCalculado = stockFinal;
     });
-
-    // 3. ACTUALIZAR EL ESTADO DE REACT
-    setEstadisticas(datosCorregidos);
-    setLoading(false);
-
-    // 4. ACTUALIZAR FIRESTORE EN SEGUNDO PLANO
-    try {
-      const batch = writeBatch(db);
-      let stockFinalDelPeriodo = 0;
-
-      datosCorregidos.forEach(item => {
-        const docRef = doc(db, 'estadisticas_diarias', item.dia);
-        batch.update(docRef, {
-          stock_anterior: item.stock_anterior,
-          stock: item.stock,
-          vd: item.vd,
-          entran: item.entran || 0,
-          baja: item.baja || 0,
-          devueltos: item.devueltos || 0,
-        });
-        stockFinalDelPeriodo = item.stock;
-      });
-
-      const docRefProd = doc(db, 'productos', '1');
-      batch.update(docRefProd, { stock: stockFinalDelPeriodo });
-
-      await batch.commit();
-      console.log("Corrección y actualización automática completada en Firestore.");
-    } catch (error) {
-      console.error("Error al actualizar los datos en Firebase:", error);
-    }
+    return datosCorregidos;
   }, []);
 
-  // EFECTO PRINCIPAL (MODIFICADO)
+  // Efecto principal para escuchar cambios externos en Firestore
   useEffect(() => {
     setLoading(true);
     const estadisticasRef = collection(db, "estadisticas_diarias");
-    const unsubscribe = onSnapshot(estadisticasRef, (querySnapshot) => {
-      const datos = querySnapshot.docs.map(doc => ({
-        dia: doc.id,
-        ...doc.data()
-      }));
+    
+    const unsubscribe = onSnapshot(estadisticasRef, async (querySnapshot) => {
+        if (!isUpdatingFromListener.current) {
+            isUpdatingFromListener.current = true;
+            return;
+        }
 
-      const datosOrdenados = datos.sort((a, b) => {
-        return dayjs(a.dia, 'DD-MM-YYYY').diff(dayjs(b.dia, 'DD-MM-YYYY'));
-      });
+      const datos = querySnapshot.docs.map(doc => ({ dia: doc.id, ...doc.data() }));
+      const datosOrdenados = datos.sort((a, b) => dayjs(a.dia, 'DD-MM-YYYY').diff(dayjs(b.dia, 'DD-MM-YYYY')));
       
       if (datosOrdenados.length === 0) {
         setLoading(false);
         return;
       }
-
-      // 1. OBTENEMOS 9 DÍAS EN LUGAR DE 8
-      const datosConArranque = datosOrdenados.slice(-9);
-
-      // 2. DETERMINAMOS EL STOCK INICIAL
-      // Si tenemos menos de 9 días (por ejemplo al principio), el stock inicial es 0.
-      // Si tenemos 9, el stock inicial es el stock final del primer día de la lista.
-      const stockDeArranque = datosConArranque.length < 9 ? 0 : datosConArranque[0].stock || 0;
       
-      // 3. SEPARAMOS LOS DATOS QUE REALMENTE VAMOS A MOSTRAR (LOS ÚLTIMOS 8)
+      const datosConArranque = datosOrdenados.slice(-9);
+      const stockDeArranque = datosConArranque.length < 9 ? 0 : datosConArranque[0].stock || 0;
       const datosParaMostrar = datosConArranque.slice(-8);
 
-      // 4. Iniciar el proceso de corrección con el stock inicial correcto
-      corregirYActualizarDatos(datosParaMostrar, stockDeArranque);
+      const ventasPromises = datosParaMostrar.map(item => getDoc(doc(db, 'estadisticas_diarias2', item.dia)));
+      const ventasDocs = await Promise.all(ventasPromises);
+      const datosConVentas = datosParaMostrar.map((item, index) => {
+        const ventaDoc = ventasDocs[index];
+        return { ...item, vd: ventaDoc.exists() ? ventaDoc.data().vd || 0 : 0 };
+      });
+
+      const datosRecalculados = recalcularCadenaDeStock(datosConVentas, stockDeArranque);
+      setEstadisticas(datosRecalculados);
+      setLoading(false);
 
     }, (error) => {
       console.error("Error al obtener datos:", error);
@@ -123,28 +75,58 @@ const PolloDetallo = () => {
     });
 
     return () => unsubscribe();
-  }, [corregirYActualizarDatos]);
+  }, [recalcularCadenaDeStock]);
 
+  // Maneja cambios en los inputs, actualizando solo el estado local
   const handleInputChange = (e, dia, campo) => {
     const value = parseFloat(e.target.value) || 0;
+    
     const nuevasEstadisticas = estadisticas.map(item =>
       item.dia === dia ? { ...item, [campo]: value } : item
     );
     
-    // Al recalcular, usamos el stock_anterior del primer elemento que ya está en el estado,
-    // que fue corregido durante la carga inicial.
-    const stockInicialRecalculo = estadisticas.length > 0 ? estadisticas[0].stock_anterior : 0;
-    
-    corregirYActualizarDatos(nuevasEstadisticas, stockInicialRecalculo);
+    const stockInicialRecalculo = nuevasEstadisticas.length > 0 ? nuevasEstadisticas[0].stock_anterior : 0;
+    const datosRecalculados = recalcularCadenaDeStock(nuevasEstadisticas, stockInicialRecalculo);
+
+    setEstadisticas(datosRecalculados);
   };
   
-  const handleActualizarManual = () => {
+  // El botón "Actualizar" es el único que escribe en Firestore
+  const handleActualizarManual = async () => {
       setLoading(true);
-      const stockInicialRecalculo = estadisticas.length > 0 ? estadisticas[0].stock_anterior : 0;
-      corregirYActualizarDatos(estadisticas, stockInicialRecalculo);
-  }
+      try {
+        const batch = writeBatch(db);
+        let stockFinalDelPeriodo = 0;
 
-  if (loading) {
+        estadisticas.forEach(item => {
+          const docRef = doc(db, 'estadisticas_diarias', item.dia);
+          batch.update(docRef, {
+            stock_anterior: item.stock_anterior,
+            stock: item.stock,
+            entran: item.entran || 0,
+            baja: item.baja || 0,
+            devueltos: item.devueltos || 0,
+          });
+          stockFinalDelPeriodo = item.stock;
+        });
+
+        const docRefProd = doc(db, 'productos', '1');
+        batch.update(docRefProd, { stock: stockFinalDelPeriodo });
+        
+        isUpdatingFromListener.current = false;
+        await batch.commit();
+
+        console.log("¡Datos actualizados en Firestore correctamente!");
+        
+      } catch (error) {
+        console.error("Error al actualizar los datos en Firebase:", error);
+        isUpdatingFromListener.current = true;
+      } finally {
+        setLoading(false);
+      }
+  };
+
+  if (loading && estadisticas.length === 0) {
     return <p className="text-center">Cargando y corrigiendo datos...</p>;
   }
 

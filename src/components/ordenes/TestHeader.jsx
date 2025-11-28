@@ -246,19 +246,20 @@ const TestHeader = ({ mostrarElementosDeOrdenes }) => {
         if (isMountedRef.current) {
           setNumeroEnBarra((enbarra_base_from_db || 0) - pollosEntregadosActuales);
           setNumeroLibres(pollosLibresCalculados);
-          // Las ventas (vm, vt, vd) se actualizan desde el listener de pedidos,
-          // aquí solo nos aseguramos de que los contadores principales estén sincronizados.
-          // Si es necesario forzar la actualización de ventasManana, ventasTarde, ventasDia aquí,
-          // se puede hacer, pero currentSalesRef.current ya debería tener los valores más recientes.
-          // Ejemplo:
-          // if (ventasManana !== ventasMananaActuales) setVentasManana(ventasMananaActuales);
-          // if (ventasTarde !== (salesToUse.vt || 0)) setVentasTarde(salesToUse.vt || 0); // Asumiendo que vt también está en salesToUse
-          // if (ventasDia !== ventasDiaActuales) setVentasDia(ventasDiaActuales);
-
-          // Asegurar que los estados de carga se manejen correctamente
+        
+          // --- NUEVO: Calcular y guardar libresManana y libresTarde para la app móvil ---
+          const libresMananaParaDB = baseLibres - ventasMananaActuales;
+          const libresTardeParaDB = baseLibres - ventasDiaActuales; // Se calcula siempre con el total del día
+        
+          // Usamos el mismo docRefEstadisticas que ya tienes definido en el useEffect
+          setDoc(docRefEstadisticas, {
+              libresManana: libresMananaParaDB,
+              libresTarde: libresTardeParaDB,
+          }, { merge: true })
+          .catch(e => console.error("TestHeader: Error guardando libresManana/Tarde:", e));
+          // --- FIN DEL CÓDIGO NUEVO ---
+        
           if (isPageLoading) setIsPageLoading(false);
-          // isListenerUpdating se maneja principalmente por el listener de pedidos,
-          // pero podemos asegurarnos de que se ponga a false si este listener termina después.
           if (isListenerUpdating && !isPageLoading) setIsListenerUpdating(false);
         }
       },

@@ -1,4 +1,4 @@
-import React from 'react'; // Eliminado useState ya que no se usa aquí
+import React, { useState, useEffect } from 'react';
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
@@ -7,6 +7,9 @@ import { TextField, IconButton } from '@mui/material'; // Box no se usa, se pued
 
 import dayjs from 'dayjs';
 import 'dayjs/locale/es';
+
+import { db } from '../../firebase/firebase';
+import { doc, setDoc, onSnapshot } from 'firebase/firestore';
 
 dayjs.locale('es');
 
@@ -20,9 +23,43 @@ const theme = createTheme({
 
 // El componente ahora recibe selectedDate y onDateChange como props
 const NavbarResultados = ({ selectedDate, onDateChange }) => {
-    // El estado 'fecha' y 'setFecha' se eliminan, ya que la fecha se maneja en el componente padre
+    const [isShopOpen, setIsShopOpen] = useState(true);
+    const [loadingShopStatus, setLoadingShopStatus] = useState(true);
 
     const empleadoNombre = sessionStorage.getItem('empleadoNombre');
+
+    useEffect(() => {
+      const shopStatusRef = doc(db, 'shop_data', 'status');
+      const unsubscribe = onSnapshot(shopStatusRef, (docSnap) => {
+          setLoadingShopStatus(true);
+          if (docSnap.exists()) {
+              setIsShopOpen(docSnap.data().isOpen);
+          } else {
+              // Si el documento no existe, lo creamos. Asumimos que la tienda está abierta por defecto.
+              setDoc(shopStatusRef, { isOpen: true }).catch(e => console.error("Error creating shop status doc:", e));
+              setIsShopOpen(true);
+          }
+          setLoadingShopStatus(false);
+      }, (error) => {
+          console.error("Error listening to shop status:", error);
+          setLoadingShopStatus(false);
+      });
+
+      return () => unsubscribe();
+  }, []);
+
+  const toggleShopStatus = async () => {
+      if (loadingShopStatus) return;
+      setLoadingShopStatus(true);
+      const shopStatusRef = doc(db, 'shop_data', 'status');
+      try {
+          // El listener de onSnapshot se encargará de actualizar el estado 'isShopOpen'
+          await setDoc(shopStatusRef, { isOpen: !isShopOpen });
+      } catch (error) {
+          console.error("Error toggling shop status:", error);
+          setLoadingShopStatus(false); // Re-enable button on error
+      }
+  };
 
   return (
     <div className="flex items-center justify-between h-full px-6">
@@ -75,6 +112,17 @@ const NavbarResultados = ({ selectedDate, onDateChange }) => {
 
     {/* Icons and user info */}
     <div className="flex items-center gap-4">
+      {/* Botón para cerrar/abrir tienda */}
+      <button
+        onClick={toggleShopStatus}
+        disabled={loadingShopStatus}
+        className={`px-3 py-1.5 rounded-md text-white font-nunito font-semibold text-sm shadow-md transition-colors disabled:opacity-50 ${
+          isShopOpen ? 'bg-red-500 hover:bg-red-600' : 'bg-green-500 hover:bg-green-600'
+        }`}
+      >
+        {loadingShopStatus ? '...' : isShopOpen ? 'Cerrar Tienda' : 'Abrir Tienda'}
+      </button>
+
       {/* Mail icon */}
       <button className="text-gray-500 hover:text-yellow-500">
       <svg

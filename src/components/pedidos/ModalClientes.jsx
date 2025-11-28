@@ -140,10 +140,10 @@ const ModalClientes = ({ show, handleClose, onSave, initialData,clearClientData 
     <>
       <Modal show={show} onHide={handleSubmitClose} size="lg" backdrop="static"  keyboard={false} top> {/* Changed onHide to ensure reset */}
 
-      <Modal.Header closeButton className='border-none text-center justify-center items-center flex' onClick={handleClose}>
-          <Modal.Title className='text-center pt-1 font-nunito text-gray-600 w-full'>
-            Datos Pedido
-          </Modal.Title>
+      <Modal.Header closeButton className='border-none text-center justify-center items-center flex'>
+        <Modal.Title className='text-center pt-1 font-nunito text-gray-600 w-full'>
+          Datos Pedido
+        </Modal.Title>
       </Modal.Header>
 
           

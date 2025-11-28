@@ -1,11 +1,14 @@
-import React, { useState, useMemo } from 'react';
+import { collection, getDocs, doc, setDoc, onSnapshot, updateDoc } from 'firebase/firestore';
 import { db } from '../../components/firebase/firebase';
-import { collection, getDocs, doc, setDoc } from 'firebase/firestore';
+import React, { useState, useMemo, useEffect } from 'react';
 import dayjs from 'dayjs';
 
 const CierreDia = ({ onCierre }) => {
   const [loading, setLoading] = useState(false);
   const [mensaje, setMensaje] = useState('');
+  const [isLastHourAvailable, setIsLastHourAvailable] = useState(false);
+
+  const [isVisible, setIsVisible] = useState(false);
 
   // Determina la configuración del turno basado en la hora actual y si es domingo
   const { textoBoton, mensajeConfirmacion, mensajeExito, fechaDestino } = useMemo(() => {
@@ -35,6 +38,62 @@ const CierreDia = ({ onCierre }) => {
       };
     }
   }, []);
+
+  useEffect(() => {
+    const unsubscribe = onSnapshot(doc(db, 'shop_data', 'last_hour'), (doc) => {
+      if (doc.exists()) {
+        setIsLastHourAvailable(doc.data().available);
+      }
+    });
+    return () => unsubscribe();
+  }, []);
+
+  useEffect(() => {
+    const checkTime = async () => {
+      const now = dayjs();
+      const currentHour = now.hour();
+      const currentMinute = now.minute();
+
+      // Visibility Logic
+      // Visible: 00:01 - 16:00 (inclusive of 16:00 minute)
+      const isMorning = (currentHour === 0 && currentMinute >= 1) || (currentHour > 0 && currentHour < 16) || (currentHour === 16 && currentMinute === 0);
+
+      // Evening: 16:01 - 23:59
+      const isEvening = (currentHour === 16 && currentMinute >= 1) || (currentHour > 16);
+
+      setIsVisible(isMorning || isEvening);
+
+      // Auto-off at 16:00 and 00:00
+      const isSwitchOffTime = (currentHour === 16 && currentMinute === 0) || (currentHour === 0 && currentMinute === 0);
+
+      if (isSwitchOffTime && isLastHourAvailable) {
+        try {
+          await updateDoc(doc(db, 'shop_data', 'last_hour'), {
+            available: false
+          });
+          console.log("Auto-turning off Last Hour availability");
+        } catch (error) {
+          console.error("Error auto-turning off last hour:", error);
+        }
+      }
+    };
+
+    checkTime();
+    const interval = setInterval(checkTime, 10000); // Check every 10s
+    return () => clearInterval(interval);
+  }, [isLastHourAvailable]);
+
+  const toggleLastHour = async () => {
+    try {
+      const docRef = doc(db, 'shop_data', 'last_hour');
+      await updateDoc(docRef, {
+        available: !isLastHourAvailable
+      });
+    } catch (error) {
+      console.error("Error updating last hour availability:", error);
+      alert("Error al actualizar el estado de pedidos última hora");
+    }
+  };
 
   const handleCerrarDia = async () => {
     if (!window.confirm(mensajeConfirmacion)) {
@@ -86,6 +145,18 @@ const CierreDia = ({ onCierre }) => {
         {loading ? 'Guardando...' : textoBoton}
       </button>
       {mensaje && <p className="ml-4 text-sm font-semibold text-white">{mensaje}</p>}
+
+      {isVisible && (
+        <button
+          onClick={toggleLastHour}
+          className={`ml-4 px-4 py-1 font-nunito font-bold rounded-md shadow-md transition-colors duration-300 ${isLastHourAvailable
+            ? 'bg-green-600 hover:bg-green-700 text-white'
+            : 'bg-gray-600 hover:bg-gray-700 text-gray-200'
+            }`}
+        >
+          Online Pedido Rapido: {isLastHourAvailable ? 'ON' : 'OFF'}
+        </button>
+      )}
     </div>
   );
 };

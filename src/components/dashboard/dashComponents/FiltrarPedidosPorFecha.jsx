@@ -1,4 +1,4 @@
-// src/components/dashboard/dashComponents/FiltrarPedidosPorFecha.jsx (o donde prefieras)
+// src/components/dashboard/dashComponents/FiltrarPedidosPorFecha.jsx
 import React, { useState } from 'react';
 import { collection, query, where, getDocs, orderBy } from "firebase/firestore";
 import { db } from '../../firebase/firebase'; // Ajusta la ruta si es necesario
@@ -18,21 +18,32 @@ import web from '../../../assets/web.png';
 
 const FiltrarPedidosPorFecha = () => {
   // Estados para las fechas
-  const [fechaInicio, setFechaInicio] = useState(dayjs().format('YYYY-MM-DD')); // Fecha de hoy por defecto
-  const [fechaFin, setFechaFin] = useState(dayjs().format('YYYY-MM-DD')); // Fecha de hoy por defecto
+  const [fechaInicio, setFechaInicio] = useState(dayjs().format('YYYY-MM-DD'));
+  const [fechaFin, setFechaFin] = useState(dayjs().format('YYYY-MM-DD'));
 
   // Estados para los datos y la carga
   const [pedidosFiltrados, setPedidosFiltrados] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
-  const [busquedaRealizada, setBusquedaRealizada] = useState(false); // Para saber si mostrar "No hay resultados"
+  const [busquedaRealizada, setBusquedaRealizada] = useState(false);
+
+  // NUEVO: Estados para guardar los totales calculados
+  const [totalTienda, setTotalTienda] = useState(0);
+  const [totalOnline, setTotalOnline] = useState(0);
+  const [totalGeneral, setTotalGeneral] = useState(0);
+
 
   // Función para buscar pedidos en el rango de fechas
   const buscarPedidosPorFecha = async () => {
     setLoading(true);
     setError(null);
     setPedidosFiltrados([]);
-    setBusquedaRealizada(true); // Marcamos que se intentó buscar
+    setBusquedaRealizada(true);
+    
+    // NUEVO: Reiniciar los totales en cada búsqueda
+    setTotalTienda(0);
+    setTotalOnline(0);
+    setTotalGeneral(0);
 
     // Validar fechas
     const inicio = dayjs(fechaInicio, 'YYYY-MM-DD');
@@ -53,35 +64,43 @@ const FiltrarPedidosPorFecha = () => {
     console.log(`Buscando pedidos entre ${inicio.format('DD-MM-YYYY')} y ${fin.format('DD-MM-YYYY')}`);
 
     try {
-      // **IMPORTANTE:** Asume que tienes un campo de fecha en tus pedidos.
-      // Cambia 'fechahora_realizado_str' al nombre real de tu campo de fecha (string DD-MM-YYYY).
-      // **NOTA:** Filtrar por rangos de fechas usando strings 'DD-MM-YYYY' directamente en Firestore
-      // con >= y <= NO FUNCIONA CORRECTAMENTE debido al orden lexicográfico.
-      // La forma más fiable (si no puedes usar Timestamps) es traer todos los documentos
-      // y filtrarlos en el cliente, lo cual puede ser ineficiente con muchos datos.
-      // Aquí implementamos el filtrado en el cliente.
-
       const pedidosRef = collection(db, 'pedidos');
-      // Podrías intentar limitar un poco la consulta si tienes otro campo ordenable,
-      // pero para el filtro de fecha estricto, a menudo necesitas traer todo.
-      const q = query(pedidosRef, orderBy('NumeroPedido', 'desc')); // Ordena por número de pedido
+      const q = query(pedidosRef, orderBy('NumeroPedido', 'desc'));
 
       const querySnapshot = await getDocs(q);
       const todosLosPedidos = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
 
       // Filtrar en el cliente
       const pedidosEnRango = todosLosPedidos.filter(pedido => {
-        // *** AJUSTA 'fechahora_realizado' al nombre de tu campo de fecha string DD-MM-YYYY ***
-        const fechaPedidoStr = pedido.fechahora_realizado; // Ejemplo: "30-07-2024"
-        if (!fechaPedidoStr) return false; // Ignora pedidos sin fecha
+        const fechaPedidoStr = pedido.fechahora_realizado;
+        if (!fechaPedidoStr) return false;
 
         const fechaPedido = dayjs(fechaPedidoStr, 'DD-MM-YYYY');
-        if (!fechaPedido.isValid()) return false; // Ignora fechas inválidas
+        if (!fechaPedido.isValid()) return false;
 
-        // Comprueba si la fecha del pedido está entre inicio y fin (inclusive)
-        // Usamos isBetween con el tercer parámetro '[]' para incluir los límites
         return fechaPedido.isBetween(inicio, fin, 'day', '[]');
       });
+
+      // NUEVO: Calcular los totales a partir de los pedidos filtrados
+      let sumaTienda = 0;
+      let sumaOnline = 0;
+      
+      pedidosEnRango.forEach(pedido => {
+        const totalPedido = parseFloat(pedido.total_pedido);
+        if (!isNaN(totalPedido)) {
+          if (pedido.origen === 1) { // Asumiendo que 1 es 'web'
+            sumaOnline += totalPedido;
+          } else { // El resto se considera 'tienda'
+            sumaTienda += totalPedido;
+          }
+        }
+      });
+      
+      // NUEVO: Actualizar los estados con los totales calculados
+      setTotalTienda(sumaTienda);
+      setTotalOnline(sumaOnline);
+      setTotalGeneral(sumaTienda + sumaOnline);
+
 
       console.log(`Se encontraron ${pedidosEnRango.length} pedidos en el rango.`);
       setPedidosFiltrados(pedidosEnRango);
@@ -146,20 +165,39 @@ const FiltrarPedidosPorFecha = () => {
 
       {/* Mensaje de Error */}
       {error && <p className="text-center text-red-600 mb-4">{error}</p>}
+      
+      {/* NUEVO: Contenedor para mostrar los totales */}
+      {busquedaRealizada && !loading && pedidosFiltrados.length > 0 && (
+        <div className="mb-6 p-4 bg-gray-50 border rounded-lg shadow-inner flex flex-col sm:flex-row justify-around items-center text-center gap-4">
+          <div>
+            <h3 className="text-sm font-medium text-gray-500 uppercase">Total Tienda</h3>
+            <p className="text-xl font-bold text-gray-800">{totalTienda.toFixed(2)} €</p>
+          </div>
+          <div className="border-t sm:border-t-0 sm:border-l h-12"></div>
+          <div>
+            <h3 className="text-sm font-medium text-gray-500 uppercase">Total Online</h3>
+            <p className="text-xl font-bold text-gray-800">{totalOnline.toFixed(2)} €</p>
+          </div>
+          <div className="border-t sm:border-t-0 sm:border-l h-12"></div>
+          <div className="p-2 bg-yellow-100 rounded-md">
+            <h3 className="text-md font-semibold text-yellow-800 uppercase">Total General</h3>
+            <p className="text-2xl font-extrabold text-yellow-900">{totalGeneral.toFixed(2)} €</p>
+          </div>
+        </div>
+      )}
+
 
       {/* Resultados */}
-           {/* Resultados */}
-           <div className="mt-6">
+      <div className="mt-6">
         {loading ? (
           <p className="text-center text-gray-500">Buscando pedidos...</p>
         ) : busquedaRealizada && pedidosFiltrados.length === 0 ? (
           <p className="text-center text-gray-500">No se encontraron pedidos en el rango de fechas seleccionado.</p>
         ) : pedidosFiltrados.length > 0 ? (
-          // *** 1. Añade max-h-* y overflow-y-auto a este div ***
-          <div className="overflow-x-auto shadow-md rounded-lg max-h-[60vh] overflow-y-auto"> {/* Ajusta max-h-[60vh] según necesites */}
+          <div className="overflow-x-auto shadow-md rounded-lg max-h-[60vh] overflow-y-auto">
             <table className="min-w-full table-auto text-sm">
-              <thead>
-                <tr className="bg-gray-700 text-white uppercase sticky top-0 z-10"> {/* Añadido sticky para cabecera */}
+              <thead className="sticky top-0 z-10">
+                <tr className="bg-gray-700 text-white uppercase">
                   <th className="px-4 py-3 text-center">Nº Pedido</th>
                   <th className="px-4 py-3 text-center">Cliente</th>
                   <th className="px-4 py-3 text-center">Fecha Realizado</th>
@@ -200,9 +238,6 @@ const FiltrarPedidosPorFecha = () => {
           </div>
         ) : null }
       </div>
-
-
-      
     </div>
   );
 };

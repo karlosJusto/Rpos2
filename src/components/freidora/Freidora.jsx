@@ -267,23 +267,29 @@ const Freidora = () => {
             };
 
             if (esEspecial) {
+                const cantidadTotal = productoItem.cantidad;
+                const entregadoTotal = productoItem.entregado || 0;
+
                 const cantidadDobles = Math.floor(productoItem.cantidad / 2);
                 const cantidadSimples = productoItem.cantidad % 2;
 
                 if (cantidadDobles > 0) {
+                    const entregadoEnDobles = Math.floor(entregadoTotal / 2);
                     todasLasPorciones.push({
                         ...baseItem,
+                        entregado: entregadoEnDobles, // Unidades de raciones dobles
                         tipo: 'doble',
-                        // *** CORRECCIÓN APLICADA AQUÍ ***
-                        // La cantidad de ración es el número de "packs dobles", no el total de unidades.
                         cantidad_racion: cantidadDobles, 
                         breakdown: { ...breakdownInfo, contributed_portions: cantidadDobles },
-                        cantidad_celiaco_racion: baseItem.celiaco ? cantidadDobles * 2 : 0,
+                        cantidad_celiaco_racion: baseItem.celiaco ? cantidadDobles : 0,
                     });
                 }
                 if (cantidadSimples > 0) {
+                    // Una ración simple solo se marca como entregada si todas las dobles ya lo están.
+                    const entregadoEnSimples = (entregadoTotal >= cantidadDobles * 2) ? (entregadoTotal % 2) : 0;
                     todasLasPorciones.push({
                         ...baseItem,
+                        entregado: entregadoEnSimples, // Unidades de raciones simples
                         tipo: 'simple',
                         cantidad_racion: cantidadSimples,
                         breakdown: { ...breakdownInfo, contributed_portions: cantidadSimples },
@@ -293,6 +299,7 @@ const Freidora = () => {
             } else {
                 todasLasPorciones.push({
                     ...baseItem,
+                    entregado: productoItem.entregado || 0, // Lógica normal para el resto
                     tipo: 'simple',
                     cantidad_racion: productoItem.cantidad,
                     breakdown: { ...breakdownInfo, contributed_portions: productoItem.cantidad },
