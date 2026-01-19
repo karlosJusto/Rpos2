@@ -61,10 +61,10 @@ const SALADS_COLLECTION_NAME = 'ensaladas';
 const normalizeTime = (timeStr) => {
   if (!timeStr) return '';
   if (timeStr.includes(':')) {
-      const parts = timeStr.split(':');
-      const hour = parts[0].padStart(2,'0');
-      const minute = parts[1] ? parts[1].padStart(2,'0') : '00';
-      return `${hour}:${minute}`;
+    const parts = timeStr.split(':');
+    const hour = parts[0].padStart(2, '0');
+    const minute = parts[1] ? parts[1].padStart(2, '0') : '00';
+    return `${hour}:${minute}`;
   }
   // If only hour is provided (e.g., "9"), assume ":00"
   const hour = timeStr.padStart(2, '0');
@@ -73,12 +73,12 @@ const normalizeTime = (timeStr) => {
 
 const generateIntervalsForSchedule = (start, end, maxAllowed, step, scheduleType) => {
   if (!start || !end || !step || typeof start !== 'string' || typeof end !== 'string' || !start.includes(':') || !end.includes(':')) {
-      console.error("generateIntervalsForSchedule: Datos de entrada inválidos o incompletos.", { start, end, maxAllowed, step, scheduleType });
-      return [];
+    console.error("generateIntervalsForSchedule: Datos de entrada inválidos o incompletos.", { start, end, maxAllowed, step, scheduleType });
+    return [];
   }
   if (step <= 0) {
-      console.error("generateIntervalsForSchedule: El paso (step) debe ser mayor que cero.", { step });
-      return [];
+    console.error("generateIntervalsForSchedule: El paso (step) debe ser mayor que cero.", { step });
+    return [];
   }
 
   try {
@@ -86,40 +86,40 @@ const generateIntervalsForSchedule = (start, end, maxAllowed, step, scheduleType
     const [endHour, endMinute] = end.split(':').map(Number);
 
     if (isNaN(startHour) || isNaN(startMinute) || isNaN(endHour) || isNaN(endMinute) ||
-        startHour < 0 || startHour > 23 || startMinute < 0 || startMinute > 59 ||
-        endHour < 0 || endHour > 23 || endMinute < 0 || endMinute > 59) {
-        console.error("generateIntervalsForSchedule: Formato de hora inválido.", { start, end });
-        return [];
+      startHour < 0 || startHour > 23 || startMinute < 0 || startMinute > 59 ||
+      endHour < 0 || endHour > 23 || endMinute < 0 || endMinute > 59) {
+      console.error("generateIntervalsForSchedule: Formato de hora inválido.", { start, end });
+      return [];
     }
 
     let current = startHour * 60 + startMinute;
     const endTime = endHour * 60 + endMinute;
 
     if (endTime <= current) {
-        // console.warn("generateIntervalsForSchedule: La hora de fin es anterior o igual a la hora de inicio.", { start, end });
-        // Allow generation even if end time is same or earlier, might be valid for single interval cases?
+      // console.warn("generateIntervalsForSchedule: La hora de fin es anterior o igual a la hora de inicio.", { start, end });
+      // Allow generation even if end time is same or earlier, might be valid for single interval cases?
     }
 
     const intervals = [];
 
     while (current < endTime) {
-        const intervalStartMinutes = current;
-        const intervalEndMinutes = current + step;
+      const intervalStartMinutes = current;
+      const intervalEndMinutes = current + step;
 
-        // Ensure the interval *starts* before the end time.
-        // The interval itself can end exactly at the end time.
-        if (intervalStartMinutes < endTime) {
-            const startStr = String(Math.floor(intervalStartMinutes / 60)).padStart(2, '0') + ':' + String(intervalStartMinutes % 60).padStart(2, '0');
-            intervals.push({
-                start: startStr,
-                maxAllowed: maxAllowed || 0, // Ensure maxAllowed is a number, default 0
-                orderedCount: 0, // Initialize orderedCount
-                scheduleType, // 'morning' or 'evening'
-            });
-        } else {
-             break; // Stop if the start of the next interval is at or after the end time
-        }
-        current += step;
+      // Ensure the interval *starts* before the end time.
+      // The interval itself can end exactly at the end time.
+      if (intervalStartMinutes < endTime) {
+        const startStr = String(Math.floor(intervalStartMinutes / 60)).padStart(2, '0') + ':' + String(intervalStartMinutes % 60).padStart(2, '0');
+        intervals.push({
+          start: startStr,
+          maxAllowed: maxAllowed || 0, // Ensure maxAllowed is a number, default 0
+          orderedCount: 0, // Initialize orderedCount
+          scheduleType, // 'morning' or 'evening'
+        });
+      } else {
+        break; // Stop if the start of the next interval is at or after the end time
+      }
+      current += step;
     }
     return intervals;
   } catch (error) {
@@ -135,8 +135,8 @@ export const ensureDailySaladDocument = async (dateStringYYYYMMDD) => {
   const logPrefix = `[EnsureSaladDoc][${dateForId}]`;
 
   if (dateForId === 'Invalid Date' || dateForName === 'Invalid Date') {
-      console.error(`${logPrefix} Error: Formato de fecha inválido al convertir ${dateStringYYYYMMDD}`);
-      return; // No continuar si la fecha es inválida
+    console.error(`${logPrefix} Error: Formato de fecha inválido al convertir ${dateStringYYYYMMDD}`);
+    return; // No continuar si la fecha es inválida
   }
 
   const saladDocRef = doc(db, SALADS_COLLECTION_NAME, dateForId);
@@ -192,9 +192,9 @@ export const generateAndMergeIntervals = async (productType, dayConfig, date) =>
     const oldData = docSnap.exists() ? docSnap.data() : { intervals: [] };
     const oldIntervals = Array.isArray(oldData.intervals) ? oldData.intervals : [];
     if (docSnap.exists()) {
-        console.log(`${logPrefix} Encontrados ${oldIntervals.length} intervalos antiguos.`);
+      console.log(`${logPrefix} Encontrados ${oldIntervals.length} intervalos antiguos.`);
     } else {
-        console.log(`${logPrefix} No existe documento previo. Se creará uno nuevo.`);
+      console.log(`${logPrefix} No existe documento previo. Se creará uno nuevo.`);
     }
 
     let newIntervals = [];
@@ -205,77 +205,77 @@ export const generateAndMergeIntervals = async (productType, dayConfig, date) =>
     if (dayConfig.morningSchedule?.active && dayConfig.morningSchedule.start && dayConfig.morningSchedule.end) {
       const morningStart = normalizeTime(dayConfig.morningSchedule.start);
       const morningEnd = normalizeTime(dayConfig.morningSchedule.end);
-       if (morningStart && morningEnd && morningEnd > morningStart) { // Check if end is strictly after start
-            console.log(`${logPrefix} Generando intervalos MAÑANA (${morningStart} - ${morningEnd})`);
-            newIntervals = newIntervals.concat(
-                generateIntervalsForSchedule(morningStart, morningEnd, maxAmount, config.intervalStep, 'morning')
-            );
-       } else {
-            console.warn(`${logPrefix} Horas de mañana inválidas o fin <= inicio:`, dayConfig.morningSchedule);
-       }
+      if (morningStart && morningEnd && morningEnd > morningStart) { // Check if end is strictly after start
+        console.log(`${logPrefix} Generando intervalos MAÑANA (${morningStart} - ${morningEnd})`);
+        newIntervals = newIntervals.concat(
+          generateIntervalsForSchedule(morningStart, morningEnd, maxAmount, config.intervalStep, 'morning')
+        );
+      } else {
+        console.warn(`${logPrefix} Horas de mañana inválidas o fin <= inicio:`, dayConfig.morningSchedule);
+      }
     } else {
-         console.log(`${logPrefix} Horario de mañana inactivo o incompleto.`);
+      console.log(`${logPrefix} Horario de mañana inactivo o incompleto.`);
     }
 
     // Generate Evening Intervals
     if (dayConfig.eveningSchedule?.active && dayConfig.eveningSchedule.start && dayConfig.eveningSchedule.end) {
-       const eveningStart = normalizeTime(dayConfig.eveningSchedule.start);
-       const eveningEnd = normalizeTime(dayConfig.eveningSchedule.end);
-        if (eveningStart && eveningEnd && eveningEnd > eveningStart) { // Check if end is strictly after start
-             console.log(`${logPrefix} Generando intervalos TARDE (${eveningStart} - ${eveningEnd})`);
-            newIntervals = newIntervals.concat(
-                generateIntervalsForSchedule(eveningStart, eveningEnd, maxAmount, config.intervalStep, 'evening')
-            );
-        } else {
-             console.warn(`${logPrefix} Horas de tarde inválidas o fin <= inicio:`, dayConfig.eveningSchedule);
-        }
+      const eveningStart = normalizeTime(dayConfig.eveningSchedule.start);
+      const eveningEnd = normalizeTime(dayConfig.eveningSchedule.end);
+      if (eveningStart && eveningEnd && eveningEnd > eveningStart) { // Check if end is strictly after start
+        console.log(`${logPrefix} Generando intervalos TARDE (${eveningStart} - ${eveningEnd})`);
+        newIntervals = newIntervals.concat(
+          generateIntervalsForSchedule(eveningStart, eveningEnd, maxAmount, config.intervalStep, 'evening')
+        );
+      } else {
+        console.warn(`${logPrefix} Horas de tarde inválidas o fin <= inicio:`, dayConfig.eveningSchedule);
+      }
     } else {
-         console.log(`${logPrefix} Horario de tarde inactivo o incompleto.`);
+      console.log(`${logPrefix} Horario de tarde inactivo o incompleto.`);
     }
     console.log(`${logPrefix} Generados ${newIntervals.length} intervalos nuevos según horario actual.`);
 
     // Merge Logic: Preserve orderedCount from old intervals if they match new ones
     const mergedIntervalsMap = new Map();
     newIntervals.forEach(newInt => {
-        // Find an old interval that matches the start time
-        const matchingOld = oldIntervals.find(oldInt => oldInt.start === newInt.start);
-        if (matchingOld && matchingOld.orderedCount > 0) {
-             // If found and has orders, preserve the old data but update maxAllowed and scheduleType
-             console.log(`${logPrefix} Intervalo ${newInt.start}: Preservando ${matchingOld.orderedCount} pedidos antiguos.`);
-             mergedIntervalsMap.set(newInt.start, {
-                ...matchingOld, // Keep all old fields (including orderedCount)
-                maxAllowed: newInt.maxAllowed, // Update maxAllowed from new config
-                scheduleType: newInt.scheduleType, // Update scheduleType from new config
-            });
-        } else {
-            // If no match or old interval had 0 orders, use the newly generated interval
-            mergedIntervalsMap.set(newInt.start, newInt);
-        }
+      // Find an old interval that matches the start time
+      const matchingOld = oldIntervals.find(oldInt => oldInt.start === newInt.start);
+      if (matchingOld && matchingOld.orderedCount > 0) {
+        // If found and has orders, preserve the old data but update maxAllowed and scheduleType
+        console.log(`${logPrefix} Intervalo ${newInt.start}: Preservando ${matchingOld.orderedCount} pedidos antiguos.`);
+        mergedIntervalsMap.set(newInt.start, {
+          ...matchingOld, // Keep all old fields (including orderedCount)
+          maxAllowed: newInt.maxAllowed, // Update maxAllowed from new config
+          scheduleType: newInt.scheduleType, // Update scheduleType from new config
+        });
+      } else {
+        // If no match or old interval had 0 orders, use the newly generated interval
+        mergedIntervalsMap.set(newInt.start, newInt);
+      }
     });
 
     // Log discarded intervals that had orders
     oldIntervals.forEach(oldInt => {
-        // If an old interval had orders but is NOT in the new schedule (mergedIntervalsMap)
-        if (oldInt.orderedCount > 0 && !mergedIntervalsMap.has(oldInt.start)) {
-            console.warn(`${logPrefix} Intervalo ${oldInt.start} con ${oldInt.orderedCount} pedidos NO está en el nuevo horario y será descartado.`);
-        }
+      // If an old interval had orders but is NOT in the new schedule (mergedIntervalsMap)
+      if (oldInt.orderedCount > 0 && !mergedIntervalsMap.has(oldInt.start)) {
+        console.warn(`${logPrefix} Intervalo ${oldInt.start} con ${oldInt.orderedCount} pedidos NO está en el nuevo horario y será descartado.`);
+      }
     });
 
     // Convert map back to array and sort by start time
     const finalIntervals = Array.from(mergedIntervalsMap.values())
-        .sort((a, b) => a.start.localeCompare(b.start));
+      .sort((a, b) => a.start.localeCompare(b.start));
 
     console.log(`${logPrefix} ${finalIntervals.length} intervalos finales generados/fusionados.`);
 
     // Write the final intervals to Firestore
     await setDoc(docRef, {
-        intervals: finalIntervals,
-        date: date, // Store the date for which these intervals apply
-        productType: productType, // Store the product type
-        lastGenerated: new Date().toISOString(), // Timestamp of generation
-     }, { merge: true }); // Use merge:true to avoid overwriting other potential fields
+      intervals: finalIntervals,
+      date: date, // Store the date for which these intervals apply
+      productType: productType, // Store the product type
+      lastGenerated: new Date().toISOString(), // Timestamp of generation
+    }, { merge: true }); // Use merge:true to avoid overwriting other potential fields
 
-     console.log(`${logPrefix} Documento actualizado/creado en Firestore.`);
+    console.log(`${logPrefix} Documento actualizado/creado en Firestore.`);
 
   } catch (error) {
     console.error(`${logPrefix} Error FATAL regenerando/fusionando:`, error);
@@ -288,8 +288,8 @@ const processTodaysFutureOrders = async (dateString) => {
 
   const dateForQuery = dayjs(dateString, 'YYYY-MM-DD').format('DD/MM/YYYY');
   if (!dateForQuery || dateForQuery === 'Invalid Date') {
-      console.error(`${logPrefix} Error: Fecha inválida ${dateString}.`);
-      return;
+    console.error(`${logPrefix} Error: Fecha inválida ${dateString}.`);
+    return;
   }
 
   const startOfDayString = `${dateForQuery} 00:00`;
@@ -298,176 +298,176 @@ const processTodaysFutureOrders = async (dateString) => {
 
   const pedidosRef = collection(db, "pedidos");
   const q = query(pedidosRef,
-      where("paraOtroDia", "==", true),
-      where("fechahora", ">=", startOfDayString),
-      where("fechahora", "<=", endOfDayString)
+    where("paraOtroDia", "==", true),
+    where("fechahora", ">=", startOfDayString),
+    where("fechahora", "<=", endOfDayString)
   );
 
   try {
-      const querySnapshot = await getDocs(q);
-      const ordersToProcess = querySnapshot.docs;
+    const querySnapshot = await getDocs(q);
+    const ordersToProcess = querySnapshot.docs;
 
-      if (ordersToProcess.length === 0) {
-          console.log(`${logPrefix} No se encontraron pedidos futuros para procesar hoy.`);
-          return;
+    if (ordersToProcess.length === 0) {
+      console.log(`${logPrefix} No se encontraron pedidos futuros para procesar hoy.`);
+      return;
+    }
+
+    console.log(`${logPrefix} Se encontraron ${ordersToProcess.length} pedidos para procesar.`);
+
+    // Revisa que todos tus IDs estén correctos aquí
+    const productProcessingConfig = {
+      '1': { stockId: 1, stockMultiplier: 1, calendarType: 'chicken' },
+      '2': { stockId: 1, stockMultiplier: 0.5, calendarType: 'chicken' },
+      '39': { stockId: 1, stockMultiplier: 0.5, calendarType: 'chicken' },
+      '40': { stockId: 1, stockMultiplier: 1, calendarType: 'chicken' },
+      '41': { stockId: 41, stockMultiplier: 1, calendarType: 'costilla' },
+      '48': { stockId: 41, stockMultiplier: 0.5, calendarType: 'costilla' },
+      '50': { stockId: 50, stockMultiplier: 1, calendarType: 'codillo' },
+      '20': { stockId: 20, stockMultiplier: 1, calendarType: 'codillo' },
+    };
+
+    for (const orderDoc of ordersToProcess) {
+      const orderId = orderDoc.id;
+      const orderData = orderDoc.data();
+      const orderLogPrefix = `[Pedido ${orderId}]`;
+
+      console.log(`%c${logPrefix} ${orderLogPrefix} Procesando... Cliente: ${orderData.cliente || 'N/A'}, Hora: ${orderData.fechahora}`, 'color: blue;');
+
+      if (!Array.isArray(orderData.productos) || orderData.productos.length === 0) {
+        console.warn(`${logPrefix} ${orderLogPrefix} Pedido sin productos. Marcando como procesado.`);
+        try {
+          await updateDoc(doc(db, "pedidos", orderId), { paraOtroDia: false, procesado: true });
+        } catch (updateError) {
+          console.error(`${logPrefix} ${orderLogPrefix} Error al marcar pedido vacío como procesado:`, updateError);
+        }
+        continue;
       }
 
-      console.log(`${logPrefix} Se encontraron ${ordersToProcess.length} pedidos para procesar.`);
+      const orderTimeString = orderData.fechahora?.split(' ')[1];
+      if (!orderTimeString || !/^\d{2}:\d{2}$/.test(orderTimeString)) {
+        console.error(`${logPrefix} ${orderLogPrefix} Error: Hora inválida (${orderData.fechahora}). Saltando pedido.`);
+        continue;
+      }
 
-      // Revisa que todos tus IDs estén correctos aquí
-      const productProcessingConfig = {
-          '1':  { stockId: 1, stockMultiplier: 1,    calendarType: 'chicken' },
-          '2':  { stockId: 1, stockMultiplier: 0.5,  calendarType: 'chicken' },
-          '39': { stockId: 1, stockMultiplier: 0.5,  calendarType: 'chicken' },
-          '40': { stockId: 1, stockMultiplier: 1,    calendarType: 'chicken' },
-          '41': { stockId: 41, stockMultiplier: 1,   calendarType: 'costilla' },
-          '48': { stockId: 41, stockMultiplier: 0.5, calendarType: 'costilla' },
-          '50': { stockId: 50, stockMultiplier: 1,   calendarType: 'codillo' },
-          '20': { stockId: 20, stockMultiplier: 1,   calendarType: 'codillo' },
-      };
+      try {
+        await runTransaction(db, async (transaction) => {
+          const txLogPrefix = `${logPrefix} ${orderLogPrefix} [TX]`;
+          console.log(`${txLogPrefix} Iniciando transacción.`);
 
-      for (const orderDoc of ordersToProcess) {
-          const orderId = orderDoc.id;
-          const orderData = orderDoc.data();
-          const orderLogPrefix = `[Pedido ${orderId}]`;
+          const productRefsToRead = new Map();
+          const calendarRefsToRead = new Map();
 
-          console.log(`%c${logPrefix} ${orderLogPrefix} Procesando... Cliente: ${orderData.cliente || 'N/A'}, Hora: ${orderData.fechahora}`, 'color: blue;');
+          for (const item of orderData.productos) {
+            const itemIdStr = String(item.id);
+            const itemQuantity = Number(item.cantidad) || 0;
+            if (itemQuantity <= 0) continue;
 
-          if (!Array.isArray(orderData.productos) || orderData.productos.length === 0) {
-              console.warn(`${logPrefix} ${orderLogPrefix} Pedido sin productos. Marcando como procesado.`);
-              try {
-                  await updateDoc(doc(db, "pedidos", orderId), { paraOtroDia: false, procesado: true });
-              } catch (updateError) {
-                  console.error(`${logPrefix} ${orderLogPrefix} Error al marcar pedido vacío como procesado:`, updateError);
+            const config = productProcessingConfig[itemIdStr];
+            let stockIdToUpdate, quantityToDeduct;
+
+            if (config) {
+              stockIdToUpdate = config.stockId;
+              quantityToDeduct = itemQuantity * config.stockMultiplier;
+              if (config.calendarType) {
+                const calendarConfig = productTypesConfig[config.calendarType];
+                const calendarPath = `${calendarConfig.dailyCollection}/${dateString}`;
+                if (!calendarRefsToRead.has(calendarPath)) {
+                  calendarRefsToRead.set(calendarPath, { ref: doc(db, calendarConfig.dailyCollection, dateString), items: [] });
+                }
+                calendarRefsToRead.get(calendarPath).items.push({ quantity: quantityToDeduct, time: orderTimeString, name: calendarConfig.name });
               }
+            } else {
+              stockIdToUpdate = item.id;
+              quantityToDeduct = itemQuantity;
+            }
+
+            if (stockIdToUpdate && quantityToDeduct > 0) {
+              const stockIdStr = String(stockIdToUpdate);
+              if (!productRefsToRead.has(stockIdStr)) {
+                productRefsToRead.set(stockIdStr, { ref: doc(db, "productos", stockIdStr), totalDeduction: 0 });
+              }
+              productRefsToRead.get(stockIdStr).totalDeduction += quantityToDeduct;
+            }
+          }
+
+          // --- FASE 1: LECTURAS ---
+          const productSnapshots = new Map();
+          for (const [id, data] of productRefsToRead.entries()) productSnapshots.set(id, await transaction.get(data.ref));
+          const calendarSnapshots = new Map();
+          for (const [path, data] of calendarRefsToRead.entries()) calendarSnapshots.set(path, await transaction.get(data.ref));
+          console.log(`${txLogPrefix} Lecturas completadas.`);
+
+          // --- FASE 2: CÁLCULOS Y VALIDACIONES ---
+          for (const [id, dataToRead] of productRefsToRead.entries()) {
+            const productSnap = productSnapshots.get(id);
+            if (!productSnap.exists()) {
+              throw new Error(`Producto con ID de stock ${id} no encontrado.`);
+            }
+            const currentStock = productSnap.data().stock;
+
+            if (currentStock < dataToRead.totalDeduction) {
+              const newStock = currentStock - dataToRead.totalDeduction;
+              console.warn(
+                `%c${txLogPrefix} ¡ATENCIÓN! El stock del producto ID ${id} entrará en negativo. Stock actual: ${currentStock}, se restará: ${dataToRead.totalDeduction}, quedará: ${newStock}`,
+                'color: orange; font-weight: bold;'
+              );
+            }
+          }
+
+          const calendarUpdates = new Map();
+          for (const [path, dataToRead] of calendarRefsToRead.entries()) {
+            const calendarSnap = calendarSnapshots.get(path);
+            if (!calendarSnap.exists() || !Array.isArray(calendarSnap.data().intervals)) {
+              console.warn(`${txLogPrefix} ADVERTENCIA: Calendario ${path} no encontrado o con formato incorrecto. Se omitirá su actualización.`);
               continue;
+            }
+
+            let intervalsCopy = JSON.parse(JSON.stringify(calendarSnap.data().intervals));
+            let hasBeenUpdated = false;
+
+            for (const item of dataToRead.items) {
+              const intervalIndex = intervalsCopy.findIndex(interval => interval.start === item.time);
+
+              if (intervalIndex === -1) {
+                console.warn(`${txLogPrefix} ADVERTENCIA: Intervalo ${item.time} no encontrado en ${path}. Se omitirá la actualización para "${item.name}".`);
+                continue;
+              }
+
+              intervalsCopy[intervalIndex].orderedCount = (intervalsCopy[intervalIndex].orderedCount || 0) + item.quantity;
+              hasBeenUpdated = true;
+            }
+
+            if (hasBeenUpdated) {
+              calendarUpdates.set(path, { ref: dataToRead.ref, intervals: intervalsCopy });
+            }
+          }
+          console.log(`${txLogPrefix} Cálculos y validaciones completadas.`);
+
+          // --- FASE 3: ESCRITURAS ---
+          for (const [id, data] of productRefsToRead.entries()) {
+            transaction.update(data.ref, { stock: increment(-data.totalDeduction) });
+          }
+          for (const [path, updateData] of calendarUpdates.entries()) {
+            transaction.update(updateData.ref, { intervals: updateData.intervals });
           }
 
-          const orderTimeString = orderData.fechahora?.split(' ')[1];
-          if (!orderTimeString || !/^\d{2}:\d{2}$/.test(orderTimeString)) {
-              console.error(`${logPrefix} ${orderLogPrefix} Error: Hora inválida (${orderData.fechahora}). Saltando pedido.`);
-              continue;
-          }
+          const orderRefToUpdate = doc(db, "pedidos", orderId);
+          transaction.update(orderRefToUpdate, { paraOtroDia: false, procesado: true });
 
-          try {
-              await runTransaction(db, async (transaction) => {
-                  const txLogPrefix = `${logPrefix} ${orderLogPrefix} [TX]`;
-                  console.log(`${txLogPrefix} Iniciando transacción.`);
+          console.log(`${txLogPrefix} Escrituras programadas.`);
+        });
 
-                  const productRefsToRead = new Map();
-                  const calendarRefsToRead = new Map();
+        console.log(`%c${logPrefix} ${orderLogPrefix} Transacción completada con éxito.`, 'color: green;');
 
-                  for (const item of orderData.productos) {
-                      const itemIdStr = String(item.id);
-                      const itemQuantity = Number(item.cantidad) || 0;
-                      if (itemQuantity <= 0) continue;
-
-                      const config = productProcessingConfig[itemIdStr];
-                      let stockIdToUpdate, quantityToDeduct;
-
-                      if (config) {
-                          stockIdToUpdate = config.stockId;
-                          quantityToDeduct = itemQuantity * config.stockMultiplier;
-                          if (config.calendarType) {
-                              const calendarConfig = productTypesConfig[config.calendarType];
-                              const calendarPath = `${calendarConfig.dailyCollection}/${dateString}`;
-                              if (!calendarRefsToRead.has(calendarPath)) {
-                                  calendarRefsToRead.set(calendarPath, { ref: doc(db, calendarConfig.dailyCollection, dateString), items: [] });
-                              }
-                              calendarRefsToRead.get(calendarPath).items.push({ quantity: quantityToDeduct, time: orderTimeString, name: calendarConfig.name });
-                          }
-                      } else {
-                          stockIdToUpdate = item.id;
-                          quantityToDeduct = itemQuantity;
-                      }
-
-                      if (stockIdToUpdate && quantityToDeduct > 0) {
-                          const stockIdStr = String(stockIdToUpdate);
-                          if (!productRefsToRead.has(stockIdStr)) {
-                              productRefsToRead.set(stockIdStr, { ref: doc(db, "productos", stockIdStr), totalDeduction: 0 });
-                          }
-                          productRefsToRead.get(stockIdStr).totalDeduction += quantityToDeduct;
-                      }
-                  }
-
-                  // --- FASE 1: LECTURAS ---
-                  const productSnapshots = new Map();
-                  for (const [id, data] of productRefsToRead.entries()) productSnapshots.set(id, await transaction.get(data.ref));
-                  const calendarSnapshots = new Map();
-                  for (const [path, data] of calendarRefsToRead.entries()) calendarSnapshots.set(path, await transaction.get(data.ref));
-                  console.log(`${txLogPrefix} Lecturas completadas.`);
-
-                  // --- FASE 2: CÁLCULOS Y VALIDACIONES ---
-                  for (const [id, dataToRead] of productRefsToRead.entries()) {
-                      const productSnap = productSnapshots.get(id);
-                      if (!productSnap.exists()) {
-                          throw new Error(`Producto con ID de stock ${id} no encontrado.`);
-                      }
-                      const currentStock = productSnap.data().stock;
-
-                      if (currentStock < dataToRead.totalDeduction) {
-                          const newStock = currentStock - dataToRead.totalDeduction;
-                          console.warn(
-                              `%c${txLogPrefix} ¡ATENCIÓN! El stock del producto ID ${id} entrará en negativo. Stock actual: ${currentStock}, se restará: ${dataToRead.totalDeduction}, quedará: ${newStock}`,
-                              'color: orange; font-weight: bold;'
-                          );
-                      }
-                  }
-                  
-                  const calendarUpdates = new Map();
-                  for (const [path, dataToRead] of calendarRefsToRead.entries()) {
-                      const calendarSnap = calendarSnapshots.get(path);
-                      if (!calendarSnap.exists() || !Array.isArray(calendarSnap.data().intervals)) {
-                          console.warn(`${txLogPrefix} ADVERTENCIA: Calendario ${path} no encontrado o con formato incorrecto. Se omitirá su actualización.`);
-                          continue;
-                      }
-                      
-                      let intervalsCopy = JSON.parse(JSON.stringify(calendarSnap.data().intervals));
-                      let hasBeenUpdated = false;
-
-                      for (const item of dataToRead.items) {
-                          const intervalIndex = intervalsCopy.findIndex(interval => interval.start === item.time);
-                          
-                          if (intervalIndex === -1) {
-                              console.warn(`${txLogPrefix} ADVERTENCIA: Intervalo ${item.time} no encontrado en ${path}. Se omitirá la actualización para "${item.name}".`);
-                              continue;
-                          }
-                          
-                          intervalsCopy[intervalIndex].orderedCount = (intervalsCopy[intervalIndex].orderedCount || 0) + item.quantity;
-                          hasBeenUpdated = true;
-                      }
-
-                      if (hasBeenUpdated) {
-                         calendarUpdates.set(path, { ref: dataToRead.ref, intervals: intervalsCopy });
-                      }
-                  }
-                  console.log(`${txLogPrefix} Cálculos y validaciones completadas.`);
-                  
-                  // --- FASE 3: ESCRITURAS ---
-                  for (const [id, data] of productRefsToRead.entries()) {
-                      transaction.update(data.ref, { stock: increment(-data.totalDeduction) });
-                  }
-                  for (const [path, updateData] of calendarUpdates.entries()) {
-                      transaction.update(updateData.ref, { intervals: updateData.intervals });
-                  }
-                  
-                  const orderRefToUpdate = doc(db, "pedidos", orderId);
-                  transaction.update(orderRefToUpdate, { paraOtroDia: false, procesado: true });
-                  
-                  console.log(`${txLogPrefix} Escrituras programadas.`);
-              });
-
-              console.log(`%c${logPrefix} ${orderLogPrefix} Transacción completada con éxito.`, 'color: green;');
-
-          } catch (error) {
-              console.error(`${logPrefix} ${orderLogPrefix} ¡ERROR FATAL EN TRANSACCIÓN! El pedido NO fue procesado. Causa:`, error.message);
-          }
+      } catch (error) {
+        console.error(`${logPrefix} ${orderLogPrefix} ¡ERROR FATAL EN TRANSACCIÓN! El pedido NO fue procesado. Causa:`, error.message);
       }
+    }
 
-      console.log(`%c${logPrefix} Proceso de pedidos futuros de hoy finalizado.`, 'color: purple; font-weight: bold;');
+    console.log(`%c${logPrefix} Proceso de pedidos futuros de hoy finalizado.`, 'color: purple; font-weight: bold;');
 
   } catch (error) {
-      console.error(`${logPrefix} Error al obtener los pedidos futuros para hoy:`, error);
+    console.error(`${logPrefix} Error al obtener los pedidos futuros para hoy:`, error);
   }
 };
 
@@ -508,8 +508,8 @@ export const initDailyCalendars = async () => {
       console.log(`[${dateString}] Detectado como: ${dayType} (ID: ${dayId}).`);
 
       if (!dayId) {
-          console.error(`[${dateString}] ¡Error Crítico! No se pudo determinar el ID del día. Saltando generación para esta fecha.`);
-          continue; // Skip to the next day in the loop
+        console.error(`[${dateString}] ¡Error Crítico! No se pudo determinar el ID del día. Saltando generación para esta fecha.`);
+        continue; // Skip to the next day in the loop
       }
 
       const dayDocRef = doc(db, 'calendar', dayId);
@@ -543,11 +543,12 @@ export const initDailyCalendars = async () => {
     } // End of loop for 7 days
 
     // --- PASO 3: Procesar pedidos futuros que son para HOY ---
-    // This will now only run once if the calling useEffect is correctly implemented
-    // It uses the *actual current date*, not the date from the loop.
+    // COMENTADO: El stock ahora se resta al momento del pedido, no hace falta procesarlo aquí.
+    /*
     const actualCurrentDateString = today.format('YYYY-MM-DD');
     console.log(`%c[${new Date().toISOString()}] Iniciando procesamiento de pedidos futuros para HOY (${actualCurrentDateString})...`, 'color: magenta; font-weight: bold;');
     await processTodaysFutureOrders(actualCurrentDateString);
+    */
 
     console.log(`%c[${new Date().toISOString()}] Proceso initDailyCalendars completado (7 días verificados, pedidos de hoy procesados).`, 'color: green; font-weight: bold;');
 
