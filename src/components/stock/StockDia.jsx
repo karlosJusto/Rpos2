@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { db } from "../firebase/firebase"; 
-import { collection, getDocs } from "firebase/firestore";
+import { db } from "../firebase/firebase";
+import { collection, getDocs, query, orderBy, limit } from "firebase/firestore";
 import dayjs from 'dayjs';
-import timezone from 'dayjs/plugin/timezone'; 
-import utc from 'dayjs/plugin/utc'; 
+import timezone from 'dayjs/plugin/timezone';
+import utc from 'dayjs/plugin/utc';
 
 dayjs.extend(utc);
 dayjs.extend(timezone);
@@ -20,15 +20,17 @@ const StockDia = () => {
 
       try {
         const pedidosRef = collection(db, 'pedidos');
-        const querySnapshot = await getDocs(pedidosRef);
+        // OPTIMIZACIÓN: Traer solo los últimos 1500 pedidos para evitar cargar toda la colección
+        const q = query(pedidosRef, orderBy("NumeroPedido", "desc"), limit(1500));
+        const querySnapshot = await getDocs(q);
 
         const pedidosDelDia = [];
         querySnapshot.forEach((doc) => {
           const pedido = doc.data();
           if (pedido.productos) {
-            const fechaRecogida = dayjs(pedido.fechahora, 'DD/MM/YYYY HH:mm'); 
-            const fechaHoy = dayjs().tz('Europe/Madrid').startOf('day'); 
-            const fechaFinal = dayjs().tz('Europe/Madrid').endOf('day'); 
+            const fechaRecogida = dayjs(pedido.fechahora, 'DD/MM/YYYY HH:mm');
+            const fechaHoy = dayjs().tz('Europe/Madrid').startOf('day');
+            const fechaFinal = dayjs().tz('Europe/Madrid').endOf('day');
 
             if (!fechaRecogida.isValid()) {
               return;
@@ -71,7 +73,7 @@ const StockDia = () => {
 
     // Buscamos si el producto ya fue agregado a la lista de esa categoría.
     const index = acc[producto.categoria].findIndex(p => p.id === producto.id);
-    
+
     if (index > -1) {
       // Si ya existe, actualizamos las cantidades según el origen.
       if (producto.origen === 1) { // Online
@@ -100,21 +102,21 @@ const StockDia = () => {
   // CAMBIO: La función ahora calcula totales para tienda, online y general.
   const calcularTotalesPollo = (productos) => {
     const getQty = (id, tipo) => {
-        const p = productos.find(prod => prod.id === id);
-        if (!p) return 0;
-        return tipo === 'tienda' ? p.cantidadTienda : p.cantidadOnline;
+      const p = productos.find(prod => prod.id === id);
+      if (!p) return 0;
+      return tipo === 'tienda' ? p.cantidadTienda : p.cantidadOnline;
     };
 
-    const totalTienda = 
-        getQty(1, 'tienda') + (getQty(2, 'tienda') * 0.5) + (getQty(39, 'tienda') * 0.5) + (getQty(40, 'tienda') * 0.5);
+    const totalTienda =
+      getQty(1, 'tienda') + (getQty(2, 'tienda') * 0.5) + (getQty(39, 'tienda') * 0.5) + (getQty(40, 'tienda') * 0.5);
 
-    const totalOnline = 
-        getQty(1, 'online') + (getQty(2, 'online') * 0.5) + (getQty(39, 'online') * 0.5) + (getQty(40, 'online') * 0.5);
+    const totalOnline =
+      getQty(1, 'online') + (getQty(2, 'online') * 0.5) + (getQty(39, 'online') * 0.5) + (getQty(40, 'online') * 0.5);
 
     return {
-        tienda: totalTienda.toFixed(1),
-        online: totalOnline.toFixed(1),
-        general: (totalTienda + totalOnline).toFixed(1)
+      tienda: totalTienda.toFixed(1),
+      online: totalOnline.toFixed(1),
+      general: (totalTienda + totalOnline).toFixed(1)
     };
   };
 
@@ -134,7 +136,7 @@ const StockDia = () => {
             categoriasOrdenadas.map(([categoria, productos]) => {
               // CAMBIO: Se llama a la función aquí para tener los totales listos.
               const totalesPollo = categoria.toLowerCase() === 'comida' ? calcularTotalesPollo(productos) : null;
-              
+
               return (
                 <div key={categoria} className="bg-white rounded-md shadow-lg p-4 w-full sm:w-1/2 md:w-1/3 lg:w-1/4 xl:w-1/5 min-w-[250px]">
                   <h2 className="text-lg font-extrabold text-yellow-500 mb-2 text-center">{categoria.toUpperCase()}</h2>
@@ -163,25 +165,25 @@ const StockDia = () => {
                     {categoria.toLowerCase() === 'comida' && (
                       <tfoot className="border-t-2 mt-2">
                         <tr>
-                            <td className="font-bold text-left pt-2" colSpan="4">TOTAL POLLOS</td>
+                          <td className="font-bold text-left pt-2" colSpan="4">TOTAL POLLOS</td>
                         </tr>
                         <tr>
-                            <td className="text-left pl-2">Tienda</td>
-                            <td className="font-extrabold text-center">{totalesPollo.tienda}</td>
-                            <td></td>
-                            <td></td>
+                          <td className="text-left pl-2">Tienda</td>
+                          <td className="font-extrabold text-center">{totalesPollo.tienda}</td>
+                          <td></td>
+                          <td></td>
                         </tr>
-                         <tr>
-                            <td className="text-left pl-2">Online</td>
-                            <td className="font-extrabold text-center">{totalesPollo.online}</td>
-                            <td></td>
-                            <td></td>
+                        <tr>
+                          <td className="text-left pl-2">Online</td>
+                          <td className="font-extrabold text-center">{totalesPollo.online}</td>
+                          <td></td>
+                          <td></td>
                         </tr>
-                         <tr className='border-t'>
-                            <td className="text-left font-bold pt-1">General</td>
-                            <td></td>
-                            <td></td>
-                            <td className="font-extrabold text-right pt-1">{totalesPollo.general}</td>
+                        <tr className='border-t'>
+                          <td className="text-left font-bold pt-1">General</td>
+                          <td></td>
+                          <td></td>
+                          <td className="font-extrabold text-right pt-1">{totalesPollo.general}</td>
                         </tr>
                       </tfoot>
                     )}

@@ -1,4 +1,3 @@
-// ChickenOrderContext.jsx
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import {
   collection,
@@ -10,7 +9,6 @@ import {
 } from 'firebase/firestore';
 import { db } from '../firebase/firebase';
 
-// Creamos el contexto
 const ChickenOrderContext = createContext();
 
 export const ChickenOrderProvider = ({ children }) => {
@@ -18,18 +16,15 @@ export const ChickenOrderProvider = ({ children }) => {
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState('');
 
-  // Fecha de hoy en formato YYYY-MM-DD y nombre del día en español
   const today = new Date();
   const dayString = today.toISOString().split('T')[0];
   const dayName = getDayName(today);
 
-  // Al montar, se intenta crear (o leer) el documento diario
   useEffect(() => {
     createDailyCalendar();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Crea el documento diario en "chicken_calendar_daily" si aún no existe
   const createDailyCalendar = async () => {
     console.log("AAAA?")
     const docRef = doc(db, 'chicken_calendar_daily', dayString);
@@ -39,7 +34,6 @@ export const ChickenOrderProvider = ({ children }) => {
       setLoading(false);
       return;
     }
-    // Si no existe, buscamos la configuración en la colección "calendar"
     const calendarQuerySnapshot = await getDocs(collection(db, 'calendar'));
     let config = null;
     calendarQuerySnapshot.forEach((doc) => {
@@ -53,7 +47,6 @@ export const ChickenOrderProvider = ({ children }) => {
       setLoading(false);
       return;
     }
-    // Generamos los intervalos para los turnos activos (ej. mañana y tarde)
     let intervals = [];
     if (config.morningSchedule && config.morningSchedule.active) {
       const morningIntervals = generateIntervals(
@@ -81,7 +74,6 @@ export const ChickenOrderProvider = ({ children }) => {
     setLoading(false);
   };
 
-  // UTILIDADES
   const normalizeTime = (timeStr) => {
     if (!timeStr) return '';
     return timeStr.includes(':') ? timeStr : `${timeStr.padStart(2, '0')}:00`;
@@ -118,7 +110,6 @@ export const ChickenOrderProvider = ({ children }) => {
     return slots;
   };
 
-  // Función para realizar un pedido en un intervalo concreto (por índice)
   const placeChickenOrder = async (intervalIndex, orderQuantity) => {
     const docRef = doc(db, 'chicken_calendar_daily', dayString);
     try {
@@ -131,15 +122,12 @@ export const ChickenOrderProvider = ({ children }) => {
         const intervals = data.intervals;
         const interval = intervals[intervalIndex];
         let newOrderedCount = interval.orderedCount;
-        // Si aún no se ha alcanzado el límite, se suma el pedido
         if (newOrderedCount < interval.maxAllowed) {
           newOrderedCount += orderQuantity;
           if (newOrderedCount > interval.maxAllowed) {
-            // Si se excede, se permite solo 1 adicional
             newOrderedCount = interval.maxAllowed + 1;
           }
         } else {
-          // Si ya se alcanzó el límite, solo se permite un pedido adicional de 1
           if (interval.orderedCount === interval.maxAllowed && orderQuantity === 1) {
             newOrderedCount += 1;
           } else {
@@ -149,7 +137,6 @@ export const ChickenOrderProvider = ({ children }) => {
         intervals[intervalIndex].orderedCount = newOrderedCount;
         transaction.update(docRef, { intervals });
       });
-      // Refrescamos el dailyCalendar después del pedido
       const updatedDoc = await getDoc(docRef);
       setDailyCalendar(updatedDoc.data());
       return { success: true, message: 'Pedido realizado correctamente.' };
@@ -158,12 +145,10 @@ export const ChickenOrderProvider = ({ children }) => {
     }
   };
 
-  // Función para consultar si se permite pedir en un intervalo (retorna true/false)
   const canOrderChicken = (intervalIndex) => {
     if (!dailyCalendar) return false;
     const interval = dailyCalendar.intervals[intervalIndex];
     if (!interval) return false;
-    // Se permite el pedido si aún no se supera el máximo, o si ya está justo en el límite (para agregar 1)
     return interval.orderedCount < interval.maxAllowed || (interval.orderedCount === interval.maxAllowed);
   };
 

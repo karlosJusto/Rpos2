@@ -1,19 +1,14 @@
-import React, { useEffect, useRef } from 'react'; // <-- Import useRef
-import { BrowserRouter, Routes, Route, useLocation } from "react-router-dom"; // Import useLocation
+import React, { useEffect, useRef } from 'react'; 
+import { BrowserRouter, Routes, Route, useLocation } from "react-router-dom"; 
 import Home from "./components/home/Home";
 import Login from "./components/login/Login";
 import LoginJefe from "./components/login/LoginJefe";
 import Terminos from "./components/Terminos";
 import DeleteAccount from "./components/DeleteAccount";
 
-// LGOrdenes no se usa en las rutas, quizá sea un componente interno o un error?
-// import LGOrdenes from "./components/ordenes/LGOrdenes";
 import LGFreidora from "./components/freidora/LGFreidora";
-// LGBuscadorPedidos se importa dos veces, eliminamos una
 import LGBuscadorPedidos from "./components/buscadorPedidos/LGBuscadorPedidos";
 import Dashboard from "./components/dashboard/Dashboard";
-// Scanner no se usa directamente en las rutas, quizá LGScanner sí?
-// import Scanner from "./components/scanner/Scanner";
 import Layout from "./components/pedidos/Layout";
 
 import DataProvider from "./components/Context/DataContext";
@@ -22,13 +17,8 @@ import LGStock from "./components/stock/LGStock";
 import LGScanner from "./components/scanner/LGScanner";
 import CrearProductos from "./components/dashboard/CrearProductos";
 import ListarClientes from "./components/dashboard/ListarClientes";
-import Ordenes from "./components/ordenes/Ordenes"; // <-- Usado en ruta /ordenes
+import Ordenes from "./components/ordenes/Ordenes";
 import Listaproductos from "./components/dashboard/ListaProductos";
-
-// CalendarioPollos no se usa directamente, quizá AdminCalendarioPage sí?
-// import CalendarioPollos from "./components/dashboard/Calendario/CalendarioPollos";
-// CalendarTabs no se usa directamente
-// import CalendarTabs from "./components/dashboard/Calendario/CalendarioTabs";
 
 
 import CrudEmpleados from "./components/dashboard/CrearEmpleado";
@@ -46,26 +36,18 @@ import VistaDeResultados from './components/dashboard/dashComponents/VistaDeResu
 
 
 
-// --- 1. IMPORTA EL NUEVO COMPONENTE LISTENER ---
-// Ajusta la ruta según donde hayas creado el archivo GlobalOrderListener.jsx
 import GlobalOrderListener from './components/Context/GlobalOrderListener';
 import SonidoOnChange from "./components/ordenes/SonidoOnChange.jsx";
 import OperativaTienda from './components/dashboard/dashComponents/OperativaTienda.jsx';
-// HeaderFinal no se usa directamente en las rutas, ¿es un componente interno?
-// import HeaderFinal from "./components/cocina/components/HeaderFinal.jsx";
 
 function App() {
-  // Log cuando la función del componente App se ejecuta (es decir, cada vez que se renderiza)
   console.log("App.jsx: La función del componente App se está ejecutando (render).");
 
-  // Usamos un componente interno para acceder a useLocation, ya que App está fuera de BrowserRouter
   const AppContent = () => {
     const location = useLocation();
     const rutaActual = location.pathname;
 
-    // Determinar si se debe renderizar SonidoOnChange
     const mostrarSonidoGlobal = !['/cocina', '/freidora'].includes(rutaActual);
-    console.log(`App.jsx: Ruta actual: ${rutaActual}, ¿Mostrar sonido global?: ${mostrarSonidoGlobal}`);
 
     return (
       <>
@@ -92,12 +74,9 @@ function App() {
             <Route path="/scanner" element={<LGScanner />} />
 
             {/* --- Rutas del Dashboard Anidadas --- */}
-            <Route path="/dashboard" element={<Dashboard />}> {/* El Layout del Dashboard */}
-              {/* Ruta Index: Muestra el contenido principal por defecto */}
+            <Route path="/dashboard" element={<Dashboard />}> 
               <Route index element={<DashboardHomeContent />} />
-              {/* Sub-ruta para Empleados */}
               <Route path="empleados" element={<Empleados />} />
-              {/* Otras sub-rutas del dashboard */}
               <Route path="listaProductos" element={<Listaproductos />} />
               <Route path="crearProductos" element={<CrearProductos />} />
               <Route path="listarClientes" element={<ListarClientes />} />
@@ -106,13 +85,8 @@ function App() {
               <Route path="operativaTienda" element={<OperativaTienda />} />
               <Route path="resultados" element={<VistaDeResultados />} />
 
-              {/* Nota: La ruta para crear empleado ya está manejada por el modal dentro de Empleados.jsx, no necesita ruta propia aquí */}
-              {/* <Route path="crearempleado" element={<CrudEmpleados />} /> */}
             </Route>
           </Route>
-
-          {/* Ruta para página no encontrada (opcional) */}
-          {/* <Route path="*" element={<NotFound />} /> */}
 
         </Routes>
       </>
@@ -120,36 +94,24 @@ function App() {
   };
 
   const initEffectRan = useRef(false);
-  // useEffect for initializing calendars, preventing StrictMode double run
   useEffect(() => {
-    console.log("App.jsx: useEffect[initDailyCalendars] - INICIO DEL EFECTO / MONTAJE.");
-
-    // Check if we are in development and if the effect has already run once
     if (import.meta.env.MODE === 'development' && initEffectRan.current) {
-       console.log("App.jsx: useEffect[initDailyCalendars] - Re-ejecución por StrictMode detectada, omitiendo lógica de initDailyCalendars.");
-       return; // Skip the second run in development Strict Mode
+       return; 
     }
 
-    // Run the initialization logic
-    console.log("App.jsx: useEffect[initDailyCalendars] - Ejecutando initDailyCalendars...");
     initDailyCalendars();
 
-    // Mark that the effect's core logic has run
     initEffectRan.current = true;
 
     return () => {
-      console.log("App.jsx: useEffect[initDailyCalendars] - LIMPIEZA DEL EFECTO / DESMONTAJE.");
-      // No specific cleanup needed for initDailyCalendars itself,
-      // but we keep the structure. We don't reset the ref here
-      // for a one-time initialization.
+      console.log("App.jsx: useEffect[initDailyCalendars]");
     };
-  }, []); // Empty dependency array ensures it runs only on initial mount
+  }, []); 
 
   return (
-    // DataProvider envuelve todo
     <DataProvider>
       <BrowserRouter>
-        <AppContent /> {/* Renderiza el contenido que depende de la ubicación */}
+        <AppContent /> {}
       </BrowserRouter>
   </DataProvider>
   );

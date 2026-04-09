@@ -232,7 +232,7 @@ const Stock = () => {
 
   // AHORA MOSTRAMOS TODOS LOS PRODUCTOS, sin el filtro del producto 20
   const productosFiltrados = data.filter((producto) =>
-    producto.name.toLowerCase().includes(search.toLowerCase()) && ![2, 39, 40, 48].includes(producto.id_product)
+    producto.name.toLowerCase().includes(search.toLowerCase()) && ![1, 2, 39, 40, 48].includes(producto.id_product)
   );
 
   const productosPorCategoria = productosFiltrados.reduce((acc, producto) => {
