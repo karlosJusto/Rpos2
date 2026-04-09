@@ -39,7 +39,7 @@ const Layout = () => {
   const [refreshTrigger, setRefreshTrigger] = useState(0);
 
   const today = new Date();
-  
+
   // ==================================================================
   // ========= INICIO DE LA CORRECCIÓN APLICADA =======================
   // ==================================================================
@@ -59,7 +59,7 @@ const Layout = () => {
         console.log("Layout (Context): Detectado orderBeingEdited CON productos. Procesando para carrito:", orderBeingEdited.productos);
         const unifiedProducts = orderBeingEdited.productos.map((orderProduct, index) => {
           const fullProductData = data.find(p =>
-              p.id_product === orderProduct.id || p.id === orderProduct.id
+            p.id_product === orderProduct.id || p.id === orderProduct.id
           );
           if (!fullProductData) {
             console.warn(`Layout (Context): No se encontraron datos completos para el producto ID ${orderProduct.id} del pedido ${orderBeingEdited.NumeroPedido || 'nuevo'}. Usando datos del pedido.`);
@@ -163,7 +163,7 @@ const Layout = () => {
         "12:00": 0, "12:15": 0, "12:30": 0, "12:45": 0,
         "13:00": 0, "13:15": 0, "13:30": 0, "13:45": 0,
         "14:00": 0, "14:15": 0, "14:30": 0, "14:45": 0,
-        "15:00": 0, "15:15": 0, "15:30": 0, 
+        "15:00": 0, "15:15": 0, "15:30": 0, "15:45": 0,
         "19:00": 0, "19:15": 0, "19:30": 0, "19:45": 0,
         "20:00": 0, "20:15": 0, "20:30": 0, "20:45": 0,
         "21:00": 0, "21:30": 0, "21:45": 0, "22:00": 0,
@@ -185,15 +185,15 @@ const Layout = () => {
             }
 
             if (cantidadAfectada > 0) {
-               pollosHoy += cantidadAfectada;
-               if (horaPedido && pollosPorFranjaEspecifica.hasOwnProperty(horaPedido)) {
-                  pollosPorFranjaEspecifica[horaPedido] += cantidadAfectada;
-               }
+              pollosHoy += cantidadAfectada;
+              if (horaPedido && pollosPorFranjaEspecifica.hasOwnProperty(horaPedido)) {
+                pollosPorFranjaEspecifica[horaPedido] += cantidadAfectada;
+              }
             }
           });
         }
       });
-      
+
       setTotalPollosPedidosHoy(pollosHoy);
       setCalculatedSlotCounts(pollosPorFranjaEspecifica);
 
@@ -210,54 +210,54 @@ const Layout = () => {
   // --- Effect for correcting calendar data based on calculatedSlotCounts ---
   useEffect(() => {
     if (updateCalendarTimeoutRef.current) {
-        clearTimeout(updateCalendarTimeoutRef.current);
+      clearTimeout(updateCalendarTimeoutRef.current);
     }
-    
+
     // La fecha del calendario se genera con formato YYYY-MM-DD
     const calendarDate = today.toISOString().split("T")[0];
 
     if (
-        calendarData &&
-        calendarData.intervals &&
-        Array.isArray(calendarData.intervals) &&
-        Object.keys(calculatedSlotCounts).length > 0
+      calendarData &&
+      calendarData.intervals &&
+      Array.isArray(calendarData.intervals) &&
+      Object.keys(calculatedSlotCounts).length > 0
     ) {
-        const calendarDocRef = doc(db, "chicken_calendar_daily", calendarDate);
-        let intervalsWereUpdated = false;
-        const newIntervalsArray = JSON.parse(JSON.stringify(calendarData.intervals));
+      const calendarDocRef = doc(db, "chicken_calendar_daily", calendarDate);
+      let intervalsWereUpdated = false;
+      const newIntervalsArray = JSON.parse(JSON.stringify(calendarData.intervals));
 
-        newIntervalsArray.forEach(intervalInCalendar => {
-            const horaFranja = intervalInCalendar.start;
-            const conteoCalculadoDesdePedidos = calculatedSlotCounts[horaFranja];
+      newIntervalsArray.forEach(intervalInCalendar => {
+        const horaFranja = intervalInCalendar.start;
+        const conteoCalculadoDesdePedidos = calculatedSlotCounts[horaFranja];
 
-            if (conteoCalculadoDesdePedidos !== undefined) {
-                const currentOrderedCountInCalendar = Number(intervalInCalendar.orderedCount) || 0;
-                const conteoPedidosNumerico = Number(conteoCalculadoDesdePedidos);
+        if (conteoCalculadoDesdePedidos !== undefined) {
+          const currentOrderedCountInCalendar = Number(intervalInCalendar.orderedCount) || 0;
+          const conteoPedidosNumerico = Number(conteoCalculadoDesdePedidos);
 
-                if (currentOrderedCountInCalendar !== conteoPedidosNumerico) {
-                    console.warn(`Layout (Corrección Calendario): Discrepancia para ${horaFranja}. Calendario: ${currentOrderedCountInCalendar}, Pedidos (Calculado): ${conteoPedidosNumerico}. SOBREESCRIBIENDO CALENDARIO.`);
-                    intervalInCalendar.orderedCount = conteoPedidosNumerico;
-                    intervalsWereUpdated = true;
-                }
-            }
-        });
-
-        if (intervalsWereUpdated) {
-            console.log(`Layout (Corrección Calendario): Discrepancia(s) detectada(s). Programando actualización para chicken_calendar_daily/${calendarDate} en 3 segundos.`);
-            updateCalendarTimeoutRef.current = setTimeout(() => {
-                updateDoc(calendarDocRef, { intervals: newIntervalsArray })
-                    .then(() => {
-                        console.log(`Layout (Corrección Calendario TIMEOUT EJECUTADO): Documento chicken_calendar_daily/${calendarDate} actualizado con éxito.`);
-                    })
-                    .catch(error => console.error(`Layout (Corrección Calendario TIMEOUT EJECUTADO): Error al actualizar chicken_calendar_daily/${calendarDate}:`, error));
-            }, 3000);
+          if (currentOrderedCountInCalendar !== conteoPedidosNumerico) {
+            console.warn(`Layout (Corrección Calendario): Discrepancia para ${horaFranja}. Calendario: ${currentOrderedCountInCalendar}, Pedidos (Calculado): ${conteoPedidosNumerico}. SOBREESCRIBIENDO CALENDARIO.`);
+            intervalInCalendar.orderedCount = conteoPedidosNumerico;
+            intervalsWereUpdated = true;
+          }
         }
+      });
+
+      if (intervalsWereUpdated) {
+        console.log(`Layout (Corrección Calendario): Discrepancia(s) detectada(s). Programando actualización para chicken_calendar_daily/${calendarDate} en 3 segundos.`);
+        updateCalendarTimeoutRef.current = setTimeout(() => {
+          updateDoc(calendarDocRef, { intervals: newIntervalsArray })
+            .then(() => {
+              console.log(`Layout (Corrección Calendario TIMEOUT EJECUTADO): Documento chicken_calendar_daily/${calendarDate} actualizado con éxito.`);
+            })
+            .catch(error => console.error(`Layout (Corrección Calendario TIMEOUT EJECUTADO): Error al actualizar chicken_calendar_daily/${calendarDate}:`, error));
+        }, 3000);
+      }
     }
 
     return () => {
-        if (updateCalendarTimeoutRef.current) {
-            clearTimeout(updateCalendarTimeoutRef.current);
-        }
+      if (updateCalendarTimeoutRef.current) {
+        clearTimeout(updateCalendarTimeoutRef.current);
+      }
     };
   }, [calendarData, calculatedSlotCounts]);
 
@@ -266,7 +266,7 @@ const Layout = () => {
     calendarData?.intervals?.filter((interval) => interval.start < "18:00") || [];
   const afternoonIntervals =
     calendarData?.intervals?.filter((interval) => interval.start >= "18:00") || [];
-  
+
   const currentHour = today.getHours();
   const isMorning = currentHour < 18;
 
@@ -288,69 +288,69 @@ const Layout = () => {
         </div>
 
         <div className="w-[70%] flex flex-col">
-              <div className="h-[9%] flex-shrink-0">
-                <Navbar />
-              </div>
-              <div className="h-[9%] flex-shrink-0">
-                <Tabs />
-              </div>
-              <div className="p-[1.5vw] pl-[3vw] h-[58%] max-h-[75%] grid grid-cols-5 overflow-y-auto gap-4">
-                <Card />
-              </div>
-               <div className="w-[90%] pt-[1vh] ms-[3.8vw] border-white rounded p-4 bg-white ">
-                <div className="flex justify-end items-center mb-2">
+          <div className="h-[9%] flex-shrink-0">
+            <Navbar />
+          </div>
+          <div className="h-[9%] flex-shrink-0">
+            <Tabs />
+          </div>
+          <div className="p-[1.5vw] pl-[3vw] h-[58%] max-h-[75%] grid grid-cols-5 overflow-y-auto gap-4">
+            <Card />
+          </div>
+          <div className="w-[90%] pt-[1vh] ms-[3.8vw] border-white rounded p-4 bg-white ">
+            <div className="flex justify-end items-center mb-2">
 
-                </div>
-                {loadingCalendar ? (
-                  <p>Cargando horarios...</p>
-                ) : errorCalendar ? (
-                  <p className="text-red-500">{errorCalendar}</p>
-                ) : calendarData && (morningIntervals.length > 0 || afternoonIntervals.length > 0) ? (
-                  <Swiper
-                    slidesPerView={1}
-                    spaceBetween={20}
-                    mousewheel={true}
-                    className="w-full"
-                  >
-                    <SwiperSlide>
-                      <div className="flex flex-wrap gap-2">
-                        {(isMorning ? morningIntervals : afternoonIntervals).map((interval, index) => {
-                            let displayCount = Number(interval.orderedCount) || 0;
-                            // Se prioriza el conteo calculado en tiempo real si existe
-                            if (
-                              calculatedSlotCounts.hasOwnProperty(interval.start)
-                            ) {
-                              displayCount = calculatedSlotCounts[interval.start];
-                            }
+            </div>
+            {loadingCalendar ? (
+              <p>Cargando horarios...</p>
+            ) : errorCalendar ? (
+              <p className="text-red-500">{errorCalendar}</p>
+            ) : calendarData && (morningIntervals.length > 0 || afternoonIntervals.length > 0) ? (
+              <Swiper
+                slidesPerView={1}
+                spaceBetween={20}
+                mousewheel={true}
+                className="w-full"
+              >
+                <SwiperSlide>
+                  <div className="flex flex-wrap gap-2">
+                    {(isMorning ? morningIntervals : afternoonIntervals).map((interval, index) => {
+                      let displayCount = Number(interval.orderedCount) || 0;
+                      // Se prioriza el conteo calculado en tiempo real si existe
+                      if (
+                        calculatedSlotCounts.hasOwnProperty(interval.start)
+                      ) {
+                        displayCount = calculatedSlotCounts[interval.start];
+                      }
 
-                            return (
-                              <button
-                                key={`${interval.start}-${index}-${displayCount}`}
-                                className={`px-2 py-1 ms-4 border rounded whitespace-nowrap font-nunito transition-colors duration-150
+                      return (
+                        <button
+                          key={`${interval.start}-${index}-${displayCount}`}
+                          className={`px-2 py-1 ms-4 border rounded whitespace-nowrap font-nunito transition-colors duration-150
                                   ${selectedSlotTime === interval.start ? 'bg-yellow-400 border-yellow-600 ring-2 ring-yellow-300' : 'hover:bg-gray-200'}`}
-                                onClick={() => setSelectedSlotTime(interval.start)}
-                              >
-                                {interval.start} [
-                                <span
-                                  className={
-                                    displayCount >= interval.maxAllowed
-                                      ? "text-red-500 font-extrabold"
-                                      : "text-green-700 font-extrabold"
-                                  }
-                                >
-                                  {displayCount}
-                                </span>
-                                ]
-                              </button>
-                            );
-                          })}
-                      </div>
-                    </SwiperSlide>
-                  </Swiper>
-                ) : (
-                  <p>No hay horarios disponibles para mostrar.</p>
-                )}
-              </div>
+                          onClick={() => setSelectedSlotTime(interval.start)}
+                        >
+                          {interval.start} [
+                          <span
+                            className={
+                              displayCount >= interval.maxAllowed
+                                ? "text-red-500 font-extrabold"
+                                : "text-green-700 font-extrabold"
+                            }
+                          >
+                            {displayCount}
+                          </span>
+                          ]
+                        </button>
+                      );
+                    })}
+                  </div>
+                </SwiperSlide>
+              </Swiper>
+            ) : (
+              <p>No hay horarios disponibles para mostrar.</p>
+            )}
+          </div>
         </div>
 
         <div className={`${isEditingOrder ? 'bg-[#b2b9ab]' : 'bg-[#F3F3F3]'} w-[23%] flex-shrink-0 shadow-lg`}>
