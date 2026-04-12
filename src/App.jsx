@@ -10,6 +10,8 @@ import LGFreidora from "./components/freidora/LGFreidora";
 import LGBuscadorPedidos from "./components/buscadorPedidos/LGBuscadorPedidos";
 import Dashboard from "./components/dashboard/Dashboard";
 import Layout from "./components/pedidos/Layout";
+// QUICK_ORDER_TODO: Reimportar QuickOrderLayout al reactivar pedido rapido para produccion.
+// import QuickOrderLayout from "./components/pedidos/QuickOrderLayout";
 
 import DataProvider from "./components/Context/DataContext";
 
@@ -39,6 +41,7 @@ import VistaDeResultados from './components/dashboard/dashComponents/VistaDeResu
 import GlobalOrderListener from './components/Context/GlobalOrderListener';
 import SonidoOnChange from "./components/ordenes/SonidoOnChange.jsx";
 import OperativaTienda from './components/dashboard/dashComponents/OperativaTienda.jsx';
+import AnnouncementManager from "./components/dashboard/AnnouncementManager.jsx";
 
 function App() {
   console.log("App.jsx: La función del componente App se está ejecutando (render).");
@@ -66,6 +69,11 @@ function App() {
             {/* Rutas fuera del Dashboard */}
             <Route path="/layout" element={<Layout />} />
             <Route path="/layout/:categoria" element={<Layout />} />
+            {/* QUICK_ORDER_TODO:
+                Reactivar estas rutas cuando queramos volver a exponer el pedido rapido.
+                <Route path="/pedido-rapido" element={<QuickOrderLayout />} />
+                <Route path="/pedido-rapido/:categoria" element={<QuickOrderLayout />} />
+            */}
             <Route path="/ordenes" element={<Ordenes />} />
             <Route path="/freidora" element={<LGFreidora />} />
             <Route path="/cocina" element={<Cocina />} />
@@ -84,6 +92,7 @@ function App() {
               <Route path="filtrarPedidos" element={<FiltrarPedidosPorFecha />} />
               <Route path="operativaTienda" element={<OperativaTienda />} />
               <Route path="resultados" element={<VistaDeResultados />} />
+              <Route path="announcement" element={<AnnouncementManager />} />
 
             </Route>
           </Route>

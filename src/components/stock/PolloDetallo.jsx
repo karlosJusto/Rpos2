@@ -96,7 +96,46 @@ const PolloDetallo = () => {
     const startOfView = dayjs(daysToGenerate[0], 'DD-MM-YYYY');
     const dayBeforeStart = startOfView.subtract(1, 'day').format('DD-MM-YYYY');
     const prevDoc = rawData[dayBeforeStart];
-    const stockDeArranque = prevDoc ? (prevDoc.stock || 0) : 0;
+    let stockDeArranque = prevDoc ? (prevDoc.stock || 0) : 0;
+
+    if (offset > 0) {
+      const previousWeekDays = buildWeekDays(offset - 1);
+      const previousWeekStart = dayjs(previousWeekDays[0], 'DD-MM-YYYY');
+      const previousWeekAnchorDay = previousWeekStart.subtract(1, 'day').format('DD-MM-YYYY');
+      const previousWeekAnchorDoc = rawData[previousWeekAnchorDay];
+      const previousWeekInitialStock = previousWeekAnchorDoc ? (previousWeekAnchorDoc.stock || 0) : 0;
+
+      const previousWeekData = previousWeekDays.map((diaStr) => {
+        const existingData = rawData[diaStr];
+        const dateObj = dayjs(diaStr, 'DD-MM-YYYY');
+        const diasemana = dateObj.format('dddd');
+
+        if (existingData) {
+          return {
+            dia: diaStr,
+            ...existingData,
+            diasemana,
+            vd: ventasData[diaStr] || 0,
+          };
+        }
+
+        return {
+          dia: diaStr,
+          diasemana,
+          stock_anterior: 0,
+          entran: 0,
+          baja: 0,
+          devueltos: 0,
+          stock: 0,
+          vd: ventasData[diaStr] || 0,
+        };
+      });
+
+      const previousWeekRecalculated = recalcularCadenaDeStock(previousWeekData, previousWeekInitialStock);
+      if (previousWeekRecalculated.length > 0) {
+        stockDeArranque = previousWeekRecalculated[previousWeekRecalculated.length - 1].stock;
+      }
+    }
 
     const datosParaMostrar = daysToGenerate.map(diaStr => {
       const existingData = rawData[diaStr];

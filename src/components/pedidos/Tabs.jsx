@@ -1,16 +1,7 @@
-
-
-
-import { Link } from 'react-router-dom'
+import { Link, useLocation } from 'react-router-dom';
 import { useState, useEffect } from 'react';
-import { useLocation } from 'react-router-dom';
 
-
-
-
-
-
-const Tabs = () => {
+const Tabs = ({ basePath = '/layout' }) => {
   const location = useLocation();
   const [activeTab, setActiveTab] = useState(location.pathname);
 
@@ -22,9 +13,9 @@ const Tabs = () => {
     <div>
       <ul className="flex  justify-center  gap-[2vw]  ">
             <Link
-              to="/layout/comida"
+              to={`${basePath}/comida`}
               className={` p-[0.75vw] rounded-lg  ${
-                activeTab === '/layout/comida' ? 'border-3 border-yellow-500 shadow-md ' : ''
+                activeTab === `${basePath}/comida` ? 'border-3 border-yellow-500 shadow-md ' : ''
               } `}
             >
               <svg fill="#757575" height="2.5vw" width="2.5vw" version="1.1" id="Layer_1" xmlns="http://www.w3.org/2000/svg" xmlnsXlink="http://www.w3.org/1999/xlink" viewBox="0 0 512.003 512.003" xmlSpace="preserve">
@@ -39,9 +30,9 @@ const Tabs = () => {
             </Link>
 
             <Link
-              to="/layout/complementos"
+              to={`${basePath}/complementos`}
               className={` p-[0.75vw] rounded-md ${
-                activeTab === '/layout/complementos' ? 'border-3 border-yellow-500 shadow-md' : ''
+                activeTab === `${basePath}/complementos` ? 'border-3 border-yellow-500 shadow-md' : ''
               }`}
             >
               <svg fill="#757575" height="2.5vw" width="2.5vw" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
@@ -57,9 +48,9 @@ const Tabs = () => {
             </Link>
 
             <Link
-              to="/layout/bebidas"
+              to={`${basePath}/bebidas`}
               className={`p-[0.75vw] rounded-md ${
-                activeTab === '/layout/bebidas' ? ' border-3 border-yellow-500 shadow-md' : ''
+                activeTab === `${basePath}/bebidas` ? ' border-3 border-yellow-500 shadow-md' : ''
               }`}
             >
               <svg fill="#757575" height="2.5vw" width="2.5vw" version="1.1" id="Layer_1" xmlns="http://www.w3.org/2000/svg" xmlnsXlink="http://www.w3.org/1999/xlink" viewBox="0 0 512 512" xmlSpace="preserve">
@@ -75,9 +66,9 @@ const Tabs = () => {
             </Link>
 
             <Link
-              to="/layout/postres"  
+              to={`${basePath}/postres`}  
               className={` p-[0.75vw] rounded-md ${
-                activeTab === '/layout/postres' ? 'border-3 border-yellow-500 shadow-md' : ''
+                activeTab === `${basePath}/postres` ? 'border-3 border-yellow-500 shadow-md' : ''
               }`}
             >
               <svg fill="#757575" height="2.5vw" width="2.5vw" version="1.1" id="Layer_1" xmlns="http://www.w3.org/2000/svg" xmlnsXlink="http://www.w3.org/1999/xlink" viewBox="0 0 511.999 511.999" xmlSpace="preserve">
@@ -93,9 +84,9 @@ const Tabs = () => {
             </Link>
 
             <Link
-              to="/layout/extras"
+              to={`${basePath}/extras`}
               className={` p-[0.75vw] rounded-md ${
-                activeTab === '/layout/extras' ? 'border-3 border-yellow-500 shadow-md' : ''
+                activeTab === `${basePath}/extras` ? 'border-3 border-yellow-500 shadow-md' : ''
               }`}
             >
               <svg fill="#757575" height="2.5vw" width="2.5vw" version="1.1" id="Layer_1" xmlns="http://www.w3.org/2000/svg" xmlnsXlink="http://www.w3.org/1999/xlink" viewBox="0 0 512 512" xmlSpace="preserve">

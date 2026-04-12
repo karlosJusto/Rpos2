@@ -657,6 +657,20 @@ const Ordenes = () => {
     );
   }, [bloquesPedidos, dateToPass]);
 
+  const esProductoVisibleEnOrdenes = (producto) => producto?.id !== 59;
+
+  const estaProductoCompletado = (producto) => {
+    const cantidad = Number(producto?.cantidad) || 0;
+    const entregado = Number(producto?.entregado) || 0;
+    return cantidad > 0 && entregado >= cantidad;
+  };
+
+  const pedidoEstaCompletado = (pedido) => {
+    const productosVisibles = (pedido?.productos || []).filter(esProductoVisibleEnOrdenes);
+    if (productosVisibles.length === 0) return false;
+    return productosVisibles.every(estaProductoCompletado);
+  };
+
   return (
     <>
       <TestHeader />
@@ -740,7 +754,7 @@ const Ordenes = () => {
                     <span>Pedidos: </span>{bloquesFiltrados[bloqueHora]?.pedidos.length || 0} | Entregados:
                   </p>
                   <p className="text-lg font-bold text-gray-300">
-                    {bloquesFiltrados[bloqueHora]?.pedidos.filter(p => p.productos.every(prod => prod.entregado === prod.cantidad && prod.cantidad > 0)).length || 0}
+                    {bloquesFiltrados[bloqueHora]?.pedidos.filter(pedidoEstaCompletado).length || 0}
                   </p>
                 </div>
               </div>
@@ -768,7 +782,7 @@ const Ordenes = () => {
                 numeroPedidoStr.includes(searchLower) ||
                 telefonoStr.includes(searchLower);
             }).map((pedido) => {
-              const todosCompletados = pedido.productos.every(producto => producto.entregado === producto.cantidad && producto.cantidad > 0);
+              const todosCompletados = pedidoEstaCompletado(pedido);
               const containerColor = todosCompletados ? 'bg-[#52be80]' : 'bg-gray-200';
               return (
                 <div key={pedido.id || pedido.NumeroPedido} className={`w-full flex ${containerColor} p-[0.30vh] mb-1 rounded-md shadow`}>
@@ -787,7 +801,7 @@ const Ordenes = () => {
                   </div>
                   <div className="ml-1 sm:ml-2 gap-1 sm:gap-2 flex flex-wrap items-center flex-grow">
                     {pedido.productos
-                      .filter(producto => producto.id !== 59)
+                      .filter(esProductoVisibleEnOrdenes)
                       .sort((a, b) => {
                         const categoriaPrioridad = { comida: 1, complementos: 2, bebidas: 3, postres: 4, extras: 5, default: 6 };
                         const categoriaA = categoriaPrioridad[a.categoria] || categoriaPrioridad.default;

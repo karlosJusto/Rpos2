@@ -31,6 +31,20 @@ dayjs.locale('es');
 const COLLECTION_ESTADISTICAS = 'estadisticas_diarias2';
 const COLLECTION_PEDIDOS = 'pedidos';
 
+const esProductoVisibleEnOrdenes = (producto) => producto?.id !== 59;
+
+const estaProductoCompletado = (producto) => {
+  const cantidad = Number(producto?.cantidad) || 0;
+  const entregado = Number(producto?.entregado) || 0;
+  return cantidad > 0 && entregado >= cantidad;
+};
+
+const pedidoEstaCompletadoEnOrdenes = (pedidoData) => {
+  const productosVisibles = (pedidoData?.productos || []).filter(esProductoVisibleEnOrdenes);
+  if (productosVisibles.length === 0) return false;
+  return productosVisibles.every(estaProductoCompletado);
+};
+
 // Se añade la nueva prop 'mostrarElementosDeOrdenes'
 const TestHeader = ({ mostrarElementosDeOrdenes }) => {
   const [numeroEnBarra, setNumeroEnBarra] = useState(0);
@@ -159,10 +173,7 @@ const TestHeader = ({ mostrarElementosDeOrdenes }) => {
               let pollosEquivalentesVM_VT_estePedido = 0;
               let pollosEquivalentesEntregados_estePedido = 0;
 
-              // Determinar si todos los productos de este pedido están entregados (cantidad === entregado)
-              const allProductsInOrderDelivered = pedidoData.productos.every(
-                (producto) => Number(producto.cantidad) === Number(producto.entregado)
-              );
+              const allProductsInOrderDelivered = pedidoEstaCompletadoEnOrdenes(pedidoData);
 
               pedidoData.productos.forEach((producto) => {
                 const cantidadTotal = Number(producto.cantidad) || 0;

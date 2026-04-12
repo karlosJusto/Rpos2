@@ -6,7 +6,7 @@ import { useState, useContext } from 'react';
 import { dataContext } from '../Context/DataContext';
 import { useParams } from 'react-router-dom';
 
-const Card = () => {
+const Card = ({ quickMode = false, onProductClick, isProductDisabled }) => {
   const [show, setShow] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState(null);
 
@@ -66,7 +66,8 @@ const Card = () => {
     <>
       {sortedData.length > 0 ? (
         sortedData.map((product) => {
-          const disabled = isOutOfStock(product, data);
+          const disabledByStock = isOutOfStock(product, data);
+          const disabled = disabledByStock || (quickMode && isProductDisabled ? isProductDisabled(product) : false);
 
           return (
             <div key={product.id_product}>
@@ -76,6 +77,10 @@ const Card = () => {
                 `}
                 onClick={() => {
                   if (!disabled) {
+                    if (quickMode && onProductClick) {
+                      onProductClick(product);
+                      return;
+                    }
                     handleShow(product);
                   }
                 }}
@@ -128,12 +133,14 @@ const Card = () => {
       )}
 
       {/* Modal para producto */}
-      <ModalProductos
-        show={show}
-        handleClose={handleClose}
-        product={selectedProduct}
-        isNuevoProducto={true}
-      />
+      {!quickMode && (
+        <ModalProductos
+          show={show}
+          handleClose={handleClose}
+          product={selectedProduct}
+          isNuevoProducto={true}
+        />
+      )}
     </>
   );
 };

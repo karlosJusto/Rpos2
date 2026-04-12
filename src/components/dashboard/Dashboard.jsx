@@ -100,6 +100,21 @@ const Dashboard = () => {
                 Empleados
               </NavLink>
             </li>
+            <li>
+              <NavLink
+                to="/dashboard/announcement"
+                className={({ isActive }) =>
+                  `${baseLinkClass} ${isActive ? activeLinkClass : inactiveLinkClass}`
+                }
+              >
+                <svg width="25px" height="25px" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M7 8.5C7 6.567 8.567 5 10.5 5H13.5C15.433 5 17 6.567 17 8.5V9.086C17 9.753 17.265 10.393 17.737 10.864L18.5 11.628C19.13 12.257 18.684 13.333 17.793 13.333H6.207C5.316 13.333 4.87 12.257 5.5 11.628L6.263 10.864C6.735 10.393 7 9.753 7 9.086V8.5Z" stroke="currentColor" strokeWidth="1.4"/>
+                  <path d="M10 17C10.386 17.583 11.05 18 12 18C12.95 18 13.614 17.583 14 17" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/>
+                  <path d="M12 3V5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/>
+                </svg>
+                Anuncios
+              </NavLink>
+            </li>
             {/* Enlaces que NO son sub-rutas de /dashboard */}
             <li>
               <NavLink
