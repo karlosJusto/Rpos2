@@ -32,6 +32,7 @@ const CrearProductos = ({ productoEditarProp, modoEdicionProp, onSave, onClose }
     sabores: false, // boolean
     cocina: false, // boolean
     promocion: false,
+    quickOrder: false,
     imagen: null,
     imagenRpos: null,
     stock: 10,
@@ -62,6 +63,7 @@ const CrearProductos = ({ productoEditarProp, modoEdicionProp, onSave, onClose }
         sabores: productoEditar.hasOwnProperty('sabores') ? productoEditar.sabores === "1" : initialProductFormState.sabores,
         cocina: productoEditar.hasOwnProperty('cocina') ? (productoEditar.cocina === "1" || productoEditar.cocina === true) : initialProductFormState.cocina,
         promocion: productoEditar.hasOwnProperty('promocion') ? (productoEditar.promocion === "1" || productoEditar.promocion === true) : initialProductFormState.promocion,
+        quickOrder: productoEditar.hasOwnProperty('quickOrder') ? (productoEditar.quickOrder === "1" || productoEditar.quickOrder === true || String(productoEditar.quickOrder).toLowerCase() === "true") : initialProductFormState.quickOrder,
         imagen: productoEditar.imagen || initialProductFormState.imagen, // URL si ya existe
         imagenRpos: productoEditar.imagen_rpos || initialProductFormState.imagenRpos, // URL si ya existe
         stock: productoEditar.hasOwnProperty('stock') ? Number(productoEditar.stock) : initialProductFormState.stock,
@@ -229,6 +231,7 @@ const CrearProductos = ({ productoEditarProp, modoEdicionProp, onSave, onClose }
       visible: producto.visible ? 1 : 0,
       cocina: !!producto.cocina,
       promocion: !!producto.promocion, // Ensure it's saved as a boolean
+      quickOrder: !!producto.quickOrder,
       freidora: !!producto.freidora,
       productoDoble: producto.productoDoble ? "1" : "0",
       botonCeliaco: !!producto.botonCeliaco,
@@ -350,6 +353,7 @@ const CrearProductos = ({ productoEditarProp, modoEdicionProp, onSave, onClose }
           { name: "vegetariano", label: "Vegetariano" }, { name: "vegano", label: "Vegano" },
           { name: "freidora", label: "Freidora" }, { name: "cocina", label: "Cocina" }, // Ensure these are boolean in state
           { name: "promocion", label: "Promoción" }, // Changed from mediaRacion
+          { name: "quickOrder", label: "Pedido rápido" },
           { name: "productoDoble", label: "Producto Doble" },
            { name: "botonCeliaco", label: "Check Celiaco" },
         ].map((campo) => (

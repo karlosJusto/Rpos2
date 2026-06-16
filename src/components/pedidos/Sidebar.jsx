@@ -35,27 +35,7 @@ const Sidebar = () => {
             
              </Link>
 
-             {/* QUICK_ORDER_TODO:
-                 Este acceso visual del sidebar abre /pedido-rapido/comida.
-                 Lo dejamos oculto para produccion hasta que queramos enseñar la funcionalidad.
-             <Link className='p-3 hover:bg-gray-100 hover:rounded-2xl' to={"/pedido-rapido/comida"}>
-
-             <svg width="40px" height="40px" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <g id="SVGRepo_bgCarrier" strokeWidth="0"></g>
-              <g id="SVGRepo_tracerCarrier" strokeLinecap="round" strokeLinejoin="round"></g>
-              <g id="SVGRepo_iconCarrier">
-                <path d="M3 4.5H5L7.4 14.1C7.49144 14.4665 7.68277 14.8002 7.95211 15.0644C8.22144 15.3285 8.55875 15.5129 8.927 15.5972C9.29525 15.6815 9.67954 15.6624 10.0374 15.542C10.3954 15.4217 10.7133 15.2047 10.956 14.915L14.7 10.5H18.3C18.9734 10.5 19.6261 10.2736 20.154 9.85719C20.682 9.44076 21.0554 8.85826 21.214 8.203L21.75 6H6.2"
-                  stroke="#757575" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                <path d="M9.5 20C10.0523 20 10.5 19.5523 10.5 19C10.5 18.4477 10.0523 18 9.5 18C8.94772 18 8.5 18.4477 8.5 19C8.5 19.5523 8.94772 20 9.5 20Z"
-                  fill="#757575" />
-                <path d="M17.5 20C18.0523 20 18.5 19.5523 18.5 19C18.5 18.4477 18.0523 18 17.5 18C16.9477 18 16.5 18.4477 16.5 19C16.5 19.5523 16.9477 20 17.5 20Z"
-                  fill="#757575" />
-                <path d="M12 3V7M10 5H14" stroke="#757575" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-              </g>
-             </svg>
-
-             </Link>
-             */}
+             {/* QUICK_ORDER_TODO: El acceso visual a pedido rapido vive solo en el menu de /ordenes. */}
 
              <Link className='p-3   hover:bg-gray-100 hover:rounded-2xl' to={"/ordenes"}>
             

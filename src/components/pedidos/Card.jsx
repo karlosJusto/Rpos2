@@ -6,7 +6,7 @@ import { useState, useContext } from 'react';
 import { dataContext } from '../Context/DataContext';
 import { useParams } from 'react-router-dom';
 
-const Card = ({ quickMode = false, onProductClick, isProductDisabled }) => {
+const Card = ({ quickMode = false, onProductClick, isProductDisabled, recentlyAddedProductId, quickCartQuantities = {} }) => {
   const [show, setShow] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState(null);
 
@@ -46,11 +46,16 @@ const Card = ({ quickMode = false, onProductClick, isProductDisabled }) => {
   const isCocinaFlagSet = (value) =>
     String(value) === "1" || value === true || value === 1;
 
+  const isQuickOrderEnabled = (value) =>
+    value === true || value === 1 || String(value).toLowerCase() === "true";
+
   // Filtrado
-  const dataFiltered = data
-    .filter(product => product.visible === 1)
-    .filter(product => product.name?.toLowerCase().includes(buscar.toLowerCase()))
-    .filter(product => categoria ? product.categoria === categoria : true);
+  const dataFiltered = quickMode
+    ? data.filter(product => isQuickOrderEnabled(product.quickOrder))
+    : data
+      .filter(product => product.visible === 1)
+      .filter(product => product.name?.toLowerCase().includes(buscar.toLowerCase()))
+      .filter(product => categoria ? product.categoria === categoria : true);
 
   const sortedData = [...dataFiltered].sort((a, b) => a.position - b.position);
 
@@ -68,12 +73,14 @@ const Card = ({ quickMode = false, onProductClick, isProductDisabled }) => {
         sortedData.map((product) => {
           const disabledByStock = isOutOfStock(product, data);
           const disabled = disabledByStock || (quickMode && isProductDisabled ? isProductDisabled(product) : false);
+          const quickProductQuantity = quickCartQuantities[Number(product.id_product)] || 1;
 
           return (
             <div key={product.id_product}>
               <div
-                className={`rounded-xl max-w-[11vw] min-w-[11vw] overflow-hidden bg-gray-100 shadow-xl
+                className={`relative rounded-xl max-w-[11vw] min-w-[11vw] overflow-hidden bg-gray-100 shadow-xl transition-all duration-200
                   ${disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}
+                  ${quickMode && recentlyAddedProductId === Number(product.id_product) ? 'ring-4 ring-yellow-400 scale-[1.03]' : ''}
                 `}
                 onClick={() => {
                   if (!disabled) {
@@ -85,6 +92,11 @@ const Card = ({ quickMode = false, onProductClick, isProductDisabled }) => {
                   }
                 }}
               >
+                {quickMode && recentlyAddedProductId === Number(product.id_product) && (
+                  <div className="absolute right-2 top-2 z-10 rounded-full bg-[#f2ac02] px-3 py-1 font-nunito text-sm font-extrabold text-white shadow-md">
+                    x{quickProductQuantity}
+                  </div>
+                )}
                 <img src={product.imagen_rpos} alt={product.name} className="" />
                 <div className="p-[0.5vw] text-[1.125vw]">
                   <h1 className="text-center font-nunito font-bold truncate">

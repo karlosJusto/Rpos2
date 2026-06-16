@@ -10,8 +10,7 @@ import LGFreidora from "./components/freidora/LGFreidora";
 import LGBuscadorPedidos from "./components/buscadorPedidos/LGBuscadorPedidos";
 import Dashboard from "./components/dashboard/Dashboard";
 import Layout from "./components/pedidos/Layout";
-// QUICK_ORDER_TODO: Reimportar QuickOrderLayout al reactivar pedido rapido para produccion.
-// import QuickOrderLayout from "./components/pedidos/QuickOrderLayout";
+import QuickOrderLayout from "./components/pedidos/QuickOrderLayout";
 
 import DataProvider from "./components/Context/DataContext";
 
@@ -69,11 +68,9 @@ function App() {
             {/* Rutas fuera del Dashboard */}
             <Route path="/layout" element={<Layout />} />
             <Route path="/layout/:categoria" element={<Layout />} />
-            {/* QUICK_ORDER_TODO:
-                Reactivar estas rutas cuando queramos volver a exponer el pedido rapido.
-                <Route path="/pedido-rapido" element={<QuickOrderLayout />} />
-                <Route path="/pedido-rapido/:categoria" element={<QuickOrderLayout />} />
-            */}
+            {/* QUICK_ORDER_TODO: Si vuelve a ocultarse para produccion, comentar estas dos rutas y el import de arriba. */}
+            <Route path="/pedido-rapido" element={<QuickOrderLayout />} />
+            <Route path="/pedido-rapido/:categoria" element={<QuickOrderLayout />} />
             <Route path="/ordenes" element={<Ordenes />} />
             <Route path="/freidora" element={<LGFreidora />} />
             <Route path="/cocina" element={<Cocina />} />

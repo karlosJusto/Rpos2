@@ -79,17 +79,19 @@ export const createQuickOrder = async ({ cart, slotTime, empleadoNombre }) => {
   return runTransaction(db, async (transaction) => {
     const counterRef = doc(db, 'contadorPedidos', 'pedidoId');
     const counterSnap = await transaction.get(counterRef);
+    const stockReads = [];
+
+    for (const [stockId, amount] of Object.entries(stockRequirements)) {
+      const productRef = doc(db, 'productos', String(stockId));
+      const productSnap = await transaction.get(productRef);
+      stockReads.push({ stockId, amount, productRef, productSnap });
+    }
 
     const nextId = counterSnap.exists()
       ? Number(counterSnap.data().id || 0) + 1
       : 1;
 
-    transaction.set(counterRef, { id: nextId }, { merge: true });
-
-    for (const [stockId, amount] of Object.entries(stockRequirements)) {
-      const productRef = doc(db, 'productos', String(stockId));
-      const productSnap = await transaction.get(productRef);
-
+    for (const { stockId, amount, productRef, productSnap } of stockReads) {
       if (!productSnap.exists()) {
         throw new Error(`No se encontró el producto de stock ${stockId}.`);
       }
@@ -103,6 +105,8 @@ export const createQuickOrder = async ({ cart, slotTime, empleadoNombre }) => {
 
       transaction.update(productRef, { stock: currentStock - amount });
     }
+
+    transaction.set(counterRef, { id: nextId }, { merge: true });
 
     const productos = cart.map((item) => {
       const quantity = Number(item.cantidad || 0);

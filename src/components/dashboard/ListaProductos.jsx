@@ -319,6 +319,7 @@ export default function ListaProductos() {
                   <th scope="col" className="px-4 py-3 hidden sm:table-cell">Opciones</th>
                   <th scope="col" className="px-4 py-3">Precio</th>
                   <th scope="col" className="px-4 py-3">Visibilidad</th>
+                  <th scope="col" className="px-4 py-3">Pedido rápido</th>
                   <th scope="col" className="px-4 py-3 text-center">Acciones</th>
                 </tr>
               </thead>
@@ -390,6 +391,17 @@ export default function ListaProductos() {
                       ) : (
                         <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-800">
                           Oculto
+                        </span>
+                      )}
+                    </td>
+                    <td className="px-4 py-2 text-center">
+                      {isFlagSet(producto.quickOrder) ? (
+                        <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-yellow-100 text-yellow-800">
+                          Sí
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-500">
+                          No
                         </span>
                       )}
                     </td>

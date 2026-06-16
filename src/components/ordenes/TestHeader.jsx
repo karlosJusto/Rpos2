@@ -14,9 +14,10 @@ import 'dayjs/locale/es';
 
 import PedidoRapido from './PedidoRapido';
 import RelojDistinto from './RelojDistinto';
+import pedidoRapidoIcon from '../../assets/pedido rapido.png';
 
 import { Offcanvas, Button, Nav, Modal, InputGroup, Form } from 'react-bootstrap';
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { StaticDatePicker } from '@mui/x-date-pickers/StaticDatePicker';
@@ -47,6 +48,7 @@ const pedidoEstaCompletadoEnOrdenes = (pedidoData) => {
 
 // Se añade la nueva prop 'mostrarElementosDeOrdenes'
 const TestHeader = ({ mostrarElementosDeOrdenes }) => {
+  const location = useLocation();
   const [numeroEnBarra, setNumeroEnBarra] = useState(0);
   const [numeroLibres, setNumeroLibres] = useState(0);
   const [ventasManana, setVentasManana] = useState(0);
@@ -73,6 +75,7 @@ const TestHeader = ({ mostrarElementosDeOrdenes }) => {
 
   const [showOffcanvasMenu, setShowOffcanvasMenu] = useState(false);
   const toggleOffcanvasMenu = () => setShowOffcanvasMenu((prev) => !prev);
+  const mostrarPedidoRapidoEnMenu = location.pathname === '/ordenes';
 
   // --- Estados para el modal de suma ---
   const [showSumarModal, setShowSumarModal] = useState(false);
@@ -587,6 +590,12 @@ const TestHeader = ({ mostrarElementosDeOrdenes }) => {
               <Link className='p-3 hover:bg-gray-100 hover:rounded-2xl block' to={"/ordenes"} onClick={() => { toggleOffcanvasMenu(); if(window.location.pathname === "/ordenes") window.location.reload();}}>
                 <svg width="40px" height="40px" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M10.5 14L17 14" stroke="#757575" strokeWidth="1.5" strokeLinecap="round"/> <path d="M7 14H7.5" stroke="#757575" strokeWidth="1.5" strokeLinecap="round"/> <path d="M7 10.5H7.5" stroke="#757575" strokeWidth="1.5" strokeLinecap="round"/> <path d="M7 17.5H7.5" stroke="#757575" strokeWidth="1.5" strokeLinecap="round"/> <path d="M10.5 10.5H17" stroke="#757575" strokeWidth="1.5" strokeLinecap="round"/> <path d="M10.5 17.5H17" stroke="#757575" strokeWidth="1.5" strokeLinecap="round"/> <path d="M8 3.5C8 2.67157 8.67157 2 9.5 2H14.5C15.3284 2 16 2.67157 16 3.5V4.5C16 5.32843 15.3284 6 14.5 6H9.5C8.67157 6 8 5.32843 8 4.5V3.5Z" stroke="#757575" strokeWidth="1.5"/> <path d="M21 16.0002C21 18.8286 21 20.2429 20.1213 21.1215C19.2426 22.0002 17.8284 22.0002 15 22.0002H9C6.17157 22.0002 4.75736 22.0002 3.87868 21.1215C3 20.2429 3 18.8286 3 16.0002V13.0002M16 4.00195C18.175 4.01406 19.3529 4.11051 20.1213 4.87889C21 5.75757 21 7.17179 21 10.0002V12.0002M8 4.00195C5.82497 4.01406 4.64706 4.11051 3.87868 4.87889C3.11032 5.64725 3.01385 6.82511 3.00174 9" stroke="#757575" strokeWidth="1.5" strokeLinecap="round"/> </svg>
               </Link>
+              {mostrarPedidoRapidoEnMenu && (
+                <Link className='p-3 hover:bg-gray-100 hover:rounded-2xl block' to={"/pedido-rapido/comida"} onClick={toggleOffcanvasMenu}>
+                  {/* QUICK_ORDER_TODO: acceso interno a pedido rapido; mantenerlo limitado al menu de /ordenes. */}
+                  <img src={pedidoRapidoIcon} alt="Pedido rápido" className="h-[40px] w-[40px] object-contain" />
+                </Link>
+              )}
               <Link className='p-3 hover:bg-gray-100 hover:rounded-2xl block' to={"/freidora"} onClick={toggleOffcanvasMenu}>
                  <svg fill="#757575" version="1.1" id="Capa_1" xmlns="http://www.w3.org/2000/svg" xmlnsXlink="http://www.w3.org/1999/xlink" width="40px" height="40px" viewBox="0 0 91.689 91.689" xmlSpace="preserve"><path d="M74.41,42.085l-6.922,3.783l0.58-6.131l1.436,0.376l16.424-5.548l-3.037-10.497l-13.729,4.637l-14.853-3.892l-14.513,2.276 l-13.521-2.528l-10.109,8.94l6.299,8.324L22.2,41.833l-9.982,3.899l-7.474-4.445L0,50.855l11.6,6.9l12.813-5.004l3.576-0.113 l-3.738,8.75l11.969,6.232L48.73,61.9l14.635-1.299l13.471-7.364l14.443,1.183l0.41-10.919L74.41,42.085z M27.438,29.346 l12.301,2.301l14.371-2.255l15.19,3.98l10.857-3.667l0.553,1.908l-11.347,3.834l-15.342-4.02l-14.309,2.245l-11.758-2.199 l-4.762,4.211l-1.172-1.549L27.438,29.346z M29.121,36.258l10.533,1.971l5.236-0.821l-8.355,3.971l-13.697,0.435L29.121,36.258z M23.506,48.284l-11.654,4.552l-6.215-3.695L6.5,47.402l5.463,3.249l11.143-4.351l14.477-0.461l14.324-6.809l11.86,1.652 l-0.186,1.978l-11.352-1.58l-14.184,6.741L23.506,48.284z M39.096,52.284l13.867-6.592l11.834,1.647l-4.608,2.52l-14.285,1.268 l-9.746,4.456l-5.801-3.021L39.096,52.284z M87.266,49.611l-11.424-0.936l-13.776,7.532l-14.492,1.285l-11.379,5.204l-6.414-3.338 l0.764-1.786l5.639,2.937l10.877-4.976l14.428-1.278l13.916-7.606l11.938,0.979L87.266,49.611z"/> </svg>
               </Link>
