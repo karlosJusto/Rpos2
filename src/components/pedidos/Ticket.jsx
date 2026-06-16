@@ -383,7 +383,7 @@ const Ticket = (props) => {
 
       {/* Sección de Versión */}
       <div className="absolute bottom-0 right-0 p-2 text-xs text-gray-400 font-nunito">
-        v1.3.0
+        v1.3.2
       </div>
     </>
   );

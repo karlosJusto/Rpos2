@@ -131,6 +131,11 @@ const ModalClientes = ({ show, handleClose, onSave, initialData,clearClientData 
 
   const clienteYaSeleccionado = formData.cliente.trim() !== '' || formData.telefono.trim() !== '';
 
+  const exactMatchExists = clientes.some((cliente) => {
+    const telefono = cliente.telefono ? cliente.telefono.toString() : '';
+    return telefono === formData.telefono;
+  });
+  const isNewClient = formData.telefono.length === 9 && !exactMatchExists;
 
 
   return (
@@ -151,15 +156,18 @@ const ModalClientes = ({ show, handleClose, onSave, initialData,clearClientData 
             <div className="form-floating w-[25vw]">
               <input
                 type="text"
-                className="form-control border-2 border-gray-200 font-nunito font-extrabold bg-gray-100 cursor-not-allowed text-gray-500 focus:ring-0"
+                className={`form-control border-2 border-gray-200 font-nunito font-extrabold focus:ring-0 ${
+                  isNewClient ? 'bg-white focus:border-yellow-500' : 'bg-gray-100 cursor-not-allowed text-gray-500'
+                }`}
                 id="cliente"
                 placeholder="Nombre"
                 value={formData.cliente}
-                readOnly // Deshabilitado como se solicitó
+                onChange={handleInputChange}
+                readOnly={!isNewClient}
                 name="cliente"
               />
               <label className="text-gray-500 font-extrabold" htmlFor="cliente">
-                Nombre (Autorellenado)
+                {isNewClient ? "Nombre (Nuevo Cliente)" : "Nombre (Autorellenado)"}
               </label>
             </div>
             {/* Input Telefono */}
@@ -297,7 +305,7 @@ const ModalClientes = ({ show, handleClose, onSave, initialData,clearClientData 
   <Button
     variant="primary"
     onClick={handleSubmitData}
-    disabled={formData.telefono.length !== 9}
+    disabled={formData.telefono.length !== 9 || (isNewClient && formData.cliente.trim() === '')}
     className="bg-white text-yellow-500 border-yellow-500 hover:bg-yellow-600  hover:text-yellow-600 hover:border-yellow-600 p-2 font-nunito shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
   >
     {initialData.cliente ? "Actualizar" : "Agregar"}
