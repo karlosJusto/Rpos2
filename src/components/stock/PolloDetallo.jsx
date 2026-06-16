@@ -25,6 +25,7 @@ const PolloDetallo = () => {
   const [rawFirestoreData, setRawFirestoreData] = useState({});
   const [rawSalesData, setRawSalesData] = useState({});
   const [pendingOrders, setPendingOrders] = useState(0);
+  const [pendingOrdersByDay, setPendingOrdersByDay] = useState({});
 
   const buildWeekDays = useCallback((offset) => {
     const targetDate = dayjs().add(offset, 'week');
@@ -91,7 +92,7 @@ const PolloDetallo = () => {
     return { statsByDay, salesByDay };
   }, [buildWeekDays]);
 
-  const processDataForView = useCallback((rawData, ventasData, offset) => {
+  const processDataForView = useCallback((rawData, ventasData, offset, pendingByDay = {}) => {
     const daysToGenerate = buildWeekDays(offset);
     const startOfView = dayjs(daysToGenerate[0], 'DD-MM-YYYY');
     const dayBeforeStart = startOfView.subtract(1, 'day').format('DD-MM-YYYY');
@@ -160,7 +161,7 @@ const PolloDetallo = () => {
 
     const datosConVentas = datosParaMostrar.map((item) => ({
       ...item,
-      vd: ventasData[item.dia] || 0,
+      vd: (ventasData[item.dia] || 0) + (pendingByDay[item.dia] || 0),
     }));
 
     const datosRecalculados = recalcularCadenaDeStock(datosConVentas, stockDeArranque);
@@ -196,6 +197,7 @@ const PolloDetallo = () => {
   useEffect(() => {
     if (weekOffset !== 0) {
       setPendingOrders(0);
+      setPendingOrdersByDay({});
       return;
     }
 
@@ -205,6 +207,7 @@ const PolloDetallo = () => {
         const pedidosQuery = query(pedidosRef, orderBy("NumeroPedido", "desc"), limit(1500));
         const snapshot = await getDocs(pedidosQuery);
         let totalPollo = 0;
+        const pendingByDayLocal = {};
         const now = dayjs();
         const endOfView = now.endOf('isoWeek');
         const filterStart = now.add(1, 'day').startOf('day');
@@ -219,6 +222,7 @@ const PolloDetallo = () => {
 
           if (orderDate.isValid() && orderDate.isBetween(filterStart, endOfView, 'day', '[]')) {
             if (data.productos && Array.isArray(data.productos)) {
+              let orderQty = 0;
               data.productos.forEach((prod) => {
                 const cant = Number(prod.cantidad) || 0;
                 const lowerName = (prod.nombre || prod.alias || '').toLowerCase();
@@ -231,15 +235,22 @@ const PolloDetallo = () => {
                 }
 
                 if (qtyToAdd > 0) {
-                  totalPollo += qtyToAdd;
+                  orderQty += qtyToAdd;
                 }
               });
+              
+              if (orderQty > 0) {
+                totalPollo += orderQty;
+                const dateKey = orderDate.format('DD-MM-YYYY');
+                pendingByDayLocal[dateKey] = (pendingByDayLocal[dateKey] || 0) + orderQty;
+              }
             }
           }
         });
 
         if (isMountedRef.current) {
           setPendingOrders(totalPollo);
+          setPendingOrdersByDay(pendingByDayLocal);
         }
       } catch (error) {
         console.error("Error al obtener encargos pendientes:", error);
@@ -257,11 +268,11 @@ const PolloDetallo = () => {
       return;
     }
 
-    processDataForView(rawFirestoreData, rawSalesData, weekOffset);
+    processDataForView(rawFirestoreData, rawSalesData, weekOffset, pendingOrdersByDay);
     if (isMountedRef.current) {
       setLoading(false);
     }
-  }, [rawFirestoreData, rawSalesData, weekOffset, processDataForView]);
+  }, [rawFirestoreData, rawSalesData, weekOffset, pendingOrdersByDay, processDataForView]);
 
 
   const handleInputChange = (e, dia, campo) => {
