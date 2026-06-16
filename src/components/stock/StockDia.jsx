@@ -1,67 +1,97 @@
 import React, { useState, useEffect } from 'react';
 import { db } from "../firebase/firebase";
-import { collection, getDocs, query, orderBy, limit } from "firebase/firestore";
+import { collection, getDocs, query, orderBy, limit, where } from "firebase/firestore";
 import dayjs from 'dayjs';
 import timezone from 'dayjs/plugin/timezone';
 import utc from 'dayjs/plugin/utc';
+import isBetween from 'dayjs/plugin/isBetween';
 
 dayjs.extend(utc);
 dayjs.extend(timezone);
+dayjs.extend(isBetween);
 
 const StockDia = () => {
   const [pedidos, setPedidos] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
+  // Nuevos estados para filtros
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [fechaInicio, setFechaInicio] = useState(dayjs().tz('Europe/Madrid').format('YYYY-MM-DD'));
+  const [fechaFin, setFechaFin] = useState(dayjs().tz('Europe/Madrid').format('YYYY-MM-DD'));
+
   useEffect(() => {
-    const obtenerPedidosDelDia = async () => {
-      setLoading(true);
-      setError(null);
-
-      try {
-        const pedidosRef = collection(db, 'pedidos');
-        // OPTIMIZACIÓN: Traer solo los últimos 1500 pedidos para evitar cargar toda la colección
-        const q = query(pedidosRef, orderBy("NumeroPedido", "desc"), limit(1500));
-        const querySnapshot = await getDocs(q);
-
-        const pedidosDelDia = [];
-        querySnapshot.forEach((doc) => {
-          const pedido = doc.data();
-          if (pedido.productos) {
-            const fechaRecogida = dayjs(pedido.fechahora, 'DD/MM/YYYY HH:mm');
-            const fechaHoy = dayjs().tz('Europe/Madrid').startOf('day');
-            const fechaFinal = dayjs().tz('Europe/Madrid').endOf('day');
-
-            if (!fechaRecogida.isValid()) {
-              return;
-            }
-
-            if (fechaRecogida.isBetween(fechaHoy, fechaFinal, null, '[]')) {
-              pedido.productos.forEach((producto) => {
-                // CAMBIO: No agrupamos aquí, solo aplanamos la lista de productos
-                // y añadimos el 'origen' del pedido a cada producto.
-                pedidosDelDia.push({
-                  id: producto.id,
-                  nombre: producto.nombre,
-                  categoria: producto.categoria,
-                  cantidad: producto.cantidad,
-                  position: producto.position,
-                  origen: pedido.origen, // CAMBIO: Añadimos el origen del pedido.
-                });
-              });
-            }
+    const checkAdmin = async () => {
+      const nombre = sessionStorage.getItem('empleadoNombre');
+      if (nombre) {
+        const q = query(collection(db, 'empleados'), where('nombre', '==', nombre));
+        const snapshot = await getDocs(q);
+        if (!snapshot.empty) {
+          const empleado = snapshot.docs[0].data();
+          if (empleado.rol === 'admin' || empleado.rol === 'jefe') {
+            setIsAdmin(true);
           }
-        });
-
-        setPedidos(pedidosDelDia);
-      } catch (err) {
-        console.error("Error al obtener los pedidos del día: ", err);
-        setError("Ocurrió un error al obtener los pedidos.");
+        }
       }
-      setLoading(false);
     };
+    checkAdmin();
+  }, []);
 
-    obtenerPedidosDelDia();
+  const obtenerPedidosDelDia = async (inicioStr, finStr) => {
+    setLoading(true);
+    setError(null);
+
+    try {
+      const inicio = dayjs(inicioStr).tz('Europe/Madrid').startOf('day');
+      const fin = dayjs(finStr).tz('Europe/Madrid').endOf('day');
+      const isToday = inicio.isSame(dayjs().tz('Europe/Madrid').startOf('day'), 'day') && fin.isSame(dayjs().tz('Europe/Madrid').endOf('day'), 'day');
+
+      const pedidosRef = collection(db, 'pedidos');
+      // OPTIMIZACIÓN: Traer solo los últimos 1500 pedidos si es hoy, sino traemos todo para el rango
+      const q = isToday 
+        ? query(pedidosRef, orderBy("NumeroPedido", "desc"), limit(1500))
+        : query(pedidosRef, orderBy("NumeroPedido", "desc"));
+        
+      const querySnapshot = await getDocs(q);
+
+      const pedidosDelDia = [];
+      querySnapshot.forEach((doc) => {
+        const pedido = doc.data();
+        if (pedido.productos) {
+          const fechaRecogida = dayjs(pedido.fechahora, 'DD/MM/YYYY HH:mm');
+
+          if (!fechaRecogida.isValid()) {
+            return;
+          }
+
+          if (fechaRecogida.isBetween(inicio, fin, null, '[]')) {
+            pedido.productos.forEach((producto) => {
+              // CAMBIO: No agrupamos aquí, solo aplanamos la lista de productos
+              // y añadimos el 'origen' del pedido a cada producto.
+              pedidosDelDia.push({
+                id: producto.id,
+                nombre: producto.nombre,
+                categoria: producto.categoria,
+                cantidad: producto.cantidad,
+                position: producto.position,
+                origen: pedido.origen, // CAMBIO: Añadimos el origen del pedido.
+              });
+            });
+          }
+        }
+      });
+
+      setPedidos(pedidosDelDia);
+    } catch (err) {
+      console.error("Error al obtener los pedidos del día: ", err);
+      setError("Ocurrió un error al obtener los pedidos.");
+    }
+    setLoading(false);
+  };
+
+  useEffect(() => {
+    obtenerPedidosDelDia(fechaInicio, fechaFin);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // CAMBIO: Lógica de agrupación modificada para separar por origen.
@@ -97,7 +127,11 @@ const StockDia = () => {
   // Definir el orden deseado de las categorías
   const ordenCategorias = ["comida", "complementos", "bebidas", "postres", "extras"];
   const categoriasOrdenadas = ordenCategorias.map(categoria => [categoria, productosAgrupadosPorCategoria[categoria]]).filter(item => item[1]);
-  const fechaHoy = dayjs().tz('Europe/Madrid').format('DD/MM/YYYY');
+  
+  const isTodayView = dayjs(fechaInicio).isSame(dayjs().tz('Europe/Madrid'), 'day') && dayjs(fechaFin).isSame(dayjs().tz('Europe/Madrid'), 'day');
+  const fechaMostrar = isTodayView 
+    ? dayjs().tz('Europe/Madrid').format('DD/MM/YYYY')
+    : `${dayjs(fechaInicio).format('DD/MM/YYYY')} al ${dayjs(fechaFin).format('DD/MM/YYYY')}`;
 
   // CAMBIO: La función ahora calcula totales para tienda, online y general.
   const calcularTotalesPollo = (productos) => {
@@ -122,7 +156,44 @@ const StockDia = () => {
 
   return (
     <div className="max-w-full mx-auto">
-      <h1 className="text-center mb-4 font-nunito text-gray-500 text-2xl -mt-5">Productos ya vendidos - {fechaHoy}</h1>
+      <h1 className="text-center mb-4 font-nunito text-gray-500 text-2xl -mt-5">Productos ya vendidos - {fechaMostrar}</h1>
+      
+      {isAdmin && (
+        <div className="flex flex-col sm:flex-row justify-center items-center gap-4 mb-6 p-4 bg-white rounded-lg shadow max-w-2xl mx-auto font-nunito">
+          <div>
+            <label htmlFor="fechaInicio" className="block text-sm font-medium text-gray-700 mb-1">
+              Fecha Inicial:
+            </label>
+            <input
+              type="date"
+              id="fechaInicio"
+              value={fechaInicio}
+              onChange={(e) => setFechaInicio(e.target.value)}
+              className="px-3 py-2 border border-gray-300 rounded-md focus:ring-yellow-500 focus:border-yellow-500 shadow-sm"
+            />
+          </div>
+          <div>
+            <label htmlFor="fechaFin" className="block text-sm font-medium text-gray-700 mb-1">
+              Fecha Final:
+            </label>
+            <input
+              type="date"
+              id="fechaFin"
+              value={fechaFin}
+              onChange={(e) => setFechaFin(e.target.value)}
+              className="px-3 py-2 border border-gray-300 rounded-md focus:ring-yellow-500 focus:border-yellow-500 shadow-sm"
+            />
+          </div>
+          <button
+            onClick={() => obtenerPedidosDelDia(fechaInicio, fechaFin)}
+            disabled={loading}
+            className="px-6 py-2 mt-3 sm:mt-5 bg-yellow-500 text-white rounded-md disabled:opacity-50 disabled:cursor-not-allowed shadow hover:bg-yellow-600 transition flex items-center gap-2 font-bold"
+          >
+            Filtrar
+          </button>
+        </div>
+      )}
+
       {error && <p className="mt-4 text-red-600 text-center">{error}</p>}
       {loading ? (
         <div className="flex justify-center items-cente">

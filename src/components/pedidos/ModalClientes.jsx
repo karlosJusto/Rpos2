@@ -65,23 +65,20 @@ const ModalClientes = ({ show, handleClose, onSave, initialData,clearClientData 
       // Assuming 'clientes' collection has fields: cliente, telefono, img_perfil, maybe observaciones?
       const clientesList = clientesSnapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
       setClientes(clientesList);
-      setFilteredClientes(clientesList);
+      setFilteredClientes([]); // Inicia la lista vacía
     };
 
     fetchClientes();
   }, []);
 
-  // Función para filtrar los clientes
+  // Función para filtrar los clientes solo por teléfono
   const filtrarClientes = (term) => {
     if (!term) {
-      setFilteredClientes(clientes);
+      setFilteredClientes([]);
     } else {
-      const termLower = term.toLowerCase();
       const clientesFiltrados = clientes.filter((cliente) => {
-        // Use 'cliente' field for name search based on your data structure
-        const nombre = cliente.cliente ? cliente.cliente.toLowerCase() : '';
         const telefono = cliente.telefono ? cliente.telefono.toString() : ''; 
-        return nombre.includes(termLower) || telefono.startsWith(term);
+        return telefono.startsWith(term);
       });
       setFilteredClientes(clientesFiltrados);
     }
@@ -95,8 +92,8 @@ const ModalClientes = ({ show, handleClose, onSave, initialData,clearClientData 
       [name]: value,
     }));
 
-    // Filtrar clientes solo si el input es 'cliente' o 'telefono'
-    if (name === 'cliente' || name === 'telefono') {
+    // Filtrar clientes solo si el input es 'telefono'
+    if (name === 'telefono') {
       filtrarClientes(value);
     }
   };
@@ -128,7 +125,7 @@ const ModalClientes = ({ show, handleClose, onSave, initialData,clearClientData 
       celiaco: false,
       img_perfil: "",
     });
-    setFilteredClientes(clientes); // Reset filtered list
+    setFilteredClientes([]); // Reset filtered list
     handleClose();
   };
 
@@ -154,15 +151,15 @@ const ModalClientes = ({ show, handleClose, onSave, initialData,clearClientData 
             <div className="form-floating w-[25vw]">
               <input
                 type="text"
-                className="form-control border-2 border-gray-200 font-nunito font-extrabold focus:border-yellow-500 focus:ring-0"
-                id="cliente" // Changed id to match name
+                className="form-control border-2 border-gray-200 font-nunito font-extrabold bg-gray-100 cursor-not-allowed text-gray-500 focus:ring-0"
+                id="cliente"
                 placeholder="Nombre"
-                value={formData.cliente} // Removed toLocaleLowerCase here, handle case in filtering/saving if needed
-                onChange={handleInputChange}
+                value={formData.cliente}
+                readOnly // Deshabilitado como se solicitó
                 name="cliente"
               />
-              <label className="text-gray-500 font-extrabold" htmlFor="cliente"> {/* Changed htmlFor */}
-                Nombre
+              <label className="text-gray-500 font-extrabold" htmlFor="cliente">
+                Nombre (Autorellenado)
               </label>
             </div>
             {/* Input Telefono */}
@@ -188,11 +185,14 @@ const ModalClientes = ({ show, handleClose, onSave, initialData,clearClientData 
           {/* Lista de clientes con scroll */}
           <div className="max-h-40 overflow-y-auto mt-1">
             {filteredClientes.length > 0 ? (
-              filteredClientes.map((cliente, index) => (
+              filteredClientes.map((cliente, index) => {
+                const isSelectable = formData.telefono.length >= 7;
+                return (
                 <div
                   key={index} // Consider using cliente.id if available and unique
-                  className="py-2 px-4 cursor-pointer hover:bg-gray-100" // Kept hover effect as it was likely intended
+                  className={`py-2 px-4 ${isSelectable ? 'cursor-pointer hover:bg-gray-100' : 'cursor-not-allowed opacity-50'}`}
                   onClick={() => {
+                    if (!isSelectable) return;
                     // Update only client-specific fields, keep order-specific fields from formData
                     setFormData(prevFormData => ({
                       ...prevFormData, // Keep existing fechahora, observaciones, pagado, celiaco
@@ -203,7 +203,7 @@ const ModalClientes = ({ show, handleClose, onSave, initialData,clearClientData 
                       //observaciones: cliente.observaciones || prevFormData.observaciones,
                          observaciones: cliente.observaciones || '', // Si el nuevo cliente no tiene obs, limpiar las anteriores
                     }));
-                    setFilteredClientes(clientes); // Hide list after selection
+                    setFilteredClientes([]); // Hide list after selection
                   }}>
                   <div className="px-[3vw]  mt-[1vh]"> {/* Adjusted margin */}
                     <div className="grid grid-cols-2 text-center h-auto"> {/* Adjusted height */}
@@ -213,10 +213,11 @@ const ModalClientes = ({ show, handleClose, onSave, initialData,clearClientData 
                     </div>
                   </div>
                 </div>
-              ))
+                );
+              })
             ) : (
-              // Show message only if a search term exists and yields no results
-              (formData.cliente || formData.telefono) && <p className='text-center mt-4 font-nunito text-red-500'>No hay coincidencias</p>
+              // Show message only if a search term exists, is incomplete, and no client is selected
+              (formData.telefono && formData.telefono.length < 9 && !formData.cliente) && <p className='text-center mt-4 font-nunito text-red-500'>No hay coincidencias</p>
             )}
           </div>
 
@@ -296,7 +297,8 @@ const ModalClientes = ({ show, handleClose, onSave, initialData,clearClientData 
   <Button
     variant="primary"
     onClick={handleSubmitData}
-    className="bg-white text-yellow-500 border-yellow-500 hover:bg-yellow-600  hover:text-yellow-600 hover:border-yellow-600 p-2 font-nunito shadow-sm"
+    disabled={formData.telefono.length !== 9}
+    className="bg-white text-yellow-500 border-yellow-500 hover:bg-yellow-600  hover:text-yellow-600 hover:border-yellow-600 p-2 font-nunito shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
   >
     {initialData.cliente ? "Actualizar" : "Agregar"}
   </Button>
