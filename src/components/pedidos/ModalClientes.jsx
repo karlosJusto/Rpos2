@@ -1,11 +1,13 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { Modal, Button } from 'react-bootstrap';
 import { collection, getDocs } from 'firebase/firestore';
+import { Pencil } from 'lucide-react';
 import { db } from '../firebase/firebase';
 import CalendarioDropdown from './CalendarioDropdown'; // Assuming CalendarioDropdown is preferred over Calendario
 
 // Added initialData prop to receive customer data when editing
 const ModalClientes = ({ show, handleClose, onSave, initialData,clearClientData }) => {
+  const [isNameEditable, setIsNameEditable] = useState(false);
   const [formData, setFormData] = useState({
     cliente: '',
     telefono: '',
@@ -29,7 +31,9 @@ const ModalClientes = ({ show, handleClose, onSave, initialData,clearClientData 
         celiaco: initialData.celiaco || false, // Keep celiaco status from the order
         img_perfil: initialData.img_perfil || '',
       });
+      setIsNameEditable(!initialData.cliente);
     } else if (!show) {
+      setIsNameEditable(false);
        // Optional: Reset form when modal is hidden (already handled by handleSubmitClose)
        // If you want it to reset *every time* it's hidden, uncomment below
        /*
@@ -87,15 +91,29 @@ const ModalClientes = ({ show, handleClose, onSave, initialData,clearClientData 
   // Manejador para actualizar el estado de los inputs (cliente y telefono)
   const handleInputChange = (e) => {
     const { name, value } = e.target;
+    if (name === 'telefono') {
+      const exactClient = clientes.find((cliente) => {
+        const telefono = cliente.telefono ? cliente.telefono.toString() : '';
+        return telefono === value;
+      });
+
+      setFormData((prevState) => ({
+        ...prevState,
+        telefono: value,
+        cliente: exactClient ? exactClient.cliente || '' : prevState.cliente,
+        img_perfil: exactClient ? exactClient.img_perfil || '' : prevState.img_perfil,
+        observaciones: exactClient ? exactClient.observaciones || '' : prevState.observaciones,
+      }));
+      filtrarClientes(value);
+      if (exactClient) setFilteredClientes([]);
+      setIsNameEditable((prevIsNameEditable) => exactClient ? false : prevIsNameEditable || value.length === 9);
+      return;
+    }
+
     setFormData((prevState) => ({
       ...prevState,
       [name]: value,
     }));
-
-    // Filtrar clientes solo si el input es 'telefono'
-    if (name === 'telefono') {
-      filtrarClientes(value);
-    }
   };
 
   // Manejador para actualizar el estado de los checkboxes
@@ -126,16 +144,17 @@ const ModalClientes = ({ show, handleClose, onSave, initialData,clearClientData 
       img_perfil: "",
     });
     setFilteredClientes([]); // Reset filtered list
+    setIsNameEditable(false);
     handleClose();
   };
-
-  const clienteYaSeleccionado = formData.cliente.trim() !== '' || formData.telefono.trim() !== '';
 
   const exactMatchExists = clientes.some((cliente) => {
     const telefono = cliente.telefono ? cliente.telefono.toString() : '';
     return telefono === formData.telefono;
   });
   const isNewClient = formData.telefono.length === 9 && !exactMatchExists;
+  const canEditName = formData.telefono.length === 9 || formData.cliente.trim() !== '';
+  const isNameInputEditable = isNewClient || isNameEditable;
 
 
   return (
@@ -153,21 +172,33 @@ const ModalClientes = ({ show, handleClose, onSave, initialData,clearClientData 
         <Modal.Body>
           <div className="bg-white rounded-lg flex justify-around gap-3 appearance-none px-[3vw] -mt-3 ">
             {/* Input Cliente */}
-            <div className="form-floating w-[25vw]">
+            <div className="form-floating w-[25vw] relative">
               <input
                 type="text"
-                className={`form-control border-2 border-gray-200 font-nunito font-extrabold focus:ring-0 ${
-                  isNewClient ? 'bg-white focus:border-yellow-500' : 'bg-gray-100 cursor-not-allowed text-gray-500'
+                className={`form-control border-2 border-gray-200 font-nunito font-extrabold focus:ring-0 pr-12 ${
+                  isNameInputEditable ? 'bg-white focus:border-yellow-500' : 'bg-gray-100 text-gray-500'
                 }`}
                 id="cliente"
                 placeholder="Nombre"
                 value={formData.cliente}
                 onChange={handleInputChange}
-                readOnly={!isNewClient}
+                readOnly={!isNameInputEditable}
                 name="cliente"
               />
+              {canEditName && (
+                <button
+                  type="button"
+                  onClick={() => setIsNameEditable(true)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-yellow-600 disabled:opacity-40"
+                  aria-label="Editar nombre del cliente"
+                  title="Editar nombre"
+                  disabled={isNameInputEditable}
+                >
+                  <Pencil size={18} strokeWidth={2.5} />
+                </button>
+              )}
               <label className="text-gray-500 font-extrabold" htmlFor="cliente">
-                {isNewClient ? "Nombre (Nuevo Cliente)" : "Nombre (Autorellenado)"}
+                {isNewClient ? "Nombre (Nuevo Cliente)" : "Nombre"}
               </label>
             </div>
             {/* Input Telefono */}
@@ -212,6 +243,7 @@ const ModalClientes = ({ show, handleClose, onSave, initialData,clearClientData 
                          observaciones: cliente.observaciones || '', // Si el nuevo cliente no tiene obs, limpiar las anteriores
                     }));
                     setFilteredClientes([]); // Hide list after selection
+                    setIsNameEditable(false);
                   }}>
                   <div className="px-[3vw]  mt-[1vh]"> {/* Adjusted margin */}
                     <div className="grid grid-cols-2 text-center h-auto"> {/* Adjusted height */}
@@ -305,7 +337,7 @@ const ModalClientes = ({ show, handleClose, onSave, initialData,clearClientData 
   <Button
     variant="primary"
     onClick={handleSubmitData}
-    disabled={formData.telefono.length !== 9 || (isNewClient && formData.cliente.trim() === '')}
+    disabled={formData.telefono.length !== 9 || formData.cliente.trim() === ''}
     className="bg-white text-yellow-500 border-yellow-500 hover:bg-yellow-600  hover:text-yellow-600 hover:border-yellow-600 p-2 font-nunito shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
   >
     {initialData.cliente ? "Actualizar" : "Agregar"}

@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { db } from '../firebase/firebase';
-import { collection, doc, getDoc, getDocs, writeBatch, query, orderBy, limit } from 'firebase/firestore';
+import { collection, doc, getDoc, getDocs, writeBatch, query, where } from 'firebase/firestore';
 import Table from 'react-bootstrap/Table';
 import dayjs from 'dayjs';
 import 'dayjs/locale/es';
@@ -25,7 +25,6 @@ const PolloDetallo = () => {
   const [rawFirestoreData, setRawFirestoreData] = useState({});
   const [rawSalesData, setRawSalesData] = useState({});
   const [pendingOrders, setPendingOrders] = useState(0);
-  const [pendingOrdersByDay, setPendingOrdersByDay] = useState({});
 
   const buildWeekDays = useCallback((offset) => {
     const targetDate = dayjs().add(offset, 'week');
@@ -65,6 +64,28 @@ const PolloDetallo = () => {
     return datosCorregidos;
   }, []);
 
+  const calcularPollosPedido = useCallback((pedido) => {
+    if (!pedido?.productos || !Array.isArray(pedido.productos)) {
+      return 0;
+    }
+
+    return pedido.productos.reduce((total, producto) => {
+      const cantidad = Number(producto.cantidad) || 0;
+      if (cantidad <= 0) return total;
+
+      const productId = Number(producto.id);
+      const nombre = (producto.nombre || producto.name || producto.alias || '').toLowerCase();
+
+      if (nombre.includes('gratis')) return total;
+      if (productId === 1 || nombre.includes('menú pollo entero')) return total + cantidad;
+      if ([2, 39, 40].includes(productId) || nombre.includes('medio pollo') || nombre.includes('menú pollo')) {
+        return total + (cantidad * 0.5);
+      }
+
+      return total;
+    }, 0);
+  }, []);
+
   const loadThreeWeekWindow = useCallback(async () => {
     const previousWeekDays = buildWeekDays(MIN_WEEK_OFFSET);
     const currentWeekDays = buildWeekDays(0);
@@ -73,9 +94,12 @@ const PolloDetallo = () => {
     const anchorDay = dayjs(firstDay, 'DD-MM-YYYY').subtract(1, 'day').format('DD-MM-YYYY');
     const allDays = [...new Set([anchorDay, ...previousWeekDays, ...currentWeekDays, ...nextWeekDays])];
 
-    const [estadisticasDocs, ventasDocs] = await Promise.all([
+    const [estadisticasDocs, pedidosDocs] = await Promise.all([
       Promise.all(allDays.map((dia) => getDoc(doc(db, 'estadisticas_diarias', dia)))),
-      Promise.all(allDays.map((dia) => getDoc(doc(db, 'estadisticas_diarias2', dia)))),
+      Promise.all(allDays.map((dia) => {
+        const pedidosQuery = query(collection(db, 'pedidos'), where('fecha_filtro', '==', dia));
+        return getDocs(pedidosQuery);
+      })),
     ]);
 
     const statsByDay = {};
@@ -83,16 +107,18 @@ const PolloDetallo = () => {
 
     allDays.forEach((dia, index) => {
       const estadisticaDoc = estadisticasDocs[index];
-      const ventaDoc = ventasDocs[index];
+      const pedidosSnapshot = pedidosDocs[index];
 
       statsByDay[dia] = estadisticaDoc.exists() ? estadisticaDoc.data() : null;
-      salesByDay[dia] = ventaDoc.exists() ? (ventaDoc.data().vd || 0) : 0;
+      salesByDay[dia] = pedidosSnapshot.docs.reduce((total, pedidoDoc) => {
+        return total + calcularPollosPedido(pedidoDoc.data());
+      }, 0);
     });
 
     return { statsByDay, salesByDay };
-  }, [buildWeekDays]);
+  }, [buildWeekDays, calcularPollosPedido]);
 
-  const processDataForView = useCallback((rawData, ventasData, offset, pendingByDay = {}) => {
+  const processDataForView = useCallback((rawData, ventasData, offset) => {
     const daysToGenerate = buildWeekDays(offset);
     const startOfView = dayjs(daysToGenerate[0], 'DD-MM-YYYY');
     const dayBeforeStart = startOfView.subtract(1, 'day').format('DD-MM-YYYY');
@@ -161,11 +187,26 @@ const PolloDetallo = () => {
 
     const datosConVentas = datosParaMostrar.map((item) => ({
       ...item,
-      vd: (ventasData[item.dia] || 0) + (pendingByDay[item.dia] || 0),
+      vd: ventasData[item.dia] || 0,
     }));
 
     const datosRecalculados = recalcularCadenaDeStock(datosConVentas, stockDeArranque);
     setEstadisticas(datosRecalculados);
+
+    if (offset === 0) {
+      const tomorrow = dayjs().add(1, 'day').startOf('day');
+      const endOfWeek = dayjs().endOf('isoWeek');
+      const totalPendiente = daysToGenerate.reduce((total, diaStr) => {
+        const dia = dayjs(diaStr, 'DD-MM-YYYY');
+        if (dia.isBetween(tomorrow, endOfWeek, 'day', '[]')) {
+          return total + (ventasData[diaStr] || 0);
+        }
+        return total;
+      }, 0);
+      setPendingOrders(totalPendiente);
+    } else {
+      setPendingOrders(0);
+    }
   }, [buildWeekDays, recalcularCadenaDeStock]);
 
   useEffect(() => {
@@ -195,84 +236,15 @@ const PolloDetallo = () => {
   }, [loadThreeWeekWindow]);
 
   useEffect(() => {
-    if (weekOffset !== 0) {
-      setPendingOrders(0);
-      setPendingOrdersByDay({});
-      return;
-    }
-
-    const fetchPendingOrders = async () => {
-      try {
-        const pedidosRef = collection(db, "pedidos");
-        const pedidosQuery = query(pedidosRef, orderBy("NumeroPedido", "desc"), limit(1500));
-        const snapshot = await getDocs(pedidosQuery);
-        let totalPollo = 0;
-        const pendingByDayLocal = {};
-        const now = dayjs();
-        const endOfView = now.endOf('isoWeek');
-        const filterStart = now.add(1, 'day').startOf('day');
-
-        snapshot.forEach((pedidoDoc) => {
-          const data = pedidoDoc.data();
-          if (!data.fechahora) return;
-
-          const [datePart] = data.fechahora.split(' ');
-          if (!datePart) return;
-          const orderDate = dayjs(datePart, 'DD/MM/YYYY');
-
-          if (orderDate.isValid() && orderDate.isBetween(filterStart, endOfView, 'day', '[]')) {
-            if (data.productos && Array.isArray(data.productos)) {
-              let orderQty = 0;
-              data.productos.forEach((prod) => {
-                const cant = Number(prod.cantidad) || 0;
-                const lowerName = (prod.nombre || prod.alias || '').toLowerCase();
-
-                let qtyToAdd = 0;
-                if (prod.id === 1 || lowerName.includes('menú pollo entero')) {
-                  qtyToAdd = cant;
-                } else if ([2, 39, 40].includes(prod.id) || lowerName.includes('menú pollo') || lowerName.includes('medio pollo')) {
-                  qtyToAdd = (cant * 0.5);
-                }
-
-                if (qtyToAdd > 0) {
-                  orderQty += qtyToAdd;
-                }
-              });
-              
-              if (orderQty > 0) {
-                totalPollo += orderQty;
-                const dateKey = orderDate.format('DD-MM-YYYY');
-                pendingByDayLocal[dateKey] = (pendingByDayLocal[dateKey] || 0) + orderQty;
-              }
-            }
-          }
-        });
-
-        if (isMountedRef.current) {
-          setPendingOrders(totalPollo);
-          setPendingOrdersByDay(pendingByDayLocal);
-        }
-      } catch (error) {
-        console.error("Error al obtener encargos pendientes:", error);
-        if (isMountedRef.current) {
-          setPendingOrders(0);
-        }
-      }
-    };
-
-    fetchPendingOrders();
-  }, [weekOffset]);
-
-  useEffect(() => {
     if (Object.keys(rawFirestoreData).length === 0) {
       return;
     }
 
-    processDataForView(rawFirestoreData, rawSalesData, weekOffset, pendingOrdersByDay);
+    processDataForView(rawFirestoreData, rawSalesData, weekOffset);
     if (isMountedRef.current) {
       setLoading(false);
     }
-  }, [rawFirestoreData, rawSalesData, weekOffset, pendingOrdersByDay, processDataForView]);
+  }, [rawFirestoreData, rawSalesData, weekOffset, processDataForView]);
 
 
   const handleInputChange = (e, dia, campo) => {
